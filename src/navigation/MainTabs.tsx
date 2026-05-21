@@ -11,6 +11,12 @@ import ContactsScreen from '../screens/contacts/ContactsScreen';
 import NewFriendsScreen from '../screens/contacts/NewFriendsScreen';
 import UserProfileScreen from '../screens/contacts/UserProfileScreen';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
+import ChannelsScreen from '../screens/discover/ChannelsScreen';
+import ChannelDetailScreen from '../screens/discover/ChannelDetailScreen';
+import CreateChannelScreen from '../screens/discover/CreateChannelScreen';
+import ComposePostScreen from '../screens/discover/ComposePostScreen';
+import MomentsScreen from '../screens/discover/MomentsScreen';
+import ComposeMomentScreen from '../screens/discover/ComposeMomentScreen';
 import MeScreen from '../screens/me/MeScreen';
 import ProfileEditScreen from '../screens/me/ProfileEditScreen';
 import { colors, fontSize } from '../utils/theme';
@@ -81,6 +87,70 @@ const ContactsStackScreen = () => (
   </ContactsStack.Navigator>
 );
 
+// ── Discover tab stack ──────────────────────────────────────────────
+const DiscoverStack = createStackNavigator();
+const DiscoverStackScreen = () => (
+  <DiscoverStack.Navigator screenOptions={stackScreenOptions}>
+    <DiscoverStack.Screen
+      name="DiscoverMenu"
+      component={DiscoverScreen as any}
+      options={{ title: 'Discover' }}
+    />
+    <DiscoverStack.Screen
+      name="Channels"
+      component={ChannelsScreen as any}
+      options={({ navigation }) => ({
+        title: 'Channels',
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CreateChannel')}
+            activeOpacity={0.7}
+            style={{ paddingRight: 16 }}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        ),
+      })}
+    />
+    <DiscoverStack.Screen
+      name="ChannelDetail"
+      component={ChannelDetailScreen as any}
+      options={{ title: 'Channel' }}
+    />
+    <DiscoverStack.Screen
+      name="CreateChannel"
+      component={CreateChannelScreen as any}
+      options={{ title: 'New Channel' }}
+    />
+    <DiscoverStack.Screen
+      name="ComposePost"
+      component={ComposePostScreen as any}
+      options={{ title: 'New Post' }}
+    />
+    <DiscoverStack.Screen
+      name="Moments"
+      component={MomentsScreen as any}
+      options={({ navigation }) => ({
+        title: 'Moments',
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ComposeMoment')}
+            activeOpacity={0.7}
+            style={{ paddingRight: 16 }}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        ),
+      })}
+    />
+    <DiscoverStack.Screen
+      name="ComposeMoment"
+      component={ComposeMomentScreen as any}
+      options={{ title: 'New Moment' }}
+    />
+  </DiscoverStack.Navigator>
+);
+
 // ── Me tab stack ─────────────────────────────────────────────────────
 const MeStack = createStackNavigator();
 const MeStackScreen = () => (
@@ -117,7 +187,7 @@ const MainTabs = () => (
         let iconName: keyof typeof Ionicons.glyphMap = 'chatbubbles';
         if (route.name === 'ChatsTab') iconName = 'chatbubbles';
         else if (route.name === 'ContactsTab') iconName = 'people';
-        else if (route.name === 'Discover') iconName = 'compass';
+        else if (route.name === 'DiscoverTab') iconName = 'compass';
         else if (route.name === 'MeTab') iconName = 'person-circle';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
@@ -133,7 +203,11 @@ const MainTabs = () => (
       component={ContactsStackScreen}
       options={{ headerShown: false, tabBarLabel: 'Contacts' }}
     />
-    <Tab.Screen name="Discover" component={DiscoverScreen} />
+    <Tab.Screen
+      name="DiscoverTab"
+      component={DiscoverStackScreen}
+      options={{ headerShown: false, tabBarLabel: 'Discover' }}
+    />
     <Tab.Screen
       name="MeTab"
       component={MeStackScreen}

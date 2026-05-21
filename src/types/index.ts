@@ -129,3 +129,85 @@ export interface SendFriendRequestResponse {
   requestId?: string;
   message?: string;
 }
+
+// ── Channels ──
+
+export interface ChannelOwner {
+  _id: string;
+  displayName: string;
+  username: string;
+  avatar?: string;
+}
+
+export interface Channel {
+  _id: string;
+  name: string;
+  description: string;
+  avatar: string;
+  owner: ChannelOwner;
+  subscriberCount: number;
+  isSubscribed: boolean;
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastPostAt?: string;
+}
+
+export interface ChannelPostAttachment {
+  url: string;
+  type: 'image' | 'video';
+  width?: number;
+  height?: number;
+}
+
+export interface ChannelPost {
+  _id: string;
+  channel: string;
+  author: ChannelOwner;
+  content: string;
+  attachments: ChannelPostAttachment[];
+  likes: string[];
+  commentCount: number;
+  createdAt: string;
+}
+
+export interface ChannelComment {
+  _id: string;
+  post: string;
+  author: ChannelOwner;
+  content: string;
+  createdAt: string;
+}
+
+// ── Moments ──
+
+export interface MomentAttachment {
+  url: string;
+  type: 'image' | 'video';
+  width?: number;
+  height?: number;
+}
+
+export interface MomentAuthor {
+  _id: string;
+  displayName: string;
+  username: string;
+  avatar?: string;
+}
+
+export interface MomentComment {
+  _id: string;
+  author: MomentAuthor;
+  content: string;
+  createdAt: string;
+}
+
+export interface Moment {
+  _id: string;
+  author: MomentAuthor;
+  content: string;
+  attachments: MomentAttachment[];
+  likes: string[];
+  comments: MomentComment[];
+  createdAt: string;
+}
