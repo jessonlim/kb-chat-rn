@@ -1,6 +1,16 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
+import AudioPlayer from './AudioPlayer';
 import type { Message, User } from '../../types';
 
 interface Props {
@@ -8,6 +18,7 @@ interface Props {
   isOwn: boolean;
   showSenderName?: boolean;
   onLongPress?: (message: Message) => void;
+  onImagePress?: (uri: string) => void;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -17,8 +28,8 @@ const formatTime = (dateStr: string): string => {
 
 const statusIcon = (status: Message['status']): string => {
   switch (status) {
-    case 'sending': return '⏳';
-    case 'failed': return '❌';
+    case 'sending': return '...';
+    case 'failed': return '!';
     case 'sent': return '✓';
     case 'delivered': return '✓✓';
     case 'read': return '✓✓';
@@ -26,7 +37,182 @@ const statusIcon = (status: Message['status']): string => {
   }
 };
 
-const MessageBubble = ({ message, isOwn, showSenderName, onLongPress }: Props) => {
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// ── Sub-components for media types ────────────────────────────────────
+
+const ImageAttachment = ({
+  url,
+  isOwn,
+  onPress,
+}: {
+  url: string;
+  isOwn: boolean;
+  onPress?: (uri: string) => void;
+}) => {
+  const { uri, loading } = useMediaUrl(url);
+
+  if (loading || !uri) {
+    return (
+      <View style={imgStyles.placeholder}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => onPress?.(uri)}
+      style={imgStyles.wrapper}
+    >
+      <Image source={{ uri }} style={imgStyles.image} resizeMode="cover" />
+    </TouchableOpacity>
+  );
+};
+
+const imgStyles = StyleSheet.create({
+  wrapper: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  image: {
+    width: 220,
+    height: 180,
+    borderRadius: borderRadius.md,
+  },
+  placeholder: {
+    width: 220,
+    height: 180,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+const VideoAttachment = ({
+  url,
+  isOwn,
+}: {
+  url: string;
+  isOwn: boolean;
+}) => {
+  const { uri, loading } = useMediaUrl(url);
+
+  return (
+    <View style={vidStyles.wrapper}>
+      {loading || !uri ? (
+        <View style={vidStyles.placeholder}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : (
+        <View style={vidStyles.placeholder}>
+          {/* Video thumbnail — we show a play overlay on a dark bg */}
+          <Image source={{ uri }} style={vidStyles.thumb} resizeMode="cover" />
+          <View style={vidStyles.playOverlay}>
+            <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.85)" />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const vidStyles = StyleSheet.create({
+  wrapper: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  placeholder: {
+    width: 220,
+    height: 160,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumb: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: borderRadius.md,
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+});
+
+const FileAttachment = ({
+  name,
+  size,
+  isOwn,
+}: {
+  name: string;
+  size: number;
+  isOwn: boolean;
+}) => {
+  return (
+    <View style={fileStyles.row}>
+      <View style={[fileStyles.iconBox, isOwn ? fileStyles.iconBoxOwn : fileStyles.iconBoxOther]}>
+        <Ionicons name="document-outline" size={22} color={isOwn ? colors.bubbleSent : colors.primary} />
+      </View>
+      <View style={fileStyles.info}>
+        <Text style={fileStyles.name} numberOfLines={1}>
+          {name || 'File'}
+        </Text>
+        {size > 0 && <Text style={fileStyles.size}>{formatFileSize(size)}</Text>}
+      </View>
+    </View>
+  );
+};
+
+const fileStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBoxOwn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  iconBoxOther: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  info: {
+    flex: 1,
+  },
+  name: {
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  size: {
+    fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 1,
+  },
+});
+
+// ── Main bubble ───────────────────────────────────────────────────────
+
+const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePress }: Props) => {
   const sender = typeof message.sender === 'object' ? message.sender : null;
 
   const handleLongPress = () => {
@@ -57,6 +243,10 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress }: Props) =
 
   // Reply preview
   const replyTo = message.replyTo;
+  const attachment = message.attachments?.[0];
+
+  // For media messages, use a slightly wider bubble
+  const isMedia = message.type === 'image' || message.type === 'video';
 
   return (
     <TouchableOpacity
@@ -65,7 +255,13 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress }: Props) =
       delayLongPress={300}
       style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}
     >
-      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+      <View
+        style={[
+          styles.bubble,
+          isOwn ? styles.bubbleOwn : styles.bubbleOther,
+          isMedia && styles.mediaBubble,
+        ]}
+      >
         {/* Sender name in group chats */}
         {showSenderName && sender && !isOwn && (
           <Text style={styles.senderName}>
@@ -82,25 +278,34 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress }: Props) =
                 : 'User'}
             </Text>
             <Text style={styles.replyContent} numberOfLines={1}>
-              {replyTo.content || (replyTo.type === 'image' ? '📷 Photo' : '📎 Attachment')}
+              {replyTo.content || (replyTo.type === 'image' ? 'Photo' : 'Attachment')}
             </Text>
           </View>
         )}
 
-        {/* Media placeholder — will be built in Phase 4 */}
-        {message.type === 'image' && message.attachments?.[0] && (
-          <Text style={styles.mediaPlaceholder}>📷 [Image — Phase 4]</Text>
+        {/* ── Media content ── */}
+        {message.type === 'image' && attachment && (
+          <ImageAttachment
+            url={attachment.url}
+            isOwn={isOwn}
+            onPress={onImagePress}
+          />
         )}
-        {message.type === 'video' && (
-          <Text style={styles.mediaPlaceholder}>🎥 [Video — Phase 4]</Text>
+
+        {message.type === 'video' && attachment && (
+          <VideoAttachment url={attachment.url} isOwn={isOwn} />
         )}
-        {message.type === 'audio' && (
-          <Text style={styles.mediaPlaceholder}>🎤 [Voice — Phase 4]</Text>
+
+        {message.type === 'audio' && attachment && (
+          <AudioPlayer url={attachment.url} isOwn={isOwn} />
         )}
-        {message.type === 'file' && (
-          <Text style={styles.mediaPlaceholder}>
-            📎 {message.attachments?.[0]?.name || 'File'}
-          </Text>
+
+        {message.type === 'file' && attachment && (
+          <FileAttachment
+            name={attachment.name}
+            size={attachment.size}
+            isOwn={isOwn}
+          />
         )}
 
         {/* Text content */}
@@ -142,6 +347,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.lg,
   },
+  mediaBubble: {
+    paddingHorizontal: spacing.xs,
+    paddingTop: spacing.xs,
+  },
   bubbleOwn: {
     backgroundColor: colors.bubbleSent,
     borderBottomRightRadius: 4,
@@ -163,6 +372,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primaryLight,
     marginBottom: 2,
+    paddingHorizontal: spacing.sm,
   },
   replyBar: {
     borderLeftWidth: 3,
@@ -170,6 +380,7 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm,
     marginBottom: spacing.xs,
     opacity: 0.8,
+    marginHorizontal: spacing.sm,
   },
   replyName: {
     fontSize: fontSize.xs,
@@ -180,14 +391,10 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textSecondary,
   },
-  mediaPlaceholder: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    paddingVertical: spacing.xs,
-  },
   content: {
     fontSize: fontSize.md,
     lineHeight: 20,
+    paddingHorizontal: spacing.sm,
   },
   contentOwn: {
     color: colors.bubbleSentText,
@@ -201,6 +408,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 4,
     marginTop: 2,
+    paddingHorizontal: spacing.sm,
   },
   edited: {
     fontSize: 10,

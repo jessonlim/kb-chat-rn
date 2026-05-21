@@ -16,8 +16,11 @@ import { useAuth } from '../../stores/authStore';
 import MessageBubble from '../../components/chat/MessageBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import MessageActions, { type MessageAction } from '../../components/chat/MessageActions';
+import AttachmentMenu from '../../components/chat/AttachmentMenu';
+import VoiceRecorder from '../../components/chat/VoiceRecorder';
+import ImageViewer from '../../components/chat/ImageViewer';
 import { colors, spacing, fontSize } from '../../utils/theme';
-import type { Chat, Message, User, SendMessageAck } from '../../types';
+import type { Chat, Message, User, Attachment, SendMessageAck } from '../../types';
 
 interface Props {
   route: { params: { chatId: string } };
@@ -56,6 +59,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [showActions, setShowActions] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editMessage, setEditMessage] = useState<Message | null>(null);
+
+  // Phase 4: media state
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
 
   // Load chat info + initial messages
   useEffect(() => {
@@ -286,7 +294,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
     };
   }, [chatId, user?.id]);
 
-  // Send message via socket
+  // Send text message via socket
   const handleSend = useCallback(
     (text: string) => {
       const socket = socketService.getSocket();
@@ -340,6 +348,73 @@ const ChatScreen = ({ route, navigation }: Props) => {
       );
     },
     [chatId, user, replyTo]
+  );
+
+  // ── Phase 4: Send attachment (image/video/audio/file) via socket ──
+  const handleSendAttachment = useCallback(
+    (type: 'image' | 'video' | 'audio' | 'file', attachments: Attachment[]) => {
+      const socket = socketService.getSocket();
+      if (!socket) return;
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const optimistic: Message = {
+        _id: tempId,
+        chat: chatId,
+        sender: user as User,
+        content: '',
+        type,
+        attachments,
+        readBy: [],
+        status: 'sending',
+        edited: false,
+        deleted: false,
+        replyTo: replyTo || undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
+
+      if (replyTo) setReplyTo(null);
+
+      socket.emit(
+        'send_message',
+        {
+          chatId,
+          content: '',
+          type,
+          attachments: attachments.map((a) => ({
+            url: a.url,
+            type: a.type,
+            name: a.name,
+            size: a.size,
+          })),
+          ...(replyTo ? { replyTo: replyTo._id } : {}),
+        },
+        (ack: SendMessageAck) => {
+          if (ack.ok && ack.message) {
+            setMessages((prev) =>
+              prev.map((m) => (m._id === tempId ? ack.message! : m))
+            );
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m._id === tempId ? { ...m, status: 'failed' as const } : m
+              )
+            );
+          }
+        }
+      );
+    },
+    [chatId, user, replyTo]
+  );
+
+  // Voice message send handler (from VoiceRecorder)
+  const handleVoiceSend = useCallback(
+    (attachments: Attachment[]) => {
+      setShowVoiceRecorder(false);
+      handleSendAttachment('audio', attachments);
+    },
+    [handleSendAttachment]
   );
 
   // Edit message via socket
@@ -443,6 +518,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
     setShowActions(true);
   }, []);
 
+  // Image tap handler — open fullscreen viewer
+  const handleImagePress = useCallback((uri: string) => {
+    setViewerImage(uri);
+  }, []);
+
   // Handle action selection
   const handleAction = useCallback(
     (action: MessageAction) => {
@@ -523,6 +603,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
             isOwn={isOwnMessage(item)}
             showSenderName={isGroup}
             onLongPress={handleLongPress}
+            onImagePress={handleImagePress}
           />
         )}
         contentContainerStyle={styles.messageList}
@@ -553,16 +634,26 @@ const ChatScreen = ({ route, navigation }: Props) => {
         </View>
       )}
 
-      <MessageInput
-        onSend={handleSend}
-        onTypingStart={handleTypingStart}
-        onTypingStop={handleTypingStop}
-        replyTo={replyTo}
-        onCancelReply={() => setReplyTo(null)}
-        editMessage={editMessage}
-        onCancelEdit={() => setEditMessage(null)}
-        onSendEdit={handleSendEdit}
-      />
+      {/* Voice recorder replaces the normal input bar */}
+      {showVoiceRecorder ? (
+        <VoiceRecorder
+          onSend={handleVoiceSend}
+          onCancel={() => setShowVoiceRecorder(false)}
+        />
+      ) : (
+        <MessageInput
+          onSend={handleSend}
+          onTypingStart={handleTypingStart}
+          onTypingStop={handleTypingStop}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          editMessage={editMessage}
+          onCancelEdit={() => setEditMessage(null)}
+          onSendEdit={handleSendEdit}
+          onAttachPress={() => setShowAttachMenu(true)}
+          onMicPress={() => setShowVoiceRecorder(true)}
+        />
+      )}
 
       {/* Message action sheet */}
       <MessageActions
@@ -574,6 +665,20 @@ const ChatScreen = ({ route, navigation }: Props) => {
           setShowActions(false);
           setActionMessage(null);
         }}
+      />
+
+      {/* Attachment menu bottom sheet */}
+      <AttachmentMenu
+        visible={showAttachMenu}
+        onClose={() => setShowAttachMenu(false)}
+        onAttachmentReady={handleSendAttachment}
+      />
+
+      {/* Fullscreen image viewer */}
+      <ImageViewer
+        visible={!!viewerImage}
+        uri={viewerImage}
+        onClose={() => setViewerImage(null)}
       />
     </KeyboardAvoidingView>
   );

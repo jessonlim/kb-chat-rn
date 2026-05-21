@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
-import type { Message } from '../../types';
+import type { Message, Attachment } from '../../types';
 
 interface Props {
   onSend: (text: string) => void;
@@ -20,6 +20,8 @@ interface Props {
   editMessage?: Message | null;
   onCancelEdit?: () => void;
   onSendEdit?: (messageId: string, newContent: string) => void;
+  onAttachPress?: () => void;
+  onMicPress?: () => void;
 }
 
 const MessageInput = ({
@@ -31,6 +33,8 @@ const MessageInput = ({
   editMessage,
   onCancelEdit,
   onSendEdit,
+  onAttachPress,
+  onMicPress,
 }: Props) => {
   const [text, setText] = useState('');
   const typingRef = useRef(false);
@@ -169,8 +173,12 @@ const MessageInput = ({
 
       {/* Input row */}
       <View style={styles.container}>
-        {/* Attachment button — Phase 4 */}
-        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+        {/* Attachment button */}
+        <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
+          onPress={onAttachPress}
+        >
           <Ionicons name="add-circle-outline" size={26} color={colors.textMuted} />
         </TouchableOpacity>
 
@@ -194,7 +202,11 @@ const MessageInput = ({
             />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            onPress={onMicPress}
+          >
             <Ionicons name="mic-outline" size={26} color={colors.textMuted} />
           </TouchableOpacity>
         )}
