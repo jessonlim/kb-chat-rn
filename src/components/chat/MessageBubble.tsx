@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Message, User } from '../../types';
 
@@ -7,6 +7,7 @@ interface Props {
   message: Message;
   isOwn: boolean;
   showSenderName?: boolean;
+  onLongPress?: (message: Message) => void;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -25,8 +26,14 @@ const statusIcon = (status: Message['status']): string => {
   }
 };
 
-const MessageBubble = ({ message, isOwn, showSenderName }: Props) => {
+const MessageBubble = ({ message, isOwn, showSenderName, onLongPress }: Props) => {
   const sender = typeof message.sender === 'object' ? message.sender : null;
+
+  const handleLongPress = () => {
+    if (onLongPress && !message.deleted && message.type !== 'system') {
+      onLongPress(message);
+    }
+  };
 
   // System messages (user joined, etc.)
   if (message.type === 'system') {
@@ -42,7 +49,7 @@ const MessageBubble = ({ message, isOwn, showSenderName }: Props) => {
     return (
       <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
         <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther, styles.deleted]}>
-          <Text style={styles.deletedText}>🚫 This message was deleted</Text>
+          <Text style={styles.deletedText}>This message was deleted</Text>
         </View>
       </View>
     );
@@ -52,7 +59,12 @@ const MessageBubble = ({ message, isOwn, showSenderName }: Props) => {
   const replyTo = message.replyTo;
 
   return (
-    <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onLongPress={handleLongPress}
+      delayLongPress={300}
+      style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}
+    >
       <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
         {/* Sender name in group chats */}
         {showSenderName && sender && !isOwn && (
@@ -109,7 +121,7 @@ const MessageBubble = ({ message, isOwn, showSenderName }: Props) => {
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

@@ -7,13 +7,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Text,
+  Alert,
 } from 'react-native';
+import * as ExpoClipboard from 'expo-clipboard';
 import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
 import MessageBubble from '../../components/chat/MessageBubble';
 import MessageInput from '../../components/chat/MessageInput';
-import Avatar from '../../components/common/Avatar';
+import MessageActions, { type MessageAction } from '../../components/chat/MessageActions';
 import { colors, spacing, fontSize } from '../../utils/theme';
 import type { Chat, Message, User, SendMessageAck } from '../../types';
 
@@ -21,6 +23,22 @@ interface Props {
   route: { params: { chatId: string } };
   navigation: any;
 }
+
+const formatLastSeen = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1) return 'last seen just now';
+  if (diffMin < 60) return `last seen ${diffMin}m ago`;
+  if (diffHr < 24) return `last seen ${diffHr}h ago`;
+  if (diffDay === 1) return 'last seen yesterday';
+  return `last seen ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+};
 
 const ChatScreen = ({ route, navigation }: Props) => {
   const { chatId } = route.params;
@@ -33,6 +51,12 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
+  // Message actions state
+  const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  const [showActions, setShowActions] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editMessage, setEditMessage] = useState<Message | null>(null);
+
   // Load chat info + initial messages
   useEffect(() => {
     const init = async () => {
@@ -44,17 +68,6 @@ const ChatScreen = ({ route, navigation }: Props) => {
         setChat(chatRes.chat);
         setMessages(msgRes.messages.reverse()); // API returns newest first
         if (msgRes.messages.length < 50) setHasMore(false);
-
-        // Set the header title
-        const c = chatRes.chat;
-        if (c.type === 'group') {
-          navigation.setOptions({ title: c.groupName || 'Group' });
-        } else {
-          const other = c.participants.find((p: User) => p.id !== user?.id);
-          navigation.setOptions({
-            title: other?.displayName || other?.username || 'Chat',
-          });
-        }
       } catch (err) {
         console.warn('Failed to load chat:', err);
       } finally {
@@ -62,7 +75,88 @@ const ChatScreen = ({ route, navigation }: Props) => {
       }
     };
     init();
-  }, [chatId, navigation, user?.id]);
+  }, [chatId]);
+
+  // Set header with online status / member count
+  useEffect(() => {
+    if (!chat) return;
+
+    if (chat.type === 'group') {
+      const memberCount = chat.participants.length;
+      const onlineCount = chat.participants.filter((p) => p.isOnline).length;
+      navigation.setOptions({
+        headerTitle: () => (
+          <View style={styles.headerTitle}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {chat.groupName || 'Group'}
+            </Text>
+            <Text style={styles.headerSub}>
+              {memberCount} member{memberCount !== 1 ? 's' : ''}
+              {onlineCount > 0 ? ` · ${onlineCount} online` : ''}
+            </Text>
+          </View>
+        ),
+      });
+    } else {
+      const other = chat.participants.find((p: User) => p.id !== user?.id);
+      if (other) {
+        navigation.setOptions({
+          headerTitle: () => (
+            <View style={styles.headerTitle}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {other.displayName || other.username}
+              </Text>
+              <Text style={styles.headerSub}>
+                {other.isOnline ? 'online' : formatLastSeen(other.lastSeen)}
+              </Text>
+            </View>
+          ),
+        });
+      }
+    }
+  }, [chat, navigation, user?.id]);
+
+  // Update other user's online status from socket
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket || !chat) return;
+
+    const onOnline = (data: { userId: string }) => {
+      setChat((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.id === data.userId ? { ...p, isOnline: true } : p
+              ),
+            }
+          : prev
+      );
+    };
+
+    const onOffline = (data: { userId: string; lastSeen?: string }) => {
+      setChat((prev) =>
+        prev
+          ? {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.id === data.userId
+                  ? { ...p, isOnline: false, lastSeen: data.lastSeen || p.lastSeen }
+                  : p
+              ),
+            }
+          : prev
+      );
+    };
+
+    socket.on('user_online', onOnline);
+    socket.on('user_offline', onOffline);
+
+    return () => {
+      socket.off('user_online', onOnline);
+      socket.off('user_offline', onOffline);
+    };
+  }, [chat]);
 
   // Join socket room
   useEffect(() => {
@@ -148,6 +242,17 @@ const ChatScreen = ({ route, navigation }: Props) => {
       );
     };
 
+    const onReaction = (data: {
+      messageId: string;
+      reactions: Message['reactions'];
+    }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === data.messageId ? { ...m, reactions: data.reactions } : m
+        )
+      );
+    };
+
     const onTypingStart = (data: { userId: string; chatId: string }) => {
       if (data.chatId !== chatId || data.userId === user?.id) return;
       setTypingUsers((prev) =>
@@ -165,6 +270,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
     socket.on('message_edited', onMessageEdited);
     socket.on('messages_read', onMessagesRead);
     socket.on('message_status_updated', onStatusUpdated);
+    socket.on('message_reaction', onReaction);
     socket.on('typing_start', onTypingStart);
     socket.on('typing_stop', onTypingStop);
 
@@ -174,6 +280,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
       socket.off('message_edited', onMessageEdited);
       socket.off('messages_read', onMessagesRead);
       socket.off('message_status_updated', onStatusUpdated);
+      socket.off('message_reaction', onReaction);
       socket.off('typing_start', onTypingStart);
       socket.off('typing_stop', onTypingStop);
     };
@@ -198,14 +305,23 @@ const ChatScreen = ({ route, navigation }: Props) => {
         status: 'sending',
         edited: false,
         deleted: false,
+        replyTo: replyTo || undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
 
+      // Clear reply state
+      if (replyTo) setReplyTo(null);
+
       socket.emit(
         'send_message',
-        { chatId, content: text, type: 'text' },
+        {
+          chatId,
+          content: text,
+          type: 'text',
+          ...(replyTo ? { replyTo: replyTo._id } : {}),
+        },
         (ack: SendMessageAck) => {
           if (ack.ok && ack.message) {
             // Replace optimistic with real message
@@ -223,7 +339,78 @@ const ChatScreen = ({ route, navigation }: Props) => {
         }
       );
     },
-    [chatId, user]
+    [chatId, user, replyTo]
+  );
+
+  // Edit message via socket
+  const handleSendEdit = useCallback(
+    (messageId: string, newContent: string) => {
+      const socket = socketService.getSocket();
+      if (!socket) return;
+
+      socket.emit('edit_message', { messageId, content: newContent });
+
+      // Optimistic update
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId ? { ...m, content: newContent, edited: true } : m
+        )
+      );
+
+      setEditMessage(null);
+    },
+    []
+  );
+
+  // Delete message via socket
+  const handleDeleteMessage = useCallback(
+    (messageId: string) => {
+      const socket = socketService.getSocket();
+      if (!socket) return;
+
+      Alert.alert('Delete Message', 'Are you sure you want to delete this message?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            socket.emit('delete_message', { messageId });
+            // Optimistic update
+            setMessages((prev) =>
+              prev.map((m) =>
+                m._id === messageId ? { ...m, deleted: true, content: '' } : m
+              )
+            );
+          },
+        },
+      ]);
+    },
+    []
+  );
+
+  // Star/unstar message
+  const handleToggleStar = useCallback(
+    async (messageId: string) => {
+      try {
+        await chatService.toggleStar(chatId, messageId);
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m._id !== messageId) return m;
+            const starredBy = m.starredBy || [];
+            const isStarred = starredBy.includes(user?.id || '');
+            return {
+              ...m,
+              starredBy: isStarred
+                ? starredBy.filter((id) => id !== user?.id)
+                : [...starredBy, user?.id || ''],
+            };
+          })
+        );
+      } catch {
+        console.warn('Failed to toggle star');
+      }
+    },
+    [chatId, user?.id]
   );
 
   const handleTypingStart = useCallback(() => {
@@ -250,7 +437,67 @@ const ChatScreen = ({ route, navigation }: Props) => {
     }
   }, [chatId, loadingMore, hasMore, messages]);
 
+  // Long-press handler
+  const handleLongPress = useCallback((message: Message) => {
+    setActionMessage(message);
+    setShowActions(true);
+  }, []);
+
+  // Handle action selection
+  const handleAction = useCallback(
+    (action: MessageAction) => {
+      if (!actionMessage) return;
+      setShowActions(false);
+
+      switch (action) {
+        case 'reply':
+          setEditMessage(null);
+          setReplyTo(actionMessage);
+          break;
+
+        case 'copy':
+          ExpoClipboard.setStringAsync(actionMessage.content);
+          break;
+
+        case 'edit':
+          setReplyTo(null);
+          setEditMessage(actionMessage);
+          break;
+
+        case 'delete':
+          handleDeleteMessage(actionMessage._id);
+          break;
+
+        case 'star':
+          handleToggleStar(actionMessage._id);
+          break;
+
+        case 'forward':
+          // Forward — Phase 5+ (would navigate to a chat picker)
+          break;
+
+        case 'react':
+          // Quick reaction — for now emit a default reaction
+          const socket = socketService.getSocket();
+          if (socket) {
+            socket.emit('react_message', {
+              messageId: actionMessage._id,
+              emoji: '👍',
+            });
+          }
+          break;
+      }
+
+      setActionMessage(null);
+    },
+    [actionMessage, handleDeleteMessage, handleToggleStar]
+  );
+
   const isGroup = chat?.type === 'group';
+
+  const isOwnMessage = (msg: Message): boolean => {
+    return (typeof msg.sender === 'object' ? msg.sender.id : msg.sender) === user?.id;
+  };
 
   if (loading) {
     return (
@@ -273,11 +520,9 @@ const ChatScreen = ({ route, navigation }: Props) => {
         renderItem={({ item }) => (
           <MessageBubble
             message={item}
-            isOwn={
-              (typeof item.sender === 'object' ? item.sender.id : item.sender) ===
-              user?.id
-            }
+            isOwn={isOwnMessage(item)}
             showSenderName={isGroup}
+            onLongPress={handleLongPress}
           />
         )}
         contentContainerStyle={styles.messageList}
@@ -312,6 +557,23 @@ const ChatScreen = ({ route, navigation }: Props) => {
         onSend={handleSend}
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
+        editMessage={editMessage}
+        onCancelEdit={() => setEditMessage(null)}
+        onSendEdit={handleSendEdit}
+      />
+
+      {/* Message action sheet */}
+      <MessageActions
+        visible={showActions}
+        message={actionMessage}
+        isOwn={actionMessage ? isOwnMessage(actionMessage) : false}
+        onAction={handleAction}
+        onClose={() => {
+          setShowActions(false);
+          setActionMessage(null);
+        }}
       />
     </KeyboardAvoidingView>
   );
@@ -340,6 +602,19 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     fontStyle: 'italic',
+  },
+  headerTitle: {
+    alignItems: 'center',
+  },
+  headerName: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  headerSub: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    marginTop: 1,
   },
 });
 

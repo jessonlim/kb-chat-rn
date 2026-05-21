@@ -79,6 +79,11 @@ const chatService = {
     const { data } = await api.post(`/api/chats/${chatId}/mark-read`);
     return data;
   },
+
+  toggleStar: async (chatId: string, messageId: string): Promise<{ ok: boolean; starred: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/messages/${messageId}/star`);
+    return data;
+  },
 };
 
 export default chatService;

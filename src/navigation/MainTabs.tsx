@@ -1,26 +1,58 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import ChatListScreen from '../screens/chats/ChatListScreen';
 import ChatScreen from '../screens/chats/ChatScreen';
+import NewChatScreen from '../screens/chats/NewChatScreen';
+import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import MeScreen from '../screens/me/MeScreen';
 import { colors, fontSize } from '../utils/theme';
 
-// Chats tab has its own stack (list → chat)
+// Chats tab has its own stack (list → chat, new chat, create group)
 const ChatsStack = createStackNavigator();
 const ChatsStackScreen = () => (
   <ChatsStack.Navigator
     screenOptions={{
       headerStyle: { backgroundColor: colors.bgHeader },
       headerTintColor: colors.textPrimary,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
     }}
   >
-    <ChatsStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Chats' }} />
-    <ChatsStack.Screen name="ChatScreen" component={ChatScreen} options={{ title: 'Chat' }} />
+    <ChatsStack.Screen
+      name="ChatList"
+      component={ChatListScreen}
+      options={({ navigation }) => ({
+        title: 'Chats',
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('NewChat')}
+            activeOpacity={0.7}
+            style={{ paddingRight: 16 }}
+          >
+            <Ionicons name="create-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        ),
+      })}
+    />
+    <ChatsStack.Screen
+      name="ChatScreen"
+      component={ChatScreen as any}
+      options={{ title: 'Chat' }}
+    />
+    <ChatsStack.Screen
+      name="NewChat"
+      component={NewChatScreen as any}
+      options={{ title: 'New Chat' }}
+    />
+    <ChatsStack.Screen
+      name="CreateGroup"
+      component={CreateGroupScreen as any}
+      options={{ title: 'New Group' }}
+    />
   </ChatsStack.Navigator>
 );
 
