@@ -1,29 +1,114 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../stores/authStore';
+import Avatar from '../../components/common/Avatar';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
-const MeScreen = () => {
+interface Props {
+  navigation: any;
+}
+
+interface MenuItem {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress?: () => void;
+}
+
+const MeScreen = ({ navigation }: Props) => {
   const { user, logout } = useAuth();
 
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    ]);
+  };
+
+  const menuItems: MenuItem[] = [
+    {
+      icon: 'settings-outline',
+      label: 'Settings',
+    },
+    {
+      icon: 'star-outline',
+      label: 'Starred Messages',
+    },
+    {
+      icon: 'shield-checkmark-outline',
+      label: 'Account Security',
+    },
+    {
+      icon: 'information-circle-outline',
+      label: 'About',
+    },
+  ];
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Profile card */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>
-            {(user?.displayName || user?.username || '?')[0].toUpperCase()}
+      <TouchableOpacity
+        style={styles.profileCard}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('ProfileEdit')}
+      >
+        <Avatar
+          name={user?.displayName || user?.username || '?'}
+          src={user?.avatar}
+          size={72}
+        />
+        <View style={styles.profileInfo}>
+          <Text style={styles.displayName} numberOfLines={1}>
+            {user?.displayName || user?.username}
           </Text>
+          <Text style={styles.username} numberOfLines={1}>
+            @{user?.username}
+          </Text>
+          {user?.about ? (
+            <Text style={styles.about} numberOfLines={2}>
+              {user.about}
+            </Text>
+          ) : null}
         </View>
-        <Text style={styles.name}>{user?.displayName || user?.username}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
+
+      {/* Menu items */}
+      <View style={styles.menuSection}>
+        {menuItems.map((item, index) => (
+          <TouchableOpacity
+            key={item.label}
+            style={[
+              styles.menuRow,
+              index < menuItems.length - 1 && styles.menuRowBorder,
+            ]}
+            activeOpacity={0.7}
+            onPress={item.onPress}
+          >
+            <Ionicons name={item.icon} size={22} color={colors.textSecondary} />
+            <Text style={styles.menuLabel}>{item.label}</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.8}>
-        <Text style={styles.logoutText}>Sign Out</Text>
+      {/* Sign Out */}
+      <TouchableOpacity
+        style={styles.signOutButton}
+        activeOpacity={0.7}
+        onPress={handleSignOut}
+      >
+        <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+        <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -31,50 +116,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,
-    paddingHorizontal: spacing.lg,
-    paddingTop: 40,
   },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: 40,
+  },
+  // Profile card
   profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.bgCard,
     borderRadius: borderRadius.lg,
-    padding: spacing.xxl,
-    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
   },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+  profileInfo: {
+    flex: 1,
   },
-  avatarText: {
-    fontSize: 32,
+  displayName: {
+    fontSize: fontSize.lg,
     fontWeight: '700',
-    color: '#fff',
-  },
-  name: {
-    fontSize: fontSize.xl,
-    fontWeight: '600',
     color: colors.textPrimary,
   },
-  email: {
+  username: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  about: {
     fontSize: fontSize.sm,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
-  logoutButton: {
-    backgroundColor: colors.danger,
-    borderRadius: borderRadius.md,
-    paddingVertical: 14,
+  // Menu
+  menuSection: {
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.xl,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xxl,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
-  logoutText: {
-    color: '#fff',
-    fontSize: fontSize.lg,
+  menuRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  menuLabel: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+  },
+  // Sign Out
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 14,
+    marginTop: spacing.xl,
+    gap: spacing.sm,
+  },
+  signOutText: {
+    fontSize: fontSize.md,
     fontWeight: '600',
+    color: colors.danger,
   },
 });
 

@@ -8,20 +8,23 @@ import ChatScreen from '../screens/chats/ChatScreen';
 import NewChatScreen from '../screens/chats/NewChatScreen';
 import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
+import NewFriendsScreen from '../screens/contacts/NewFriendsScreen';
+import UserProfileScreen from '../screens/contacts/UserProfileScreen';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import MeScreen from '../screens/me/MeScreen';
+import ProfileEditScreen from '../screens/me/ProfileEditScreen';
 import { colors, fontSize } from '../utils/theme';
 
-// Chats tab has its own stack (list → chat, new chat, create group)
+const stackScreenOptions = {
+  headerStyle: { backgroundColor: colors.bgHeader },
+  headerTintColor: colors.textPrimary,
+  headerBackButtonDisplayMode: 'minimal' as const,
+};
+
+// ── Chats tab stack ──────────────────────────────────────────────────
 const ChatsStack = createStackNavigator();
 const ChatsStackScreen = () => (
-  <ChatsStack.Navigator
-    screenOptions={{
-      headerStyle: { backgroundColor: colors.bgHeader },
-      headerTintColor: colors.textPrimary,
-      headerBackButtonDisplayMode: 'minimal',
-    }}
-  >
+  <ChatsStack.Navigator screenOptions={stackScreenOptions}>
     <ChatsStack.Screen
       name="ChatList"
       component={ChatListScreen}
@@ -56,6 +59,46 @@ const ChatsStackScreen = () => (
   </ChatsStack.Navigator>
 );
 
+// ── Contacts tab stack ───────────────────────────────────────────────
+const ContactsStack = createStackNavigator();
+const ContactsStackScreen = () => (
+  <ContactsStack.Navigator screenOptions={stackScreenOptions}>
+    <ContactsStack.Screen
+      name="ContactsList"
+      component={ContactsScreen as any}
+      options={{ title: 'Contacts' }}
+    />
+    <ContactsStack.Screen
+      name="NewFriends"
+      component={NewFriendsScreen}
+      options={{ title: 'New Friends' }}
+    />
+    <ContactsStack.Screen
+      name="UserProfile"
+      component={UserProfileScreen as any}
+      options={{ title: 'Profile' }}
+    />
+  </ContactsStack.Navigator>
+);
+
+// ── Me tab stack ─────────────────────────────────────────────────────
+const MeStack = createStackNavigator();
+const MeStackScreen = () => (
+  <MeStack.Navigator screenOptions={stackScreenOptions}>
+    <MeStack.Screen
+      name="MeMain"
+      component={MeScreen as any}
+      options={{ title: 'Me' }}
+    />
+    <MeStack.Screen
+      name="ProfileEdit"
+      component={ProfileEditScreen as any}
+      options={{ title: 'Edit Profile' }}
+    />
+  </MeStack.Navigator>
+);
+
+// ── Bottom tabs ──────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => (
@@ -73,9 +116,9 @@ const MainTabs = () => (
       tabBarIcon: ({ color, size }) => {
         let iconName: keyof typeof Ionicons.glyphMap = 'chatbubbles';
         if (route.name === 'ChatsTab') iconName = 'chatbubbles';
-        else if (route.name === 'Contacts') iconName = 'people';
+        else if (route.name === 'ContactsTab') iconName = 'people';
         else if (route.name === 'Discover') iconName = 'compass';
-        else if (route.name === 'Me') iconName = 'person-circle';
+        else if (route.name === 'MeTab') iconName = 'person-circle';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
     })}
@@ -85,9 +128,17 @@ const MainTabs = () => (
       component={ChatsStackScreen}
       options={{ headerShown: false, tabBarLabel: 'Chats' }}
     />
-    <Tab.Screen name="Contacts" component={ContactsScreen} />
+    <Tab.Screen
+      name="ContactsTab"
+      component={ContactsStackScreen}
+      options={{ headerShown: false, tabBarLabel: 'Contacts' }}
+    />
     <Tab.Screen name="Discover" component={DiscoverScreen} />
-    <Tab.Screen name="Me" component={MeScreen} />
+    <Tab.Screen
+      name="MeTab"
+      component={MeStackScreen}
+      options={{ headerShown: false, tabBarLabel: 'Me' }}
+    />
   </Tab.Navigator>
 );
 
