@@ -8,11 +8,14 @@ import {
   Platform,
   Text,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ExpoClipboard from 'expo-clipboard';
 import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
+import { useCall } from '../../context/CallContext';
 import MessageBubble from '../../components/chat/MessageBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import MessageActions, { type MessageAction } from '../../components/chat/MessageActions';
@@ -46,6 +49,7 @@ const formatLastSeen = (dateStr: string): string => {
 const ChatScreen = ({ route, navigation }: Props) => {
   const { chatId } = route.params;
   const { user } = useAuth();
+  const { startCall, callState } = useCall();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +112,12 @@ const ChatScreen = ({ route, navigation }: Props) => {
     } else {
       const other = chat.participants.find((p: User) => p.id !== user?.id);
       if (other) {
+        const remoteTarget = {
+          id: other.id,
+          displayName: other.displayName || other.username,
+          username: other.username,
+          avatar: other.avatar,
+        };
         navigation.setOptions({
           headerTitle: () => (
             <View style={styles.headerTitle}>
@@ -119,10 +129,30 @@ const ChatScreen = ({ route, navigation }: Props) => {
               </Text>
             </View>
           ),
+          headerRight: () => (
+            <View style={styles.headerCallButtons}>
+              <TouchableOpacity
+                onPress={() => callState === 'idle' && startCall(remoteTarget, chatId, 'voice')}
+                activeOpacity={0.7}
+                style={styles.headerCallBtn}
+                disabled={callState !== 'idle'}
+              >
+                <Ionicons name="call-outline" size={22} color={callState === 'idle' ? colors.primary : colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => callState === 'idle' && startCall(remoteTarget, chatId, 'video')}
+                activeOpacity={0.7}
+                style={styles.headerCallBtn}
+                disabled={callState !== 'idle'}
+              >
+                <Ionicons name="videocam-outline" size={22} color={callState === 'idle' ? colors.primary : colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          ),
         });
       }
     }
-  }, [chat, navigation, user?.id]);
+  }, [chat, navigation, user?.id, callState, startCall, chatId]);
 
   // Update other user's online status from socket
   useEffect(() => {
@@ -720,6 +750,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     marginTop: 1,
+  },
+  headerCallButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingRight: 8,
+  },
+  headerCallBtn: {
+    padding: 6,
   },
 });
 

@@ -13,6 +13,7 @@ import userService from '../../services/userService';
 import contactService from '../../services/contactService';
 import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
+import { useCall } from '../../context/CallContext';
 import Avatar from '../../components/common/Avatar';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User, ContactStatus } from '../../types';
@@ -25,6 +26,7 @@ interface Props {
 const UserProfileScreen = ({ navigation, route }: Props) => {
   const { userId } = route.params;
   const { user: me } = useAuth();
+  const { startCall, callState } = useCall();
 
   const [profile, setProfile] = useState<User | null>(null);
   const [status, setStatus] = useState<ContactStatus>('none');
@@ -106,6 +108,23 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
       console.warn('Failed to reject request:', err);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleCall = async (type: 'voice' | 'video') => {
+    if (!profile || callState !== 'idle') return;
+    try {
+      const { chat } = await chatService.createOrGetPrivateChat(profile.id);
+      const target = {
+        id: profile.id,
+        displayName: profile.displayName || profile.username,
+        username: profile.username,
+        avatar: profile.avatar,
+      };
+      startCall(target, chat._id, type);
+    } catch (err) {
+      console.warn('Failed to start call:', err);
+      Alert.alert('Error', 'Could not start call');
     }
   };
 
@@ -224,23 +243,21 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
               <TouchableOpacity
                 style={styles.actionButton}
                 activeOpacity={0.7}
-                disabled
+                onPress={() => handleCall('voice')}
+                disabled={callState !== 'idle'}
               >
-                <Ionicons name="call" size={20} color={colors.textMuted} />
-                <Text style={[styles.actionButtonText, { color: colors.textMuted }]}>
-                  Voice Call
-                </Text>
+                <Ionicons name="call" size={20} color={callState === 'idle' ? colors.primary : colors.textMuted} />
+                <Text style={styles.actionButtonText}>Voice Call</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.actionButton}
                 activeOpacity={0.7}
-                disabled
+                onPress={() => handleCall('video')}
+                disabled={callState !== 'idle'}
               >
-                <Ionicons name="videocam" size={20} color={colors.textMuted} />
-                <Text style={[styles.actionButtonText, { color: colors.textMuted }]}>
-                  Video Call
-                </Text>
+                <Ionicons name="videocam" size={20} color={callState === 'idle' ? colors.primary : colors.textMuted} />
+                <Text style={styles.actionButtonText}>Video Call</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
