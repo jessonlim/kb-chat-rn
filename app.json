@@ -13,9 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      "react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "expo-dev-client"
     ],
     "ios": {
+      "bundleIdentifier": "com.kbchat.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "KB Chat needs camera access for video calls",
@@ -23,6 +25,7 @@
       }
     },
     "android": {
+      "package": "com.kbchat.app",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
