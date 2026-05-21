@@ -1,0 +1,84 @@
+import api from './api';
+import type { ChatsResponse, ChatResponse, MessagesResponse, MessageResponse } from '../types';
+
+const chatService = {
+  getMyChats: async (): Promise<ChatsResponse> => {
+    const { data } = await api.get<ChatsResponse>('/api/chats');
+    return data;
+  },
+
+  createOrGetPrivateChat: async (userId: string): Promise<ChatResponse> => {
+    const { data } = await api.post<ChatResponse>('/api/chats/private', { userId });
+    return data;
+  },
+
+  getChatById: async (chatId: string): Promise<ChatResponse> => {
+    const { data } = await api.get<ChatResponse>(`/api/chats/${chatId}`);
+    return data;
+  },
+
+  getMessages: async (chatId: string, before?: string): Promise<MessagesResponse> => {
+    const params = before ? { before } : {};
+    const { data } = await api.get<MessagesResponse>(`/api/chats/${chatId}/messages`, { params });
+    return data;
+  },
+
+  sendMessageRest: async (chatId: string, content: string): Promise<MessageResponse> => {
+    const { data } = await api.post<MessageResponse>(`/api/chats/${chatId}/messages`, { content });
+    return data;
+  },
+
+  createGroup: async (body: {
+    groupName: string;
+    memberIds: string[];
+    groupImage?: string;
+  }): Promise<ChatResponse> => {
+    const { data } = await api.post<ChatResponse>('/api/chats/group', body);
+    return data;
+  },
+
+  updateGroup: async (
+    chatId: string,
+    body: { groupName?: string; groupImage?: string }
+  ): Promise<ChatResponse> => {
+    const { data } = await api.put<ChatResponse>(`/api/chats/group/${chatId}`, body);
+    return data;
+  },
+
+  addMembers: async (chatId: string, userIds: string[]): Promise<ChatResponse> => {
+    const { data } = await api.post<ChatResponse>(`/api/chats/group/${chatId}/members`, { userIds });
+    return data;
+  },
+
+  removeMember: async (chatId: string, userId: string): Promise<ChatResponse> => {
+    const { data } = await api.delete<ChatResponse>(`/api/chats/group/${chatId}/members/${userId}`);
+    return data;
+  },
+
+  leaveGroup: async (chatId: string): Promise<{ left?: boolean; deleted?: boolean }> => {
+    const { data } = await api.post(`/api/chats/group/${chatId}/leave`);
+    return data;
+  },
+
+  togglePin: async (chatId: string): Promise<{ ok: boolean; isPinned: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/pin`);
+    return data;
+  },
+
+  toggleMute: async (chatId: string): Promise<{ ok: boolean; isMuted: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/mute`);
+    return data;
+  },
+
+  deleteChatForMe: async (chatId: string): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/delete-for-me`);
+    return data;
+  },
+
+  markChatRead: async (chatId: string): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/mark-read`);
+    return data;
+  },
+};
+
+export default chatService;

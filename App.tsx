@@ -1,20 +1,23 @@
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NavigationContainer } from '@react-navigation/native';
+import Toast from 'react-native-toast-message';
+import { AuthContext, useAuthProvider } from './src/stores/authStore';
+import RootNavigator from './src/navigation/RootNavigator';
 
 export default function App() {
+  const auth = useAuthProvider();
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthContext.Provider value={auth}>
+        <NavigationContainer>
+          <RootNavigator />
+          <StatusBar style="light" />
+        </NavigationContainer>
+        <Toast />
+      </AuthContext.Provider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
