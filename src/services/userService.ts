@@ -51,6 +51,19 @@ const userService = {
     });
     return data;
   },
+
+  /** GET /api/users/privacy — read current friend-request policy */
+  getPrivacy: async (): Promise<{ friendRequestPolicy: 'anyone' | 'friends_of_friends' | 'nobody' }> => {
+    const { data } = await api.get('/api/users/privacy');
+    return data;
+  },
+
+  /** PUT /api/users/privacy — update friend-request policy */
+  setPrivacy: async (
+    friendRequestPolicy: 'anyone' | 'friends_of_friends' | 'nobody'
+  ): Promise<void> => {
+    await api.put('/api/users/privacy', { friendRequestPolicy });
+  },
 };
 
 export default userService;
