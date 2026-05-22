@@ -26,10 +26,21 @@ const ChatListScreen = ({ navigation }: Props) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Strip any duplicate chat IDs — defensive against backend or race conditions
+  // that could otherwise crash FlatList with "two children with the same key".
+  const dedupe = (list: Chat[]): Chat[] => {
+    const seen = new Set<string>();
+    return list.filter((c) => {
+      if (!c._id || seen.has(c._id)) return false;
+      seen.add(c._id);
+      return true;
+    });
+  };
+
   const loadChats = useCallback(async () => {
     try {
       const { chats: data } = await chatService.getMyChats();
-      setChats(data);
+      setChats(dedupe(data));
     } catch (err) {
       console.warn('Failed to load chats:', err);
     } finally {
@@ -48,11 +59,12 @@ const ChatListScreen = ({ navigation }: Props) => {
     if (!socket) return;
 
     const onChatUpdated = (data: { chatId: string; lastMessage: Message }) => {
+      let needsReload = false;
       setChats((prev) => {
         const idx = prev.findIndex((c) => c._id === data.chatId);
         if (idx === -1) {
-          // New chat we haven't seen — reload the full list
-          loadChats();
+          // New chat we haven't seen — flag a reload after this state update
+          needsReload = true;
           return prev;
         }
         const updated = [...prev];
@@ -68,8 +80,9 @@ const ChatListScreen = ({ navigation }: Props) => {
           if (!a.isPinned && b.isPinned) return 1;
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         });
-        return updated;
+        return dedupe(updated);
       });
+      if (needsReload) loadChats();
     };
 
     const onPresence = (data: { userId: string }) => {
