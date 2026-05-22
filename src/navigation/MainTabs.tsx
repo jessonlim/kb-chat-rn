@@ -19,6 +19,11 @@ import MomentsScreen from '../screens/discover/MomentsScreen';
 import ComposeMomentScreen from '../screens/discover/ComposeMomentScreen';
 import MeScreen from '../screens/me/MeScreen';
 import ProfileEditScreen from '../screens/me/ProfileEditScreen';
+import SettingsScreen from '../screens/me/SettingsScreen';
+import StarredMessagesScreen from '../screens/me/StarredMessagesScreen';
+import AccountSecurityScreen from '../screens/me/AccountSecurityScreen';
+import AboutScreen from '../screens/me/AboutScreen';
+import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
 import { colors, fontSize } from '../utils/theme';
 
 const stackScreenOptions = {
@@ -164,6 +169,31 @@ const MeStackScreen = () => (
       name="ProfileEdit"
       component={ProfileEditScreen as any}
       options={{ title: 'Edit Profile' }}
+    />
+    <MeStack.Screen
+      name="Settings"
+      component={SettingsScreen as any}
+      options={{ title: 'Settings' }}
+    />
+    <MeStack.Screen
+      name="StarredMessages"
+      component={StarredMessagesScreen as any}
+      options={{ title: 'Starred Messages' }}
+    />
+    <MeStack.Screen
+      name="AccountSecurity"
+      component={AccountSecurityScreen as any}
+      options={{ title: 'Account Security' }}
+    />
+    <MeStack.Screen
+      name="About"
+      component={AboutScreen as any}
+      options={{ title: 'About' }}
+    />
+    <MeStack.Screen
+      name="BlockedUsers"
+      component={BlockedUsersScreen as any}
+      options={{ title: 'Blocked Users' }}
     />
   </MeStack.Navigator>
 );

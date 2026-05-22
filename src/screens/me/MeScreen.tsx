@@ -36,18 +36,22 @@ const MeScreen = ({ navigation }: Props) => {
     {
       icon: 'settings-outline',
       label: 'Settings',
+      onPress: () => navigation.navigate('Settings'),
     },
     {
       icon: 'star-outline',
       label: 'Starred Messages',
+      onPress: () => navigation.navigate('StarredMessages'),
     },
     {
       icon: 'shield-checkmark-outline',
       label: 'Account Security',
+      onPress: () => navigation.navigate('AccountSecurity'),
     },
     {
       icon: 'information-circle-outline',
       label: 'About',
+      onPress: () => navigation.navigate('About'),
     },
   ];
 
