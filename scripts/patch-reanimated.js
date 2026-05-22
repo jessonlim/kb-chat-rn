@@ -2,11 +2,12 @@
 //
 // IncomingCallActivity.java has an optional "mainComponent" feature that uses
 // ReactFragment.Builder. In RN 0.81, the Builder API changed and methods are
-// ambiguous. We don't use this feature (we use the library's built-in call
-// notification UI), so we remove the broken code block entirely.
+// ambiguous. We don't use this feature, so we remove the broken code block.
 
 const fs = require('fs');
 const path = require('path');
+
+// ─── Patch 1: Full-screen notification incoming call ───
 
 const callActivityPath = path.join(
   __dirname, '..', 'node_modules',
