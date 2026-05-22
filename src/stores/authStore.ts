@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { storage } from '../services/api';
 import * as authService from '../services/authService';
 import socketService from '../services/socketService';
+import notificationService from '../services/notificationService';
 import type { User } from '../types';
 
 interface AuthState {
@@ -94,6 +95,9 @@ export const useAuthProvider = () => {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      await notificationService.unregisterToken();
+    } catch {}
     try {
       await authService.logout();
     } catch {
