@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { storage } from '../../services/api';
 import userService from '../../services/userService';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -32,13 +33,9 @@ const KEYS = {
 
 type FriendPolicy = 'anyone' | 'friends_of_friends' | 'nobody';
 
-const POLICY_LABELS: Record<FriendPolicy, string> = {
-  anyone: 'Anyone',
-  friends_of_friends: 'Friends of friends',
-  nobody: 'Nobody',
-};
-
 const SettingsScreen = ({ navigation }: Props) => {
+  const { lang, setLang, t } = useT();
+
   // ── Local prefs ─────────────────────────────────────
   const [notifications, setNotifications] = useState(true);
   const [sounds, setSounds] = useState(true);
@@ -133,25 +130,76 @@ const SettingsScreen = ({ navigation }: Props) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* ─── Display ─── */}
+      <Text style={styles.sectionHeader}>{t('settings.section.display')}</Text>
+      <View style={styles.section}>
+        {/* Language */}
+        <View style={styles.policyHeader}>
+          <Ionicons name="language-outline" size={22} color={colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.policyTitle}>{t('settings.language')}</Text>
+            <Text style={styles.policyDesc}>{t('settings.languageDesc')}</Text>
+          </View>
+        </View>
+        <View style={styles.segmentRow}>
+          <TouchableOpacity
+            style={[styles.segment, lang === 'zh' && styles.segmentActive]}
+            activeOpacity={0.7}
+            onPress={() => setLang('zh')}
+          >
+            <Text style={[styles.segmentText, lang === 'zh' && styles.segmentTextActive]}>
+              {t('settings.langZh')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, lang === 'en' && styles.segmentActive]}
+            activeOpacity={0.7}
+            onPress={() => setLang('en')}
+          >
+            <Text style={[styles.segmentText, lang === 'en' && styles.segmentTextActive]}>
+              {t('settings.langEn')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Theme — placeholder until light theme is implemented */}
+        <View style={[styles.policyHeader, styles.bordered]}>
+          <Ionicons name="color-palette-outline" size={22} color={colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.policyTitle}>{t('display.theme')}</Text>
+            <Text style={styles.policyDesc}>{t('common.soon')}</Text>
+          </View>
+        </View>
+
+        {/* Font size — placeholder */}
+        <View style={[styles.policyHeader, styles.bordered]}>
+          <Ionicons name="text-outline" size={22} color={colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.policyTitle}>{t('display.fontSize')}</Text>
+            <Text style={styles.policyDesc}>{t('common.soon')}</Text>
+          </View>
+        </View>
+      </View>
+
       {/* ─── Notifications ─── */}
-      <Text style={styles.sectionHeader}>Notifications</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.notifications')}</Text>
       <View style={styles.section}>
         <ToggleRow
           icon="notifications-outline"
-          label="Push notifications"
+          label={t('settings.notifications')}
           value={notifications}
           onChange={(v) => toggle(KEYS.notifications, v, setNotifications)}
         />
         <ToggleRow
           icon="volume-medium-outline"
-          label="Sound"
+          label={t('settings.sound')}
           value={sounds}
           onChange={(v) => toggle(KEYS.sounds, v, setSounds)}
           bordered
         />
         <ToggleRow
           icon="phone-portrait-outline"
-          label="Vibrate"
+          label={t('settings.vibrate')}
           value={vibrate}
           onChange={(v) => toggle(KEYS.vibrate, v, setVibrate)}
           bordered
@@ -159,19 +207,21 @@ const SettingsScreen = ({ navigation }: Props) => {
       </View>
 
       {/* ─── Privacy ─── */}
-      <Text style={styles.sectionHeader}>Privacy</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.privacy')}</Text>
       <View style={styles.section}>
         <View style={styles.policyHeader}>
           <Ionicons name="people-outline" size={22} color={colors.textSecondary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.policyTitle}>Who can send you friend requests</Text>
-            <Text style={styles.policyDesc}>
-              Choose who's allowed to add you as a friend.
-            </Text>
+            <Text style={styles.policyTitle}>{t('privacy.frp.title')}</Text>
+            <Text style={styles.policyDesc}>{t('privacy.frp.desc')}</Text>
           </View>
         </View>
         {(['anyone', 'friends_of_friends', 'nobody'] as FriendPolicy[]).map((opt) => {
           const selected = friendPolicy === opt;
+          const labelKey =
+            opt === 'anyone' ? 'privacy.frp.anyone' :
+            opt === 'friends_of_friends' ? 'privacy.frp.fof' :
+            'privacy.frp.nobody';
           return (
             <TouchableOpacity
               key={opt}
@@ -180,7 +230,7 @@ const SettingsScreen = ({ navigation }: Props) => {
               onPress={() => handleChangeFriendPolicy(opt)}
               disabled={friendPolicy === null || savingPolicy}
             >
-              <Text style={styles.policyOptionText}>{POLICY_LABELS[opt]}</Text>
+              <Text style={styles.policyOptionText}>{t(labelKey as any)}</Text>
               {selected && <Ionicons name="checkmark" size={20} color={colors.primary} />}
             </TouchableOpacity>
           );
@@ -191,25 +241,25 @@ const SettingsScreen = ({ navigation }: Props) => {
           onPress={() => navigation.navigate('BlockedUsers')}
         >
           <Ionicons name="ban-outline" size={22} color={colors.textSecondary} />
-          <Text style={styles.rowLabel}>Blocked users</Text>
+          <Text style={styles.rowLabel}>{t('privacy.blocked.title')}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* ─── Chats ─── */}
-      <Text style={styles.sectionHeader}>Chats</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.chats')}</Text>
       <View style={styles.section}>
         <ToggleRow
           icon="return-down-back-outline"
-          label="Enter to send"
-          subtext="Press Enter to send messages"
+          label={t('chats.enterToSend')}
+          subtext={t('chats.enterToSendDesc')}
           value={enterToSend}
           onChange={(v) => toggle(KEYS.enterToSend, v, setEnterToSend)}
         />
         <ToggleRow
           icon="eye-outline"
-          label="Show message preview"
-          subtext="Display message content in notifications"
+          label={t('chats.preview')}
+          subtext={t('chats.previewDesc')}
           value={messagePreview}
           onChange={(v) => toggle(KEYS.messagePreview, v, setMessagePreview)}
           bordered
@@ -217,19 +267,19 @@ const SettingsScreen = ({ navigation }: Props) => {
       </View>
 
       {/* ─── Calls ─── */}
-      <Text style={styles.sectionHeader}>Calls</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.calls')}</Text>
       <View style={styles.section}>
         <ToggleRow
           icon="volume-high-outline"
-          label="Default to speaker"
-          subtext="Start calls with speakerphone on"
+          label={t('callsSettings.speaker.title')}
+          subtext={t('callsSettings.speaker.desc')}
           value={speakerOn}
           onChange={(v) => toggle(KEYS.speakerOn, v, setSpeakerOn)}
         />
         <ToggleRow
           icon="musical-note-outline"
-          label="Ringtone"
-          subtext="Play ringtone for incoming calls"
+          label={t('callsSettings.ringtone.title')}
+          subtext={t('callsSettings.ringtone.desc')}
           value={ringtone}
           onChange={(v) => toggle(KEYS.ringtone, v, setRingtone)}
           bordered
@@ -237,7 +287,7 @@ const SettingsScreen = ({ navigation }: Props) => {
       </View>
 
       {/* ─── Storage ─── */}
-      <Text style={styles.sectionHeader}>Storage</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.storage')}</Text>
       <View style={styles.section}>
         <TouchableOpacity
           style={styles.cacheRow}
@@ -251,8 +301,8 @@ const SettingsScreen = ({ navigation }: Props) => {
             <Ionicons name="trash-outline" size={22} color={colors.danger} />
           )}
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: colors.danger }]}>Clear cache</Text>
-            <Text style={styles.subText}>Remove temporary files. Messages stay safe.</Text>
+            <Text style={[styles.rowLabel, { color: colors.danger }]}>{t('storage.cache.clear')}</Text>
+            <Text style={styles.subText}>{t('storage.cache.desc')}</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -378,6 +428,34 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
+  },
+  // Segmented control (language picker)
+  segmentRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgInput,
+    borderRadius: borderRadius.full,
+    padding: 4,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    gap: 4,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+  },
+  segmentActive: {
+    backgroundColor: colors.primary,
+  },
+  segmentText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  segmentTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 

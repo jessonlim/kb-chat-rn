@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { AuthContext, useAuthProvider } from './src/stores/authStore';
 import { CallProvider } from './src/context/CallContext';
+import { I18nProvider } from './src/i18n/I18nContext';
 import { navigationRef } from './src/navigation/navigationRef';
 import useNotifications from './src/hooks/useNotifications';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -19,18 +20,20 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthContext.Provider value={auth}>
-        <CallProvider>
-          <NavigationContainer ref={navigationRef}>
-            <RootNavigator />
-            <StatusBar style="light" />
-          </NavigationContainer>
-          {/* Call overlays — rendered above everything */}
-          <CallScreen />
-          <IncomingCallOverlay />
-        </CallProvider>
-        <Toast />
-      </AuthContext.Provider>
+      <I18nProvider>
+        <AuthContext.Provider value={auth}>
+          <CallProvider>
+            <NavigationContainer ref={navigationRef}>
+              <RootNavigator />
+              <StatusBar style="light" />
+            </NavigationContainer>
+            {/* Call overlays — rendered above everything */}
+            <CallScreen />
+            <IncomingCallOverlay />
+          </CallProvider>
+          <Toast />
+        </AuthContext.Provider>
+      </I18nProvider>
     </GestureHandlerRootView>
   );
 }

@@ -10,32 +10,34 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 const AboutScreen = () => {
+  const { t, lang } = useT();
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
 
   const linkItems = [
     {
       icon: 'globe-outline' as const,
-      label: 'Visit website',
+      label: lang === 'zh' ? '访问官网' : 'Visit website',
       url: 'https://www.kb-chat.com',
     },
     {
       icon: 'mail-outline' as const,
-      label: 'Contact support',
+      label: lang === 'zh' ? '联系客服' : 'Contact support',
       url: 'mailto:support@kb-chat.com',
     },
     {
       icon: 'shield-outline' as const,
-      label: 'Privacy Policy',
+      label: lang === 'zh' ? '隐私政策' : 'Privacy Policy',
       url: 'https://www.kb-chat.com/privacy',
     },
     {
       icon: 'document-text-outline' as const,
-      label: 'Terms of Service',
+      label: lang === 'zh' ? '服务条款' : 'Terms of Service',
       url: 'https://www.kb-chat.com/terms',
     },
   ];
@@ -45,8 +47,8 @@ const AboutScreen = () => {
       {/* App icon + name */}
       <View style={styles.header}>
         <Image source={require('../../../assets/icon.png')} style={styles.logo} />
-        <Text style={styles.appName}>KB Chat</Text>
-        <Text style={styles.version}>Version {APP_VERSION}</Text>
+        <Text style={styles.appName}>{t('app.appName')}</Text>
+        <Text style={styles.version}>{t('about.version')} {APP_VERSION}</Text>
       </View>
 
       {/* Links */}
@@ -66,8 +68,14 @@ const AboutScreen = () => {
       </View>
 
       {/* Credits */}
-      <Text style={styles.credits}>Made by Meka Games</Text>
-      <Text style={styles.copyright}>© 2026 KB Chat. All rights reserved.</Text>
+      <Text style={styles.credits}>
+        {lang === 'zh' ? '由 Meka Games 出品' : 'Made by Meka Games'}
+      </Text>
+      <Text style={styles.copyright}>
+        {lang === 'zh'
+          ? '© 2026 KB Chat。保留所有权利。'
+          : '© 2026 KB Chat. All rights reserved.'}
+      </Text>
     </ScrollView>
   );
 };

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import * as authService from '../../services/authService';
 import { useAuth } from '../../stores/authStore';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 
 const AccountSecurityScreen = ({ navigation }: Props) => {
   const { logout } = useAuth();
+  const { t } = useT();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,30 +31,27 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
   const [showNew, setShowNew] = useState(false);
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Toast.show({ type: 'error', text1: 'Please fill in all fields' });
-      return;
-    }
+    if (!currentPassword || !newPassword || !confirmPassword) return;
     if (newPassword.length < 6) {
-      Toast.show({ type: 'error', text1: 'New password must be at least 6 characters' });
+      Toast.show({ type: 'error', text1: t('pwd.tooShort') });
       return;
     }
     if (newPassword !== confirmPassword) {
-      Toast.show({ type: 'error', text1: 'Passwords do not match' });
+      Toast.show({ type: 'error', text1: t('pwd.mismatch') });
       return;
     }
 
     setSaving(true);
     try {
       await authService.changePassword({ currentPassword, newPassword });
-      Toast.show({ type: 'success', text1: 'Password changed successfully' });
+      Toast.show({ type: 'success', text1: t('pwd.success') });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: err?.response?.data?.message || 'Failed to change password',
+        text1: err?.response?.data?.message || t('auth.loginFailed'),
       });
     } finally {
       setSaving(false);
@@ -61,23 +60,23 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
 
   const handleDeleteAccount = () => {
     Alert.prompt(
-      'Delete Account',
-      'This action cannot be undone. All your messages and data will be permanently deleted. Enter your password to confirm:',
+      t('account.delete.title'),
+      t('account.delete.warning'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('account.delete.confirm'),
           style: 'destructive',
           onPress: async (password) => {
             if (!password) return;
             try {
               await authService.deleteAccount(password);
-              Toast.show({ type: 'success', text1: 'Account deleted' });
+              Toast.show({ type: 'success', text1: t('account.delete.success') });
               await logout();
             } catch (err: any) {
               Toast.show({
                 type: 'error',
-                text1: err?.response?.data?.message || 'Failed to delete account',
+                text1: err?.response?.data?.message || t('account.delete.failed'),
               });
             }
           },
@@ -94,12 +93,12 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
       keyboardShouldPersistTaps="handled"
     >
       {/* Change password */}
-      <Text style={styles.sectionHeader}>Change Password</Text>
+      <Text style={styles.sectionHeader}>{t('pwd.title')}</Text>
       <View style={styles.section}>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
-            placeholder="Current password"
+            placeholder={t('pwd.current')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry={!showCurrent}
             value={currentPassword}
@@ -118,7 +117,7 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
         <View style={[styles.inputRow, styles.inputBorder]}>
           <TextInput
             style={styles.input}
-            placeholder="New password (min 6 chars)"
+            placeholder={t('pwd.new')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry={!showNew}
             value={newPassword}
@@ -137,7 +136,7 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
         <View style={[styles.inputRow, styles.inputBorder]}>
           <TextInput
             style={styles.input}
-            placeholder="Confirm new password"
+            placeholder={t('pwd.confirm')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry={!showNew}
             value={confirmPassword}
@@ -157,12 +156,12 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
         {saving ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.saveButtonText}>Update Password</Text>
+          <Text style={styles.saveButtonText}>{t('pwd.submit')}</Text>
         )}
       </TouchableOpacity>
 
       {/* Privacy / blocked users */}
-      <Text style={styles.sectionHeader}>Privacy</Text>
+      <Text style={styles.sectionHeader}>{t('settings.section.privacy')}</Text>
       <View style={styles.section}>
         <TouchableOpacity
           style={styles.linkRow}
@@ -170,20 +169,20 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
           onPress={() => navigation.navigate('BlockedUsers')}
         >
           <Ionicons name="ban-outline" size={22} color={colors.textSecondary} />
-          <Text style={styles.linkLabel}>Blocked users</Text>
+          <Text style={styles.linkLabel}>{t('privacy.blocked.title')}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* Danger zone */}
-      <Text style={styles.sectionHeader}>Danger zone</Text>
+      <Text style={styles.sectionHeader}>{t('account.delete.title')}</Text>
       <TouchableOpacity
         style={styles.dangerButton}
         activeOpacity={0.7}
         onPress={handleDeleteAccount}
       >
         <Ionicons name="trash-outline" size={20} color={colors.danger} />
-        <Text style={styles.dangerText}>Delete account</Text>
+        <Text style={styles.dangerText}>{t('account.delete.button')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

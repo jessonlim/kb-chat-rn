@@ -24,6 +24,7 @@ import StarredMessagesScreen from '../screens/me/StarredMessagesScreen';
 import AccountSecurityScreen from '../screens/me/AccountSecurityScreen';
 import AboutScreen from '../screens/me/AboutScreen';
 import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
+import { useT } from '../i18n/I18nContext';
 import { colors, fontSize } from '../utils/theme';
 
 const stackScreenOptions = {
@@ -158,92 +159,98 @@ const DiscoverStackScreen = () => (
 
 // ── Me tab stack ─────────────────────────────────────────────────────
 const MeStack = createStackNavigator();
-const MeStackScreen = () => (
-  <MeStack.Navigator screenOptions={stackScreenOptions}>
-    <MeStack.Screen
-      name="MeMain"
-      component={MeScreen as any}
-      options={{ title: 'Me' }}
-    />
-    <MeStack.Screen
-      name="ProfileEdit"
-      component={ProfileEditScreen as any}
-      options={{ title: 'Edit Profile' }}
-    />
-    <MeStack.Screen
-      name="Settings"
-      component={SettingsScreen as any}
-      options={{ title: 'Settings' }}
-    />
-    <MeStack.Screen
-      name="StarredMessages"
-      component={StarredMessagesScreen as any}
-      options={{ title: 'Starred Messages' }}
-    />
-    <MeStack.Screen
-      name="AccountSecurity"
-      component={AccountSecurityScreen as any}
-      options={{ title: 'Account Security' }}
-    />
-    <MeStack.Screen
-      name="About"
-      component={AboutScreen as any}
-      options={{ title: 'About' }}
-    />
-    <MeStack.Screen
-      name="BlockedUsers"
-      component={BlockedUsersScreen as any}
-      options={{ title: 'Blocked Users' }}
-    />
-  </MeStack.Navigator>
-);
+const MeStackScreen = () => {
+  const { t } = useT();
+  return (
+    <MeStack.Navigator screenOptions={stackScreenOptions}>
+      <MeStack.Screen
+        name="MeMain"
+        component={MeScreen as any}
+        options={{ title: t('tab.me') }}
+      />
+      <MeStack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen as any}
+        options={{ title: t('settings.section.profile') }}
+      />
+      <MeStack.Screen
+        name="Settings"
+        component={SettingsScreen as any}
+        options={{ title: t('settings.title') }}
+      />
+      <MeStack.Screen
+        name="StarredMessages"
+        component={StarredMessagesScreen as any}
+        options={{ title: t('me.starredMessages') }}
+      />
+      <MeStack.Screen
+        name="AccountSecurity"
+        component={AccountSecurityScreen as any}
+        options={{ title: t('settings.section.security') }}
+      />
+      <MeStack.Screen
+        name="About"
+        component={AboutScreen as any}
+        options={{ title: t('settings.section.about') }}
+      />
+      <MeStack.Screen
+        name="BlockedUsers"
+        component={BlockedUsersScreen as any}
+        options={{ title: t('privacy.blocked.title') }}
+      />
+    </MeStack.Navigator>
+  );
+};
 
 // ── Bottom tabs ──────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
-const MainTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerStyle: { backgroundColor: colors.bgHeader },
-      headerTintColor: colors.textPrimary,
-      tabBarStyle: {
-        backgroundColor: colors.bgHeader,
-        borderTopColor: colors.border,
-      },
-      tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.textMuted,
-      tabBarLabelStyle: { fontSize: fontSize.xs },
-      tabBarIcon: ({ color, size }) => {
-        let iconName: keyof typeof Ionicons.glyphMap = 'chatbubbles';
-        if (route.name === 'ChatsTab') iconName = 'chatbubbles';
-        else if (route.name === 'ContactsTab') iconName = 'people';
-        else if (route.name === 'DiscoverTab') iconName = 'compass';
-        else if (route.name === 'MeTab') iconName = 'person-circle';
-        return <Ionicons name={iconName} size={size} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen
-      name="ChatsTab"
-      component={ChatsStackScreen}
-      options={{ headerShown: false, tabBarLabel: 'Chats' }}
-    />
-    <Tab.Screen
-      name="ContactsTab"
-      component={ContactsStackScreen}
-      options={{ headerShown: false, tabBarLabel: 'Contacts' }}
-    />
-    <Tab.Screen
-      name="DiscoverTab"
-      component={DiscoverStackScreen}
-      options={{ headerShown: false, tabBarLabel: 'Discover' }}
-    />
-    <Tab.Screen
-      name="MeTab"
-      component={MeStackScreen}
-      options={{ headerShown: false, tabBarLabel: 'Me' }}
-    />
-  </Tab.Navigator>
-);
+const MainTabs = () => {
+  const { t } = useT();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerStyle: { backgroundColor: colors.bgHeader },
+        headerTintColor: colors.textPrimary,
+        tabBarStyle: {
+          backgroundColor: colors.bgHeader,
+          borderTopColor: colors.border,
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: fontSize.xs },
+        tabBarIcon: ({ color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap = 'chatbubbles';
+          if (route.name === 'ChatsTab') iconName = 'chatbubbles';
+          else if (route.name === 'ContactsTab') iconName = 'people';
+          else if (route.name === 'DiscoverTab') iconName = 'compass';
+          else if (route.name === 'MeTab') iconName = 'person-circle';
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen
+        name="ChatsTab"
+        component={ChatsStackScreen}
+        options={{ headerShown: false, tabBarLabel: t('tab.chats') }}
+      />
+      <Tab.Screen
+        name="ContactsTab"
+        component={ContactsStackScreen}
+        options={{ headerShown: false, tabBarLabel: t('tab.contacts') }}
+      />
+      <Tab.Screen
+        name="DiscoverTab"
+        component={DiscoverStackScreen}
+        options={{ headerShown: false, tabBarLabel: t('tab.discover') }}
+      />
+      <Tab.Screen
+        name="MeTab"
+        component={MeStackScreen}
+        options={{ headerShown: false, tabBarLabel: t('tab.me') }}
+      />
+    </Tab.Navigator>
+  );
+};
 
 export default MainTabs;

@@ -13,10 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import * as authService from '../../services/authService';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
 const BlockedUsersScreen = () => {
+  const { t } = useT();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,13 +30,13 @@ const BlockedUsersScreen = () => {
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: err?.response?.data?.message || 'Failed to load blocked users',
+        text1: err?.response?.data?.message || t('privacy.unblockFailed'),
       });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -42,21 +44,21 @@ const BlockedUsersScreen = () => {
 
   const handleUnblock = (user: User) => {
     Alert.alert(
-      'Unblock User',
-      `Unblock ${user.displayName || user.username}?`,
+      t('privacy.unblock'),
+      `${t('privacy.unblock')}: ${user.displayName || user.username}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Unblock',
+          text: t('privacy.unblock'),
           onPress: async () => {
             try {
               await authService.unblockUser(user.id);
               setUsers((prev) => prev.filter((u) => u.id !== user.id));
-              Toast.show({ type: 'success', text1: 'User unblocked' });
+              Toast.show({ type: 'success', text1: t('privacy.unblocked') });
             } catch (err: any) {
               Toast.show({
                 type: 'error',
-                text1: err?.response?.data?.message || 'Failed to unblock',
+                text1: err?.response?.data?.message || t('privacy.unblockFailed'),
               });
             }
           },
@@ -77,10 +79,7 @@ const BlockedUsersScreen = () => {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="ban-outline" size={64} color={colors.textMuted} />
-        <Text style={styles.emptyTitle}>No blocked users</Text>
-        <Text style={styles.emptyText}>
-          Users you block will appear here. You won't receive messages from them.
-        </Text>
+        <Text style={styles.emptyTitle}>{t('privacy.blocked.empty')}</Text>
       </View>
     );
   }
@@ -126,7 +125,7 @@ const BlockedUsersScreen = () => {
             activeOpacity={0.7}
             onPress={() => handleUnblock(item)}
           >
-            <Text style={styles.unblockText}>Unblock</Text>
+            <Text style={styles.unblockText}>{t('privacy.unblock')}</Text>
           </TouchableOpacity>
         </View>
       )}

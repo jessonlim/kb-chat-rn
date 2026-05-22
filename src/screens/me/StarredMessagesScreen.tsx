@@ -1,16 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize } from '../../utils/theme';
 
 const StarredMessagesScreen = () => {
+  const { t } = useT();
   return (
     <View style={styles.container}>
       <Ionicons name="star-outline" size={64} color={colors.textMuted} />
-      <Text style={styles.title}>No starred messages</Text>
-      <Text style={styles.description}>
-        Long-press any message in a chat and tap the star icon to save it here for quick access.
-      </Text>
+      <Text style={styles.title}>{t('starred.title')}</Text>
+      <Text style={styles.description}>{t('starred.empty')}</Text>
     </View>
   );
 };

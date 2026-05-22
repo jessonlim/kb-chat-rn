@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../stores/authStore';
+import { useT } from '../../i18n/I18nContext';
 import Avatar from '../../components/common/Avatar';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
@@ -24,33 +25,34 @@ interface MenuItem {
 
 const MeScreen = ({ navigation }: Props) => {
   const { user, logout } = useAuth();
+  const { t } = useT();
 
   const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    Alert.alert(t('me.logout'), '', [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('me.logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
   const menuItems: MenuItem[] = [
     {
       icon: 'settings-outline',
-      label: 'Settings',
+      label: t('settings.title'),
       onPress: () => navigation.navigate('Settings'),
     },
     {
       icon: 'star-outline',
-      label: 'Starred Messages',
+      label: t('me.starredMessages'),
       onPress: () => navigation.navigate('StarredMessages'),
     },
     {
       icon: 'shield-checkmark-outline',
-      label: 'Account Security',
+      label: t('settings.section.security'),
       onPress: () => navigation.navigate('AccountSecurity'),
     },
     {
       icon: 'information-circle-outline',
-      label: 'About',
+      label: t('settings.section.about'),
       onPress: () => navigation.navigate('About'),
     },
   ];
@@ -110,7 +112,7 @@ const MeScreen = ({ navigation }: Props) => {
         onPress={handleSignOut}
       >
         <Ionicons name="log-out-outline" size={22} color={colors.danger} />
-        <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={styles.signOutText}>{t('me.logout')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
