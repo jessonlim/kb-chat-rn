@@ -19,6 +19,7 @@ import InCallManager from 'react-native-incall-manager';
 import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
+import callkeepService from '../services/callkeepService';
 import { useAuth } from '../stores/authStore';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -165,6 +166,9 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       InCallManager.stop();
     } catch {}
+
+    // Hide native call notification (if showing)
+    callkeepService.hideIncomingCall();
 
     // Reset refs
     remoteDescSetRef.current = false;
@@ -483,6 +487,30 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  // ── CallKeep listeners (native notification Answer/Decline) ────
+  useEffect(() => {
+    if (!user) return;
+
+    const cleanup_ck = callkeepService.setupListeners(
+      // User tapped Answer on native notification
+      (_info) => {
+        console.log('[callkeep] Answer triggered, callState:', callStateRef.current);
+        if (callStateRef.current === 'ringing') {
+          acceptCall();
+        }
+      },
+      // User tapped Decline on native notification (or it timed out)
+      (_info, timedOut) => {
+        console.log('[callkeep] Decline triggered, timedOut:', timedOut);
+        if (callStateRef.current === 'ringing') {
+          rejectCall(timedOut ? 'timeout' : undefined);
+        }
+      },
+    );
+
+    return cleanup_ck;
+  }, [user, acceptCall, rejectCall]);
+
   // ── Socket event handlers ─────────────────────────────────────
   useEffect(() => {
     if (!user) return;
@@ -532,6 +560,15 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       setIsCameraOn(data.type === 'video');
       setIsSpeaker(data.type === 'video');
       setCallState('ringing');
+
+      // Show native full-screen incoming call notification (lock screen / background)
+      callkeepService.showIncomingCall({
+        callerId: data.callerId,
+        callerName: callerInfo.displayName,
+        avatar: callerInfo.avatar,
+        callType: data.type,
+        chatId: data.chatId,
+      });
 
       // Play ringtone
       try {

@@ -6,17 +6,45 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
+import callkeepService from './callkeepService';
 
 // ── Foreground notification display ─────────────────────────────────
 // Show notifications even when the app is in the foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data;
+
+    // If this is an incoming call notification, suppress the regular notification
+    // because the native full-screen call UI handles it via callkeepService
+    if (data?.type === 'incoming_call') {
+      // Show native call screen instead
+      callkeepService.showIncomingCall({
+        callerId: data.callerId as string,
+        callerName: (data.callerName as string) || 'Unknown',
+        avatar: data.callerAvatar as string | undefined,
+        callType: (data.callType as 'voice' | 'video') || 'voice',
+        chatId: data.chatId as string,
+      });
+
+      // Don't show the regular notification — the native call UI is enough
+      return {
+        shouldShowAlert: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    // For all other notifications, show normally
+    return {
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 // ── Stored token for cleanup on logout ──────────────────────────────

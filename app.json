@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,8 @@
     "plugins": [
       "@config-plugins/react-native-webrtc",
       "expo-dev-client",
-      "expo-font"
+      "expo-font",
+      ["react-native-full-screen-notification-incoming-call", { "statusBarColor": "#000000" }]
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
@@ -39,7 +40,13 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
+        "android.permission.VIBRATE",
+        "android.permission.DISABLE_KEYGUARD",
+        "android.permission.MANAGE_OWN_CALLS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
