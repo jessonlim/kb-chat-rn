@@ -1,36 +1,42 @@
-// Patch react-native-reanimated to skip the "New Architecture required" assertion.
-// Reanimated 4.x forces newArchEnabled=true, but react-native-webrtc and
+// Patch react-native-reanimated and react-native-worklets to skip the
+// "New Architecture required" assertion.
+// Both libraries force newArchEnabled=true, but react-native-webrtc and
 // react-native-incall-manager don't work with New Arch yet.
-// This removes the build-blocking assertion while keeping everything else intact.
+// This removes the build-blocking assertions while keeping everything else intact.
 
 const fs = require('fs');
 const path = require('path');
 
-const buildGradlePath = path.join(
-  __dirname,
-  '..',
-  'node_modules',
+const TARGET = 'preBuild.dependsOn(assertNewArchitectureEnabledTask)';
+const COMMENT = '// Patched: allow Old Arch for WebRTC compatibility';
+
+const libraries = [
   'react-native-reanimated',
-  'android',
-  'build.gradle'
-);
+  'react-native-worklets',
+];
 
-if (!fs.existsSync(buildGradlePath)) {
-  console.log('[patch-reanimated] build.gradle not found — skipping');
-  process.exit(0);
-}
-
-let content = fs.readFileSync(buildGradlePath, 'utf-8');
-
-const target = 'preBuild.dependsOn(assertNewArchitectureEnabledTask)';
-
-if (content.includes(target)) {
-  content = content.replace(
-    target,
-    '// ' + target + ' // Patched: allow Old Arch for WebRTC compatibility'
+for (const lib of libraries) {
+  const gradlePath = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    lib,
+    'android',
+    'build.gradle'
   );
-  fs.writeFileSync(buildGradlePath, content, 'utf-8');
-  console.log('[patch-reanimated] Disabled New Arch assertion — Old Arch build OK');
-} else {
-  console.log('[patch-reanimated] Assertion already patched or not found — skipping');
+
+  if (!fs.existsSync(gradlePath)) {
+    console.log(`[patch] ${lib} build.gradle not found — skipping`);
+    continue;
+  }
+
+  let content = fs.readFileSync(gradlePath, 'utf-8');
+
+  if (content.includes(TARGET)) {
+    content = content.replace(TARGET, '// ' + TARGET + ' ' + COMMENT);
+    fs.writeFileSync(gradlePath, content, 'utf-8');
+    console.log(`[patch] ${lib} — disabled New Arch assertion`);
+  } else {
+    console.log(`[patch] ${lib} — already patched or no assertion found`);
+  }
 }
