@@ -18,6 +18,7 @@ import channelService from '../../services/channelService';
 import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Channel, ChannelPost, ChannelComment } from '../../types';
 
@@ -26,16 +27,18 @@ interface Props {
   route: { params: { channelId: string } };
 }
 
+type TFn = (key: any, vars?: Record<string, string | number>) => string;
+
 // ── Time formatter ──────────────────────────────────────────────────
-const formatPostTime = (iso: string): string => {
+const formatPostTime = (iso: string, t: TFn): string => {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t('moments.justNow');
+  if (min < 60) return t('moments.minutesAgo', { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t('moments.hoursAgo', { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
+  if (day < 7) return t('moments.daysAgo', { n: day });
   return new Date(iso).toLocaleDateString();
 };
 
@@ -91,6 +94,7 @@ const CommentsSection = ({
   onCountChange: (count: number) => void;
 }) => {
   const { user } = useAuth();
+  const { t } = useT();
   const [comments, setComments] = useState<ChannelComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -133,10 +137,10 @@ const CommentsSection = ({
   };
 
   const handleDelete = (comment: ChannelComment) => {
-    Alert.alert('Delete Comment', 'Delete this comment?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('channels.comments.deleteConfirm'), t('channels.comments.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -169,7 +173,7 @@ const CommentsSection = ({
           style={{ paddingVertical: spacing.md }}
         />
       ) : comments.length === 0 ? (
-        <Text style={commentStyles.empty}>No comments yet</Text>
+        <Text style={commentStyles.empty}>{t('channels.comments.empty')}</Text>
       ) : (
         comments.map((c) => (
           <View key={c._id} style={commentStyles.row}>
@@ -179,7 +183,7 @@ const CommentsSection = ({
               </Text>
               <Text style={commentStyles.commentText}>{c.content}</Text>
               <Text style={commentStyles.commentTime}>
-                {formatPostTime(c.createdAt)}
+                {formatPostTime(c.createdAt, t)}
               </Text>
             </View>
             {canDelete(c) && (
@@ -201,7 +205,7 @@ const CommentsSection = ({
           style={commentStyles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Write a comment..."
+          placeholder={t('channels.comments.placeholder')}
           placeholderTextColor={colors.textMuted}
           maxLength={2000}
           editable={!sending}
@@ -292,6 +296,7 @@ const commentStyles = StyleSheet.create({
 const ChannelDetailScreen = ({ navigation, route }: Props) => {
   const { channelId } = route.params;
   const { user } = useAuth();
+  const { t } = useT();
   const [channel, setChannel] = useState<Channel | null>(null);
   const [posts, setPosts] = useState<ChannelPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -359,10 +364,10 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
     if (!channel) return;
     try {
       if (channel.isSubscribed) {
-        Alert.alert('Unsubscribe', `Unsubscribe from ${channel.name}?`, [
-          { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('channels.unsubscribe'), t('channels.unsubscribeConfirm'), [
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Unsubscribe',
+            text: t('channels.unsubscribe'),
             style: 'destructive',
             onPress: async () => {
               const { subscriberCount } = await channelService.unsubscribe(
@@ -390,12 +395,12 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
   const handleDeleteChannel = () => {
     if (!channel) return;
     Alert.alert(
-      'Delete Channel',
-      `Delete "${channel.name}" permanently? This cannot be undone.`,
+      t('channels.delete'),
+      t('channels.deleteConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -446,10 +451,10 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
   };
 
   const handleDeletePost = (post: ChannelPost) => {
-    Alert.alert('Delete Post', 'Delete this post?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('channels.post.delete'), t('channels.post.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -504,8 +509,9 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
           <View style={styles.subscriberRow}>
             <Ionicons name="people-outline" size={14} color={colors.textMuted} />
             <Text style={styles.subscriberText}>
-              {channel.subscriberCount}{' '}
-              {channel.subscriberCount === 1 ? 'subscriber' : 'subscribers'}
+              {channel.subscriberCount === 1
+                ? t('channels.subscribers', { n: channel.subscriberCount })
+                : t('channels.subscribersPlural', { n: channel.subscriberCount })}
             </Text>
           </View>
         </View>
@@ -524,7 +530,7 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
                 channel.isSubscribed && styles.subButtonTextActive,
               ]}
             >
-              {channel.isSubscribed ? 'Subscribed' : 'Subscribe'}
+              {channel.isSubscribed ? t('channels.subscribed') : t('channels.subscribe')}
             </Text>
           </TouchableOpacity>
         )}
@@ -554,7 +560,7 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
             <Text style={styles.postAuthorName}>
               {post.author.displayName}
             </Text>
-            <Text style={styles.postTime}>{formatPostTime(post.createdAt)}</Text>
+            <Text style={styles.postTime}>{formatPostTime(post.createdAt, t)}</Text>
           </View>
           {isOwner && (
             <TouchableOpacity
@@ -680,12 +686,9 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           <View style={styles.emptyPosts}>
-            <Text style={styles.emptyText}>No posts yet</Text>
-            {isOwner && (
-              <Text style={styles.emptySubtext}>
-                Tap + to create your first post
-              </Text>
-            )}
+            <Text style={styles.emptyText}>
+              {isOwner ? t('channels.posts.emptyOwner') : t('channels.posts.empty')}
+            </Text>
           </View>
         }
         refreshControl={

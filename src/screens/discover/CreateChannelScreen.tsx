@@ -17,6 +17,7 @@ import channelService from '../../services/channelService';
 import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 }
 
 const CreateChannelScreen = ({ navigation }: Props) => {
+  const { t } = useT();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -58,7 +60,7 @@ const CreateChannelScreen = ({ navigation }: Props) => {
         setAvatarUrl(uploaded.url);
       } catch (err) {
         console.warn('Avatar upload failed:', err);
-        Alert.alert('Error', 'Failed to upload avatar');
+        Alert.alert(t('common.failed'), t('attach.uploadFailed'));
         setAvatarLocalUri(null);
       } finally {
         setUploading(false);
@@ -69,11 +71,11 @@ const CreateChannelScreen = ({ navigation }: Props) => {
   const handleCreate = async () => {
     const trimmed = name.trim();
     if (trimmed.length < 3) {
-      Alert.alert('Error', 'Channel name must be at least 3 characters');
+      Alert.alert(t('common.failed'), t('channels.create.nameRequired'));
       return;
     }
     if (uploading) {
-      Alert.alert('Wait', 'Avatar is still uploading...');
+      Alert.alert(t('common.failed'), t('attach.waitForUpload'));
       return;
     }
 
@@ -88,8 +90,8 @@ const CreateChannelScreen = ({ navigation }: Props) => {
       navigation.replace('ChannelDetail', { channelId: channel._id });
     } catch (err: any) {
       Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed to create channel'
+        t('common.failed'),
+        err?.response?.data?.message || t('channels.create.failed')
       );
     } finally {
       setSubmitting(false);
@@ -123,31 +125,31 @@ const CreateChannelScreen = ({ navigation }: Props) => {
             )}
           </View>
         </TouchableOpacity>
-        <Text style={styles.avatarHint}>Tap to add a channel photo</Text>
+        <Text style={styles.avatarHint}>{t('channels.create.avatar')}</Text>
 
         {/* Name */}
         <View style={styles.field}>
-          <Text style={styles.label}>CHANNEL NAME</Text>
+          <Text style={styles.label}>{t('channels.create.nameLabel')}</Text>
           <TextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="Enter channel name"
+            placeholder={t('channels.create.namePlaceholder')}
             placeholderTextColor={colors.textMuted}
             maxLength={50}
             autoCapitalize="words"
           />
-          <Text style={styles.hint}>3-50 characters</Text>
+          <Text style={styles.hint}>{t('channels.create.nameHint')}</Text>
         </View>
 
         {/* Description */}
         <View style={styles.field}>
-          <Text style={styles.label}>DESCRIPTION</Text>
+          <Text style={styles.label}>{t('channels.create.descLabel')}</Text>
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             value={description}
             onChangeText={setDescription}
-            placeholder="What is this channel about?"
+            placeholder={t('channels.create.descPlaceholder')}
             placeholderTextColor={colors.textMuted}
             maxLength={500}
             multiline
@@ -171,7 +173,7 @@ const CreateChannelScreen = ({ navigation }: Props) => {
           {submitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.createButtonText}>Create Channel</Text>
+            <Text style={styles.createButtonText}>{t('channels.create.submit')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

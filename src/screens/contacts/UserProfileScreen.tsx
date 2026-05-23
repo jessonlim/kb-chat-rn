@@ -15,6 +15,7 @@ import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User, ContactStatus } from '../../types';
 
@@ -27,6 +28,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   const { userId } = route.params;
   const { user: me } = useAuth();
   const { startCall, callState } = useCall();
+  const { t } = useT();
 
   const [profile, setProfile] = useState<User | null>(null);
   const [status, setStatus] = useState<ContactStatus>('none');
@@ -124,19 +126,19 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
       startCall(target, chat._id, type);
     } catch (err) {
       console.warn('Failed to start call:', err);
-      Alert.alert('Error', 'Could not start call');
+      Alert.alert(t('common.failed'), t('call.cantStart'));
     }
   };
 
   const handleRemoveFriend = () => {
     if (!profile) return;
     Alert.alert(
-      'Remove Friend',
-      `Are you sure you want to remove ${profile.displayName || profile.username} from your contacts?`,
+      t('profile.removeFriend'),
+      t('profile.confirmRemoveFriend'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('profile.removeFriend'),
           style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
@@ -155,19 +157,24 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   };
 
   const formatLastSeen = (dateStr: string): string => {
-    if (!dateStr) return 'Unknown';
+    if (!dateStr) return '';
     const diff = Date.now() - new Date(dateStr).getTime();
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes} min ago`;
+    if (minutes < 1) return t('chat.lastSeen.justNow');
+    if (minutes < 60) return t('chat.lastSeen.minAgo', { n: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) {
+      if (hours === 1) return t('chat.lastSeen.hourAgo', { n: hours });
+      return t('chat.lastSeen.hoursAgo', { n: hours });
+    }
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString([], {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    if (days === 1) return t('chat.lastSeen.yesterday');
+    return t('chat.lastSeen.date', {
+      date: new Date(dateStr).toLocaleDateString([], {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
     });
   };
 
@@ -183,7 +190,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
     return (
       <View style={styles.center}>
         <Ionicons name="person-outline" size={64} color={colors.textMuted} />
-        <Text style={styles.errorText}>User not found</Text>
+        <Text style={styles.errorText}>{t('qr.userNotFound')}</Text>
       </View>
     );
   }
@@ -221,7 +228,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
           ]}
         />
         <Text style={styles.statusText}>
-          {profile.isOnline ? 'Online' : `Last seen ${formatLastSeen(profile.lastSeen)}`}
+          {profile.isOnline ? t('chat.online') : formatLastSeen(profile.lastSeen)}
         </Text>
       </View>
 
@@ -237,7 +244,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 disabled={actionLoading}
               >
                 <Ionicons name="chatbubble" size={20} color={colors.primary} />
-                <Text style={styles.actionButtonText}>Send Message</Text>
+                <Text style={styles.actionButtonText}>{t('profile.sendMessage')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -247,7 +254,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 disabled={callState !== 'idle'}
               >
                 <Ionicons name="call" size={20} color={callState === 'idle' ? colors.primary : colors.textMuted} />
-                <Text style={styles.actionButtonText}>Voice Call</Text>
+                <Text style={styles.actionButtonText}>{t('chat.voiceCall')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -257,7 +264,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 disabled={callState !== 'idle'}
               >
                 <Ionicons name="videocam" size={20} color={callState === 'idle' ? colors.primary : colors.textMuted} />
-                <Text style={styles.actionButtonText}>Video Call</Text>
+                <Text style={styles.actionButtonText}>{t('chat.videoCall')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -267,7 +274,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 disabled={actionLoading}
               >
                 <Ionicons name="person-remove" size={20} color={colors.danger} />
-                <Text style={styles.dangerButtonText}>Remove Friend</Text>
+                <Text style={styles.dangerButtonText}>{t('profile.removeFriend')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -284,7 +291,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
               ) : (
                 <>
                   <Ionicons name="person-add" size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Add Friend</Text>
+                  <Text style={styles.primaryButtonText}>{t('profile.addFriend')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -293,7 +300,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
           {status === 'pending_sent' && (
             <View style={styles.pendingButton}>
               <Ionicons name="time-outline" size={20} color={colors.textMuted} />
-              <Text style={styles.pendingText}>Request Sent</Text>
+              <Text style={styles.pendingText}>{t('profile.requestSent')}</Text>
             </View>
           )}
 
@@ -308,7 +315,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 {actionLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Accept</Text>
+                  <Text style={styles.primaryButtonText}>{t('requests.accept')}</Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
@@ -317,7 +324,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
                 onPress={handleReject}
                 disabled={actionLoading}
               >
-                <Text style={styles.secondaryButtonText}>Reject</Text>
+                <Text style={styles.secondaryButtonText}>{t('requests.reject')}</Text>
               </TouchableOpacity>
             </View>
           )}

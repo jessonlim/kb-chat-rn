@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import contactService from '../../services/contactService';
 import socketService from '../../services/socketService';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
@@ -25,6 +26,7 @@ interface Section {
 }
 
 const ContactsScreen = ({ navigation }: Props) => {
+  const { t } = useT();
   const [contacts, setContacts] = useState<User[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ const ContactsScreen = ({ navigation }: Props) => {
       <View style={styles.newFriendsIcon}>
         <Ionicons name="person-add" size={22} color="#fff" />
       </View>
-      <Text style={styles.newFriendsText}>New Friends</Text>
+      <Text style={styles.newFriendsText}>{t('contacts.newFriends')}</Text>
       <View style={styles.newFriendsRight}>
         {pendingCount > 0 && (
           <View style={styles.badge}>
@@ -193,9 +195,9 @@ const ContactsScreen = ({ navigation }: Props) => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={64} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No contacts yet</Text>
+            <Text style={styles.emptyText}>{t('contacts.empty')}</Text>
             <Text style={styles.emptySubtext}>
-              Search for friends in the Discover tab
+              {t('contacts.emptyHint')}
             </Text>
           </View>
         }

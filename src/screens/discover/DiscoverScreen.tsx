@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -19,14 +20,16 @@ interface MenuItem {
   screen: string | null; // null = coming soon
 }
 
-const menuItems: MenuItem[] = [
-  { icon: 'megaphone-outline', label: 'Channels', screen: 'Channels' },
-  { icon: 'heart-outline', label: 'Moments', screen: 'Moments' },
-  { icon: 'wallet-outline', label: 'Wallet', screen: null },
-  { icon: 'compass-outline', label: 'Mini Programs', screen: null },
-];
-
 const DiscoverScreen = ({ navigation }: Props) => {
+  const { t } = useT();
+
+  const menuItems: MenuItem[] = [
+    { icon: 'megaphone-outline', label: t('discover.channels'), screen: 'Channels' },
+    { icon: 'heart-outline', label: t('discover.moments'), screen: 'Moments' },
+    { icon: 'wallet-outline', label: t('discover.wallet'), screen: null },
+    { icon: 'compass-outline', label: t('discover.miniPrograms'), screen: null },
+  ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.menuSection}>
@@ -61,7 +64,7 @@ const DiscoverScreen = ({ navigation }: Props) => {
                 {item.label}
               </Text>
               {isDisabled ? (
-                <Text style={styles.soonBadge}>SOON</Text>
+                <Text style={styles.soonBadge}>{t('common.soon')}</Text>
               ) : (
                 <Ionicons
                   name="chevron-forward"
@@ -75,7 +78,7 @@ const DiscoverScreen = ({ navigation }: Props) => {
       </View>
 
       <Text style={styles.footer}>
-        Explore channels, moments, and more
+        {t('discover.placeholder')}
       </Text>
     </ScrollView>
   );

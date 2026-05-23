@@ -67,7 +67,7 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
         {
           text: t('account.delete.confirm'),
           style: 'destructive',
-          onPress: async (password) => {
+          onPress: async (password?: string) => {
             if (!password) return;
             try {
               await authService.deleteAccount(password);

@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import momentService from '../../services/momentService';
 import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { MomentAttachment } from '../../types';
 
@@ -36,6 +37,7 @@ interface Props {
 let nextPhotoId = 0;
 
 const ComposeMomentScreen = ({ navigation }: Props) => {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -43,7 +45,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
   const addPhotos = async () => {
     const remaining = MAX_PHOTOS - photos.length;
     if (remaining <= 0) {
-      Alert.alert('Limit', `Maximum ${MAX_PHOTOS} photos per moment`);
+      Alert.alert(t('common.failed'), t('attach.fileTooLarge'));
       return;
     }
 
@@ -89,7 +91,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
         } catch (err) {
           console.warn('Photo upload failed:', err);
           setPhotos((prev) => prev.filter((p) => p.id !== id));
-          Alert.alert('Error', 'Failed to upload photo');
+          Alert.alert(t('common.failed'), t('attach.uploadFailed'));
         }
       })();
     }
@@ -104,7 +106,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
     const allUploaded = photos.every((p) => !p.uploading);
 
     if (!allUploaded) {
-      Alert.alert('Wait', 'Some photos are still uploading...');
+      Alert.alert(t('common.failed'), t('moments.waitUploading'));
       return;
     }
 
@@ -113,7 +115,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
       .filter((a): a is MomentAttachment => !!a);
 
     if (!trimmed && attachments.length === 0) {
-      Alert.alert('Error', 'Write something or add a photo');
+      Alert.alert(t('common.failed'), t('moments.cantBeEmpty'));
       return;
     }
 
@@ -123,8 +125,8 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
       navigation.goBack();
     } catch (err: any) {
       Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed to post moment'
+        t('common.failed'),
+        err?.response?.data?.message || t('channels.compose.failed')
       );
     } finally {
       setSubmitting(false);
@@ -144,7 +146,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
           style={styles.textInput}
           value={text}
           onChangeText={setText}
-          placeholder="Share what's on your mind..."
+          placeholder={t('moments.composePlaceholder')}
           placeholderTextColor={colors.textMuted}
           maxLength={4000}
           multiline
@@ -215,7 +217,7 @@ const ComposeMomentScreen = ({ navigation }: Props) => {
           {submitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.postButtonText}>Post</Text>
+            <Text style={styles.postButtonText}>{t('moments.post')}</Text>
           )}
         </TouchableOpacity>
       </View>

@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../stores/authStore';
 import userService from '../../services/userService';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 
 const ProfileEditScreen = ({ navigation }: Props) => {
   const { user, updateUser } = useAuth();
+  const { t } = useT();
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [about, setAbout] = useState(user?.about || '');
@@ -51,7 +53,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
   const handleSave = async () => {
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      Alert.alert('Error', 'Display name cannot be empty');
+      Alert.alert(t('common.failed'), t('profile.displayNameRequired'));
       return;
     }
 
@@ -77,7 +79,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
       navigation.goBack();
     } catch (err) {
       console.warn('Failed to update profile:', err);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert(t('common.failed'), t('profile.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -110,16 +112,16 @@ const ProfileEditScreen = ({ navigation }: Props) => {
             <Ionicons name="camera" size={18} color="#fff" />
           </View>
         </TouchableOpacity>
-        <Text style={styles.changeAvatarText}>Tap to change photo</Text>
+        <Text style={styles.changeAvatarText}>{t('profile.clickAvatar')}</Text>
 
         {/* Display Name */}
         <View style={styles.field}>
-          <Text style={styles.label}>Display Name</Text>
+          <Text style={styles.label}>{t('profile.displayNameLabel')}</Text>
           <TextInput
             style={styles.input}
             value={displayName}
             onChangeText={setDisplayName}
-            placeholder="Your display name"
+            placeholder={t('profile.displayNameLabel')}
             placeholderTextColor={colors.textMuted}
             maxLength={50}
             autoCapitalize="words"
@@ -128,12 +130,12 @@ const ProfileEditScreen = ({ navigation }: Props) => {
 
         {/* About */}
         <View style={styles.field}>
-          <Text style={styles.label}>About</Text>
+          <Text style={styles.label}>{t('profile.aboutLabel')}</Text>
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             value={about}
             onChangeText={setAbout}
-            placeholder="Write something about yourself..."
+            placeholder={t('profile.aboutPlaceholder')}
             placeholderTextColor={colors.textMuted}
             maxLength={200}
             multiline
@@ -153,7 +155,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>{t('common.save')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

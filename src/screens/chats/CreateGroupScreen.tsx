@@ -14,6 +14,7 @@ import userService from '../../services/userService';
 import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
@@ -23,6 +24,7 @@ interface Props {
 
 const CreateGroupScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+  const { t } = useT();
 
   // Step 1: select members   Step 2: enter group name + create
   const [step, setStep] = useState<1 | 2>(1);
@@ -84,7 +86,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
 
   const handleNext = () => {
     if (selected.length === 0) {
-      Alert.alert('No members', 'Select at least one member for the group.');
+      Alert.alert(t('group.atLeastOne'), t('group.atLeastOne'));
       return;
     }
     setStep(2);
@@ -93,7 +95,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
   const handleCreate = async () => {
     const name = groupName.trim();
     if (!name) {
-      Alert.alert('Group name', 'Please enter a name for the group.');
+      Alert.alert(t('group.groupName'), t('group.groupNameRequired'));
       return;
     }
 
@@ -105,7 +107,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
       navigation.replace('ChatScreen', { chatId: chat._id });
     } catch (err) {
       console.warn('Failed to create group:', err);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
+      Alert.alert(t('common.failed'), t('group.failedCreate'));
       setCreating(false);
     }
   };
@@ -123,7 +125,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
           </View>
           <TextInput
             style={styles.groupNameInput}
-            placeholder="Group name"
+            placeholder={t('group.groupNamePlaceholder')}
             placeholderTextColor={colors.textMuted}
             value={groupName}
             onChangeText={setGroupName}
@@ -136,7 +138,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
 
         {/* Member list */}
         <Text style={styles.sectionTitle}>
-          Members: {selected.length}
+          {t('group.membersCount', { n: selected.length })}
         </Text>
         <FlatList
           data={selected}
@@ -179,7 +181,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
           ) : (
             <>
               <Ionicons name="checkmark" size={22} color="#fff" />
-              <Text style={styles.createButtonText}>Create Group</Text>
+              <Text style={styles.createButtonText}>{t('group.create')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -195,7 +197,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
         <Ionicons name="search" size={20} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search users to add"
+          placeholder={t('group.searchByUsername')}
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={handleChangeText}
@@ -247,7 +249,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
       {searching && (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.loadingText}>Searching...</Text>
+          <Text style={styles.loadingText}>{t('chats.searching')}</Text>
         </View>
       )}
 
@@ -292,9 +294,9 @@ const CreateGroupScreen = ({ navigation }: Props) => {
           !searching ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Search for users to add</Text>
+              <Text style={styles.emptyText}>{t('group.searchByUsername')}</Text>
               <Text style={styles.emptySubtext}>
-                Type at least 2 characters to search
+                {t('chat.searchHint')}
               </Text>
             </View>
           ) : null
@@ -315,7 +317,9 @@ const CreateGroupScreen = ({ navigation }: Props) => {
           activeOpacity={0.7}
         >
           <Text style={styles.nextButtonText}>
-            Next ({selected.length} selected)
+            {selected.length === 1
+              ? t('group.selected', { n: selected.length })
+              : t('group.selectedPlural', { n: selected.length })}
           </Text>
           <Ionicons name="arrow-forward" size={20} color="#fff" />
         </TouchableOpacity>

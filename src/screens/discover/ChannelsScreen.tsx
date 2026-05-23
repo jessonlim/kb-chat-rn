@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import channelService from '../../services/channelService';
 import Avatar from '../../components/common/Avatar';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Channel } from '../../types';
 
@@ -22,6 +23,7 @@ interface Props {
 type Tab = 'mine' | 'discover';
 
 const ChannelsScreen = ({ navigation }: Props) => {
+  const { t } = useT();
   const [tab, setTab] = useState<Tab>('mine');
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,7 @@ const ChannelsScreen = ({ navigation }: Props) => {
   const renderChannel = ({ item }: { item: Channel }) => (
     <ChannelRow
       channel={item}
+      t={t}
       onPress={() =>
         navigation.navigate('ChannelDetail', { channelId: item._id })
       }
@@ -80,7 +83,7 @@ const ChannelsScreen = ({ navigation }: Props) => {
               tab === 'mine' && styles.tabTextActive,
             ]}
           >
-            My Channels
+            {t('channels.tab.mine')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -94,7 +97,7 @@ const ChannelsScreen = ({ navigation }: Props) => {
               tab === 'discover' && styles.tabTextActive,
             ]}
           >
-            Discover
+            {t('channels.tab.discover')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -126,12 +129,12 @@ const ChannelsScreen = ({ navigation }: Props) => {
               />
               <Text style={styles.emptyText}>
                 {tab === 'mine'
-                  ? 'No channels yet'
-                  : 'No channels to discover'}
+                  ? t('channels.empty.mine')
+                  : t('channels.empty.discover')}
               </Text>
               {tab === 'mine' && (
                 <Text style={styles.emptySubtext}>
-                  Create a channel or subscribe to one from Discover
+                  {t('channels.empty.mineHint')}
                 </Text>
               )}
             </View>
@@ -150,9 +153,11 @@ const ChannelsScreen = ({ navigation }: Props) => {
 const ChannelRow = ({
   channel,
   onPress,
+  t,
 }: {
   channel: Channel;
   onPress: () => void;
+  t: (key: any, vars?: Record<string, string | number>) => string;
 }) => {
   const { uri: avatarUri } = useMediaUrl(channel.avatar || '');
 
@@ -174,7 +179,7 @@ const ChannelRow = ({
           </Text>
           {channel.isOwner && (
             <View style={styles.ownerBadge}>
-              <Text style={styles.ownerBadgeText}>OWNER</Text>
+              <Text style={styles.ownerBadgeText}>{t('channels.owner')}</Text>
             </View>
           )}
         </View>
@@ -184,8 +189,9 @@ const ChannelRow = ({
         <View style={styles.subscriberRow}>
           <Ionicons name="people-outline" size={12} color={colors.textMuted} />
           <Text style={styles.subscriberText}>
-            {channel.subscriberCount}{' '}
-            {channel.subscriberCount === 1 ? 'subscriber' : 'subscribers'}
+            {channel.subscriberCount === 1
+              ? t('channels.subscribers', { n: channel.subscriberCount })
+              : t('channels.subscribersPlural', { n: channel.subscriberCount })}
           </Text>
         </View>
       </View>

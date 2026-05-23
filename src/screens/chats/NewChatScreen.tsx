@@ -13,6 +13,7 @@ import userService from '../../services/userService';
 import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
@@ -22,6 +23,7 @@ interface Props {
 
 const NewChatScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
@@ -118,7 +120,7 @@ const NewChatScreen = ({ navigation }: Props) => {
         <Ionicons name="search" size={20} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name or username"
+          placeholder={t('chats.searchPlaceholder')}
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={handleChangeText}
@@ -150,7 +152,7 @@ const NewChatScreen = ({ navigation }: Props) => {
         <View style={styles.createGroupIcon}>
           <Ionicons name="people" size={24} color={colors.primary} />
         </View>
-        <Text style={styles.createGroupText}>New Group</Text>
+        <Text style={styles.createGroupText}>{t('chats.newGroup')}</Text>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </TouchableOpacity>
 
@@ -160,7 +162,7 @@ const NewChatScreen = ({ navigation }: Props) => {
       {searching && (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.loadingText}>Searching...</Text>
+          <Text style={styles.loadingText}>{t('chats.searching')}</Text>
         </View>
       )}
 
@@ -172,17 +174,17 @@ const NewChatScreen = ({ navigation }: Props) => {
           hasSearched && !searching ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No users found</Text>
+              <Text style={styles.emptyText}>{t('chats.noUsersFound')}</Text>
               <Text style={styles.emptySubtext}>
-                Try searching with a different name or username
+                {t('contact.noMatch')}
               </Text>
             </View>
           ) : !hasSearched ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Find someone to chat with</Text>
+              <Text style={styles.emptyText}>{t('contacts.findUsers')}</Text>
               <Text style={styles.emptySubtext}>
-                Type at least 2 characters to search
+                {t('chat.searchHint')}
               </Text>
             </View>
           ) : null

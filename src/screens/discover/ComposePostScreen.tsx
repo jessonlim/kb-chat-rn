@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import channelService from '../../services/channelService';
 import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { ChannelPostAttachment } from '../../types';
 
@@ -38,6 +39,7 @@ let nextPhotoId = 0;
 
 const ComposePostScreen = ({ navigation, route }: Props) => {
   const { channelId } = route.params;
+  const { t } = useT();
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +47,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
   const addPhotos = async () => {
     const remaining = MAX_PHOTOS - photos.length;
     if (remaining <= 0) {
-      Alert.alert('Limit', `Maximum ${MAX_PHOTOS} photos per post`);
+      Alert.alert(t('common.failed'), t('attach.fileTooLarge'));
       return;
     }
 
@@ -92,7 +94,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
         } catch (err) {
           console.warn('Photo upload failed:', err);
           setPhotos((prev) => prev.filter((p) => p.id !== id));
-          Alert.alert('Error', 'Failed to upload photo');
+          Alert.alert(t('common.failed'), t('attach.uploadFailed'));
         }
       })();
     }
@@ -107,7 +109,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
     const allUploaded = photos.every((p) => !p.uploading);
 
     if (!allUploaded) {
-      Alert.alert('Wait', 'Some photos are still uploading...');
+      Alert.alert(t('common.failed'), t('attach.waitForUpload'));
       return;
     }
 
@@ -116,7 +118,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
       .filter((a): a is ChannelPostAttachment => !!a);
 
     if (!trimmed && attachments.length === 0) {
-      Alert.alert('Error', 'Write something or add a photo');
+      Alert.alert(t('common.failed'), t('channels.compose.empty'));
       return;
     }
 
@@ -129,8 +131,8 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
       navigation.goBack();
     } catch (err: any) {
       Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed to create post'
+        t('common.failed'),
+        err?.response?.data?.message || t('channels.compose.failed')
       );
     } finally {
       setSubmitting(false);
@@ -151,7 +153,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
           style={styles.textInput}
           value={text}
           onChangeText={setText}
-          placeholder="What's on your mind?"
+          placeholder={t('channels.compose.placeholder')}
           placeholderTextColor={colors.textMuted}
           maxLength={4000}
           multiline
@@ -224,7 +226,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
           {submitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.postButtonText}>Post</Text>
+            <Text style={styles.postButtonText}>{t('moments.post')}</Text>
           )}
         </TouchableOpacity>
       </View>

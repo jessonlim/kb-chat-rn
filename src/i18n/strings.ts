@@ -304,6 +304,7 @@ export const STRINGS = {
   'settings.title':           { en: 'Settings',       zh: '设置' },
   'settings.sound':           { en: 'Sound',          zh: '声音' },
   'settings.soundDesc':       { en: 'Play a chime when a new message arrives', zh: '收到新消息时播放提示音' },
+  'settings.vibrate':         { en: 'Vibrate',        zh: '震动' },
   'settings.notifications':   { en: 'Browser notifications', zh: '浏览器通知' },
   'settings.notificationsDesc': { en: 'Show a notification when the chat is in the background', zh: '聊天窗口在后台时显示通知' },
   'settings.notificationsBlocked': { en: 'Notifications are blocked. Allow them in your browser settings to enable.', zh: '通知已被禁止。请在浏览器设置中允许。' },

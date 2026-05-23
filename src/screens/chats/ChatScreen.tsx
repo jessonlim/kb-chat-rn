@@ -22,6 +22,7 @@ import MessageActions, { type MessageAction } from '../../components/chat/Messag
 import AttachmentMenu from '../../components/chat/AttachmentMenu';
 import VoiceRecorder from '../../components/chat/VoiceRecorder';
 import ImageViewer from '../../components/chat/ImageViewer';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize } from '../../utils/theme';
 import type { Chat, Message, User, Attachment, SendMessageAck } from '../../types';
 
@@ -30,26 +31,32 @@ interface Props {
   navigation: any;
 }
 
-const formatLastSeen = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffMin < 1) return 'last seen just now';
-  if (diffMin < 60) return `last seen ${diffMin}m ago`;
-  if (diffHr < 24) return `last seen ${diffHr}h ago`;
-  if (diffDay === 1) return 'last seen yesterday';
-  return `last seen ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-};
-
 const ChatScreen = ({ route, navigation }: Props) => {
   const { chatId } = route.params;
   const { user } = useAuth();
   const { startCall, callState } = useCall();
+  const { t } = useT();
+
+  const formatLastSeen = useCallback((dateStr: string): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+
+    if (diffMin < 1) return t('chat.lastSeen.justNow');
+    if (diffMin < 60) return t('chat.lastSeen.minAgo', { n: diffMin });
+    if (diffHr < 24) {
+      if (diffHr === 1) return t('chat.lastSeen.hourAgo', { n: diffHr });
+      return t('chat.lastSeen.hoursAgo', { n: diffHr });
+    }
+    if (diffDay === 1) return t('chat.lastSeen.yesterday');
+    return t('chat.lastSeen.date', {
+      date: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+    });
+  }, [t]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +107,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
         headerTitle: () => (
           <View style={styles.headerTitle}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {chat.groupName || 'Group'}
+              {chat.groupName || t('group.info')}
             </Text>
             <Text style={styles.headerSub}>
-              {memberCount} member{memberCount !== 1 ? 's' : ''}
-              {onlineCount > 0 ? ` · ${onlineCount} online` : ''}
+              {t('group.membersCount', { n: memberCount })}
+              {onlineCount > 0 ? ` · ${onlineCount} ${t('chat.online')}` : ''}
             </Text>
           </View>
         ),
@@ -125,7 +132,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
                 {other.displayName || other.username}
               </Text>
               <Text style={styles.headerSub}>
-                {other.isOnline ? 'online' : formatLastSeen(other.lastSeen)}
+                {other.isOnline ? t('chat.online') : formatLastSeen(other.lastSeen)}
               </Text>
             </View>
           ),
@@ -473,10 +480,10 @@ const ChatScreen = ({ route, navigation }: Props) => {
       const socket = socketService.getSocket();
       if (!socket) return;
 
-      Alert.alert('Delete Message', 'Are you sure you want to delete this message?', [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('msg.deleted'), t('msg.confirmDeleteAll'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             socket.emit('delete_message', { messageId });
@@ -490,7 +497,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         },
       ]);
     },
-    []
+    [t]
   );
 
   // Star/unstar message
@@ -659,7 +666,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
       {typingUsers.length > 0 && (
         <View style={styles.typingBar}>
           <Text style={styles.typingText}>
-            {typingUsers.length === 1 ? 'Someone is typing...' : 'Several people are typing...'}
+            {typingUsers.length === 1 ? t('chat.typing') : t('chat.typingMany')}
           </Text>
         </View>
       )}

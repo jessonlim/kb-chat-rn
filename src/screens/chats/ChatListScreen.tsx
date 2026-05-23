@@ -13,6 +13,7 @@ import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Chat, Message, User } from '../../types';
 
@@ -22,6 +23,7 @@ interface Props {
 
 const ChatListScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+  const { t } = useT();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -130,9 +132,9 @@ const ChatListScreen = ({ navigation }: Props) => {
   };
 
   const getChatName = (chat: Chat): string => {
-    if (chat.type === 'group') return chat.groupName || 'Group';
+    if (chat.type === 'group') return chat.groupName || t('group.info');
     const other = getOtherUser(chat);
-    return other?.displayName || other?.username || 'Chat';
+    return other?.displayName || other?.username || t('tab.chats');
   };
 
   const getChatAvatar = (chat: Chat) => {
@@ -146,11 +148,11 @@ const ChatListScreen = ({ navigation }: Props) => {
   const getLastMessagePreview = (chat: Chat): string => {
     const msg = chat.lastMessage;
     if (!msg) return '';
-    if (msg.type === 'image') return '📷 Photo';
-    if (msg.type === 'video') return '🎥 Video';
-    if (msg.type === 'audio') return '🎤 Voice message';
-    if (msg.type === 'file') return '📎 File';
-    if (msg.type === 'sticker') return '🎨 Sticker';
+    if (msg.type === 'image') return `📷 ${t('msg.preview.photo')}`;
+    if (msg.type === 'video') return `🎥 ${t('msg.preview.video')}`;
+    if (msg.type === 'audio') return `🎤 ${t('msg.preview.audio')}`;
+    if (msg.type === 'file') return `📎 ${t('msg.preview.file')}`;
+    if (msg.type === 'sticker') return `🎨 ${t('msg.preview.sticker')}`;
     if (msg.type === 'system') return msg.content;
     return msg.content || '';
   };
@@ -164,7 +166,7 @@ const ChatListScreen = ({ navigation }: Props) => {
     if (days === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    if (days === 1) return 'Yesterday';
+    if (days === 1) return t('chat.lastSeen.yesterday');
     if (days < 7) {
       return date.toLocaleDateString([], { weekday: 'short' });
     }
@@ -254,8 +256,8 @@ const ChatListScreen = ({ navigation }: Props) => {
         ListEmptyComponent={
           <View style={styles.center}>
             <Ionicons name="chatbubbles-outline" size={64} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No chats yet</Text>
-            <Text style={styles.emptySubtext}>Start a conversation!</Text>
+            <Text style={styles.emptyText}>{t('chats.empty')}</Text>
+            <Text style={styles.emptySubtext}>{t('chats.emptyHint')}</Text>
           </View>
         }
         contentContainerStyle={chats.length === 0 ? { flex: 1 } : undefined}

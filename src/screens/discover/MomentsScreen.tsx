@@ -16,6 +16,7 @@ import momentService from '../../services/momentService';
 import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Moment, MomentComment } from '../../types';
 
@@ -23,16 +24,18 @@ interface Props {
   navigation: any;
 }
 
+type TFn = (key: any, vars?: Record<string, string | number>) => string;
+
 // ── Time formatter ──────────────────────────────────────────────────
-const formatRelative = (iso: string): string => {
+const formatRelative = (iso: string, t: TFn): string => {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t('moments.justNow');
+  if (min < 60) return t('moments.minutesAgo', { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t('moments.hoursAgo', { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
+  if (day < 30) return t('moments.daysAgo', { n: day });
   return new Date(iso).toLocaleDateString();
 };
 
@@ -85,6 +88,7 @@ const MomentCard = ({
   onDelete: () => void;
   onDeleteComment: (commentId: string) => void;
 }) => {
+  const { t } = useT();
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const liked = moment.likes.includes(currentUserId);
@@ -153,7 +157,7 @@ const MomentCard = ({
 
       {/* Actions */}
       <View style={cardStyles.actionRow}>
-        <Text style={cardStyles.timeText}>{formatRelative(moment.createdAt)}</Text>
+        <Text style={cardStyles.timeText}>{formatRelative(moment.createdAt, t)}</Text>
 
         <TouchableOpacity
           style={cardStyles.actionBtn}
@@ -232,7 +236,7 @@ const MomentCard = ({
             style={cardStyles.commentInput}
             value={commentText}
             onChangeText={setCommentText}
-            placeholder="Write a comment..."
+            placeholder={t('moments.commentPlaceholder')}
             placeholderTextColor={colors.textMuted}
             autoFocus
             maxLength={500}
@@ -246,7 +250,7 @@ const MomentCard = ({
             ]}
             activeOpacity={0.7}
           >
-            <Text style={cardStyles.commentSendText}>Send</Text>
+            <Text style={cardStyles.commentSendText}>{t('common.send')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -362,6 +366,7 @@ const cardStyles = StyleSheet.create({
 
 const MomentsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+  const { t } = useT();
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -443,10 +448,10 @@ const MomentsScreen = ({ navigation }: Props) => {
   };
 
   const handleDelete = (m: Moment) => {
-    Alert.alert('Delete Moment', 'Delete this moment?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('moments.delete'), t('moments.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -511,10 +516,7 @@ const MomentsScreen = ({ navigation }: Props) => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="heart-outline" size={64} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No moments yet</Text>
-            <Text style={styles.emptySubtext}>
-              Share what's on your mind with friends
-            </Text>
+            <Text style={styles.emptyText}>{t('moments.empty')}</Text>
           </View>
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}

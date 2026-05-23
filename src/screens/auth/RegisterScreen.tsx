@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../stores/authStore';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 
 const RegisterScreen = ({ navigation }: Props) => {
   const { register } = useAuth();
+  const { t } = useT();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -29,15 +31,15 @@ const RegisterScreen = ({ navigation }: Props) => {
 
   const handleRegister = async () => {
     if (!username.trim() || !email.trim() || !password) {
-      Toast.show({ type: 'error', text1: 'Please fill in all required fields' });
+      Toast.show({ type: 'error', text1: t('auth.fillRequired') });
       return;
     }
     if (password !== confirmPassword) {
-      Toast.show({ type: 'error', text1: 'Passwords do not match' });
+      Toast.show({ type: 'error', text1: t('auth.passwordsDontMatch') });
       return;
     }
     if (password.length < 6) {
-      Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+      Toast.show({ type: 'error', text1: t('auth.passwordTooShort') });
       return;
     }
 
@@ -50,7 +52,7 @@ const RegisterScreen = ({ navigation }: Props) => {
         displayName: displayName.trim() || undefined,
       });
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Registration failed';
+      const msg = err?.response?.data?.message || t('auth.registerFailed');
       Toast.show({ type: 'error', text1: msg });
     } finally {
       setLoading(false);
@@ -64,14 +66,14 @@ const RegisterScreen = ({ navigation }: Props) => {
     >
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join KB Chat</Text>
+          <Text style={styles.title}>{t('auth.createAccount')}</Text>
+          <Text style={styles.subtitle}>{t('auth.createYourAccount')}</Text>
         </View>
 
         <View style={styles.form}>
           <TextInput
             style={styles.input}
-            placeholder="Username *"
+            placeholder={t('auth.username')}
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
@@ -80,7 +82,7 @@ const RegisterScreen = ({ navigation }: Props) => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Email *"
+            placeholder={t('auth.email')}
             placeholderTextColor={colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -90,14 +92,14 @@ const RegisterScreen = ({ navigation }: Props) => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Display Name (optional)"
+            placeholder={t('auth.displayName')}
             placeholderTextColor={colors.textMuted}
             value={displayName}
             onChangeText={setDisplayName}
           />
           <TextInput
             style={styles.input}
-            placeholder="Password *"
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={password}
@@ -105,7 +107,7 @@ const RegisterScreen = ({ navigation }: Props) => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Confirm Password *"
+            placeholder={t('auth.confirmPassword')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={confirmPassword}
@@ -122,7 +124,7 @@ const RegisterScreen = ({ navigation }: Props) => {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Create Account</Text>
+              <Text style={styles.buttonText}>{t('auth.createAccount')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -132,8 +134,8 @@ const RegisterScreen = ({ navigation }: Props) => {
           style={styles.linkRow}
         >
           <Text style={styles.linkText}>
-            Already have an account?{' '}
-            <Text style={styles.linkBold}>Sign In</Text>
+            {t('auth.alreadyHaveAccount')}{' '}
+            <Text style={styles.linkBold}>{t('auth.signIn')}</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>

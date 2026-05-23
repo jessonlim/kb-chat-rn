@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../stores/authStore';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -19,20 +20,21 @@ interface Props {
 
 const LoginScreen = ({ navigation }: Props) => {
   const { login } = useAuth();
+  const { t } = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Toast.show({ type: 'error', text1: 'Please fill in all fields' });
+      Toast.show({ type: 'error', text1: t('auth.fillAllFields') });
       return;
     }
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Login failed';
+      const msg = err?.response?.data?.message || t('auth.loginFailed');
       Toast.show({ type: 'error', text1: msg });
     } finally {
       setLoading(false);
@@ -48,15 +50,15 @@ const LoginScreen = ({ navigation }: Props) => {
         {/* Logo / Title */}
         <View style={styles.header}>
           <Text style={styles.logo}>💬</Text>
-          <Text style={styles.title}>KB Chat</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.title}>{t('about.appName')}</Text>
+          <Text style={styles.subtitle}>{t('auth.signInToContinue')}</Text>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={t('auth.email')}
             placeholderTextColor={colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -66,7 +68,7 @@ const LoginScreen = ({ navigation }: Props) => {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder={t('auth.password')}
             placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={password}
@@ -83,7 +85,7 @@ const LoginScreen = ({ navigation }: Props) => {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>{t('auth.signIn')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -94,8 +96,8 @@ const LoginScreen = ({ navigation }: Props) => {
           style={styles.linkRow}
         >
           <Text style={styles.linkText}>
-            Don't have an account?{' '}
-            <Text style={styles.linkBold}>Sign Up</Text>
+            {t('auth.dontHaveAccount')}{' '}
+            <Text style={styles.linkBold}>{t('auth.createOne')}</Text>
           </Text>
         </TouchableOpacity>
       </View>

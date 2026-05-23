@@ -11,10 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import contactService from '../../services/contactService';
 import Avatar from '../../components/common/Avatar';
+import { useT } from '../../i18n/I18nContext';
 import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { FriendRequest } from '../../types';
 
 const NewFriendsScreen = () => {
+  const { t } = useT();
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,12 +73,12 @@ const NewFriendsScreen = () => {
   const formatTimeAgo = (dateStr: string): string => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1) return t('moments.justNow');
+    if (minutes < 60) return t('moments.minutesAgo', { n: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t('moments.hoursAgo', { n: hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
+    if (days < 7) return t('moments.daysAgo', { n: days });
     return new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
@@ -111,7 +113,7 @@ const NewFriendsScreen = () => {
               {isProcessing ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.acceptText}>Accept</Text>
+                <Text style={styles.acceptText}>{t('requests.accept')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -120,7 +122,7 @@ const NewFriendsScreen = () => {
               onPress={() => handleReject(item._id)}
               disabled={isProcessing}
             >
-              <Text style={styles.rejectText}>Reject</Text>
+              <Text style={styles.rejectText}>{t('requests.reject')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -156,9 +158,9 @@ const NewFriendsScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="person-add-outline" size={64} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No pending requests</Text>
+            <Text style={styles.emptyText}>{t('requests.empty')}</Text>
             <Text style={styles.emptySubtext}>
-              When someone sends you a friend request, it will appear here
+              {t('contact.noFriends')}
             </Text>
           </View>
         }

@@ -35,127 +35,136 @@ const stackScreenOptions = {
 
 // ── Chats tab stack ──────────────────────────────────────────────────
 const ChatsStack = createStackNavigator();
-const ChatsStackScreen = () => (
-  <ChatsStack.Navigator screenOptions={stackScreenOptions}>
-    <ChatsStack.Screen
-      name="ChatList"
-      component={ChatListScreen}
-      options={({ navigation }) => ({
-        title: 'Chats',
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('NewChat')}
-            activeOpacity={0.7}
-            style={{ paddingRight: 16 }}
-          >
-            <Ionicons name="create-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        ),
-      })}
-    />
-    <ChatsStack.Screen
-      name="ChatScreen"
-      component={ChatScreen as any}
-      options={{ title: 'Chat' }}
-    />
-    <ChatsStack.Screen
-      name="NewChat"
-      component={NewChatScreen as any}
-      options={{ title: 'New Chat' }}
-    />
-    <ChatsStack.Screen
-      name="CreateGroup"
-      component={CreateGroupScreen as any}
-      options={{ title: 'New Group' }}
-    />
-  </ChatsStack.Navigator>
-);
+const ChatsStackScreen = () => {
+  const { t } = useT();
+  return (
+    <ChatsStack.Navigator screenOptions={stackScreenOptions}>
+      <ChatsStack.Screen
+        name="ChatList"
+        component={ChatListScreen}
+        options={({ navigation }) => ({
+          title: t('chats.title'),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('NewChat')}
+              activeOpacity={0.7}
+              style={{ paddingRight: 16 }}
+            >
+              <Ionicons name="create-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <ChatsStack.Screen
+        name="ChatScreen"
+        component={ChatScreen as any}
+        options={{ title: t('tab.chats') }}
+      />
+      <ChatsStack.Screen
+        name="NewChat"
+        component={NewChatScreen as any}
+        options={{ title: t('chats.newChat') }}
+      />
+      <ChatsStack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen as any}
+        options={{ title: t('group.newGroup') }}
+      />
+    </ChatsStack.Navigator>
+  );
+};
 
 // ── Contacts tab stack ───────────────────────────────────────────────
 const ContactsStack = createStackNavigator();
-const ContactsStackScreen = () => (
-  <ContactsStack.Navigator screenOptions={stackScreenOptions}>
-    <ContactsStack.Screen
-      name="ContactsList"
-      component={ContactsScreen as any}
-      options={{ title: 'Contacts' }}
-    />
-    <ContactsStack.Screen
-      name="NewFriends"
-      component={NewFriendsScreen}
-      options={{ title: 'New Friends' }}
-    />
-    <ContactsStack.Screen
-      name="UserProfile"
-      component={UserProfileScreen as any}
-      options={{ title: 'Profile' }}
-    />
-  </ContactsStack.Navigator>
-);
+const ContactsStackScreen = () => {
+  const { t } = useT();
+  return (
+    <ContactsStack.Navigator screenOptions={stackScreenOptions}>
+      <ContactsStack.Screen
+        name="ContactsList"
+        component={ContactsScreen as any}
+        options={{ title: t('contacts.title') }}
+      />
+      <ContactsStack.Screen
+        name="NewFriends"
+        component={NewFriendsScreen}
+        options={{ title: t('contacts.newFriends') }}
+      />
+      <ContactsStack.Screen
+        name="UserProfile"
+        component={UserProfileScreen as any}
+        options={{ title: t('profile.title') }}
+      />
+    </ContactsStack.Navigator>
+  );
+};
 
 // ── Discover tab stack ──────────────────────────────────────────────
 const DiscoverStack = createStackNavigator();
-const DiscoverStackScreen = () => (
-  <DiscoverStack.Navigator screenOptions={stackScreenOptions}>
-    <DiscoverStack.Screen
-      name="DiscoverMenu"
-      component={DiscoverScreen as any}
-      options={{ title: 'Discover' }}
-    />
-    <DiscoverStack.Screen
-      name="Channels"
-      component={ChannelsScreen as any}
-      options={({ navigation }) => ({
-        title: 'Channels',
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('CreateChannel')}
-            activeOpacity={0.7}
-            style={{ paddingRight: 16 }}
-          >
-            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        ),
-      })}
-    />
-    <DiscoverStack.Screen
-      name="ChannelDetail"
-      component={ChannelDetailScreen as any}
-      options={{ title: 'Channel' }}
-    />
-    <DiscoverStack.Screen
-      name="CreateChannel"
-      component={CreateChannelScreen as any}
-      options={{ title: 'New Channel' }}
-    />
-    <DiscoverStack.Screen
-      name="ComposePost"
-      component={ComposePostScreen as any}
-      options={{ title: 'New Post' }}
-    />
-    <DiscoverStack.Screen
-      name="Moments"
-      component={MomentsScreen as any}
-      options={({ navigation }) => ({
-        title: 'Moments',
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('ComposeMoment')}
-            activeOpacity={0.7}
-            style={{ paddingRight: 16 }}
-          >
-            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        ),
-      })}
-    />
-    <DiscoverStack.Screen
-      name="ComposeMoment"
-      component={ComposeMomentScreen as any}
-      options={{ title: 'New Moment' }}
-    />
-  </DiscoverStack.Navigator>
-);
+const DiscoverStackScreen = () => {
+  const { t } = useT();
+  return (
+    <DiscoverStack.Navigator screenOptions={stackScreenOptions}>
+      <DiscoverStack.Screen
+        name="DiscoverMenu"
+        component={DiscoverScreen as any}
+        options={{ title: t('discover.title') }}
+      />
+      <DiscoverStack.Screen
+        name="Channels"
+        component={ChannelsScreen as any}
+        options={({ navigation }) => ({
+          title: t('channels.title'),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CreateChannel')}
+              activeOpacity={0.7}
+              style={{ paddingRight: 16 }}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <DiscoverStack.Screen
+        name="ChannelDetail"
+        component={ChannelDetailScreen as any}
+        options={{ title: t('channels.info') }}
+      />
+      <DiscoverStack.Screen
+        name="CreateChannel"
+        component={CreateChannelScreen as any}
+        options={{ title: t('channels.create.title') }}
+      />
+      <DiscoverStack.Screen
+        name="ComposePost"
+        component={ComposePostScreen as any}
+        options={{ title: t('channels.compose') }}
+      />
+      <DiscoverStack.Screen
+        name="Moments"
+        component={MomentsScreen as any}
+        options={({ navigation }) => ({
+          title: t('moments.title'),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ComposeMoment')}
+              activeOpacity={0.7}
+              style={{ paddingRight: 16 }}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <DiscoverStack.Screen
+        name="ComposeMoment"
+        component={ComposeMomentScreen as any}
+        options={{ title: t('moments.compose') }}
+      />
+    </DiscoverStack.Navigator>
+  );
+};
 
 // ── Me tab stack ─────────────────────────────────────────────────────
 const MeStack = createStackNavigator();
