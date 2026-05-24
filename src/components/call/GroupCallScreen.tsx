@@ -328,14 +328,14 @@ const ControlButton = ({
     activeOpacity={0.7}
     style={[styles.controlButton, active && styles.controlButtonActive]}
   >
-    <Ionicons name={icon} size={22} color={active ? '#0a2a1f' : '#fff'} />
+    <Ionicons name={icon} size={22} color={active ? '#000000' : '#fff'} />
   </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
   fullscreen: {
     flex: 1,
-    backgroundColor: '#0a2a1f',
+    backgroundColor: '#000000',
   },
   // Incoming
   incomingHero: {

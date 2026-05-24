@@ -109,16 +109,29 @@ const ChatListScreen = ({ navigation }: Props) => {
       );
     };
 
+    // When the current user opens a chat, the backend emits messages_read.
+    // Clear the unread badge for that chat instantly so the list reflects it.
+    const onMessagesRead = (data: { chatId: string; readerId: string }) => {
+      if (data.readerId !== user?.id) return; // only self-reads clear our badge
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat._id === data.chatId ? { ...chat, unreadCount: 0 } : chat
+        )
+      );
+    };
+
     socket.on('chat_updated', onChatUpdated);
     socket.on('user_online', onPresence);
     socket.on('user_offline', onOffline);
+    socket.on('messages_read', onMessagesRead);
 
     return () => {
       socket.off('chat_updated', onChatUpdated);
       socket.off('user_online', onPresence);
       socket.off('user_offline', onOffline);
+      socket.off('messages_read', onMessagesRead);
     };
-  }, [loadChats]);
+  }, [loadChats, user?.id]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -182,7 +195,17 @@ const ChatListScreen = ({ navigation }: Props) => {
       <TouchableOpacity
         style={styles.chatRow}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate('ChatScreen', { chatId: chat._id })}
+        onPress={() => {
+          // Optimistically clear the unread badge so the UI updates instantly.
+          // The backend confirms via the messages_read socket event when
+          // ChatScreen mounts and emits mark_chat_read.
+          if ((chat.unreadCount || 0) > 0) {
+            setChats((prev) =>
+              prev.map((c) => (c._id === chat._id ? { ...c, unreadCount: 0 } : c))
+            );
+          }
+          navigation.navigate('ChatScreen', { chatId: chat._id });
+        }}
       >
         <Avatar
           name={avatar.name}

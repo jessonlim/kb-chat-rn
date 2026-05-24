@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   policyOptionSelected: {
-    backgroundColor: 'rgba(34,197,94,0.08)',
+    backgroundColor: 'rgba(220,38,38,0.10)',
   },
   policyOptionText: {
     fontSize: fontSize.md,

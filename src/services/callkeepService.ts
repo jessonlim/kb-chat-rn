@@ -47,7 +47,7 @@ const callkeepService = {
         notificationBody: `Incoming ${callLabel}`,
         answerText: 'Answer',
         declineText: 'Decline',
-        notificationColor: '#22c55e',
+        notificationColor: '#dc2626',
         isVideo,
         // Store call info in payload so we can retrieve it on answer/decline
         payload: JSON.stringify({

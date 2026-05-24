@@ -1,16 +1,16 @@
-// KB Chat theme — matches the existing green/dark theme from the web app.
+// KB Chat theme — black background with KB Chat red as the brand color.
 
 export const colors = {
-  // Primary brand (green)
-  primary: '#22c55e',
-  primaryDark: '#16a34a',
-  primaryLight: '#86efac',
+  // Primary brand (KB Chat red)
+  primary: '#dc2626',
+  primaryDark: '#b91c1c',
+  primaryLight: '#fca5a5',
 
-  // Backgrounds
-  bgDark: '#0a0a0a',
-  bgCard: '#1a1a1a',
-  bgInput: '#262626',
-  bgHeader: '#111111',
+  // Backgrounds (deeper black for KB Chat brand)
+  bgDark: '#000000',
+  bgCard: '#141414',
+  bgInput: '#1f1f1f',
+  bgHeader: '#0a0a0a',
 
   // Text
   textPrimary: '#ffffff',
@@ -21,17 +21,19 @@ export const colors = {
   danger: '#ef4444',
   warning: '#f59e0b',
   info: '#3b82f6',
+  // Success stays green — universal convention (checkmarks, "done", etc.)
   success: '#22c55e',
 
-  // Chat
-  bubbleSent: '#22c55e',
+  // Chat bubbles
+  bubbleSent: '#dc2626',         // outgoing messages in brand red
   bubbleSentText: '#ffffff',
-  bubbleReceived: '#262626',
+  bubbleReceived: '#1f1f1f',
   bubbleReceivedText: '#ffffff',
 
   // Misc
-  border: '#333333',
+  border: '#262626',
   overlay: 'rgba(0,0,0,0.6)',
+  // Online indicator stays green — universal convention
   online: '#22c55e',
   offline: '#71717a',
 };

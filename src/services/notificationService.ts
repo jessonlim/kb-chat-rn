@@ -73,7 +73,7 @@ const notificationService = {
         vibrationPattern: [0, 250, 250, 250],
         sound: 'default',
         enableLights: true,
-        lightColor: '#22c55e',
+        lightColor: '#dc2626',
       });
 
       await Notifications.setNotificationChannelAsync('calls_v2', {
@@ -83,7 +83,7 @@ const notificationService = {
         vibrationPattern: [0, 500, 500, 500, 500, 500],
         sound: 'default',
         enableLights: true,
-        lightColor: '#22c55e',
+        lightColor: '#dc2626',
       });
     }
 
