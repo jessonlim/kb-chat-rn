@@ -42,6 +42,10 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
   const [imageFailed, setImageFailed] = useState(false);
   // Reset the failure flag when the URL changes (user uploaded a new avatar)
   useEffect(() => { setImageFailed(false); }, [uri]);
+  // Debug — log every time we get a new URI so we can see what's coming through
+  useEffect(() => {
+    if (uri) console.log('[Avatar] uri:', uri);
+  }, [uri]);
 
   const showImage = !!uri && !imageFailed;
 
@@ -51,7 +55,11 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
         <Image
           source={{ uri }}
           style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
-          onError={() => setImageFailed(true)}
+          onError={(e) => {
+            console.warn('[Avatar] image failed to load:', uri, e?.nativeEvent);
+            setImageFailed(true);
+          }}
+          onLoad={() => console.log('[Avatar] image loaded:', uri)}
         />
       ) : (
         <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>

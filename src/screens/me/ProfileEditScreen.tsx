@@ -113,7 +113,8 @@ const ProfileEditScreen = ({ navigation }: Props) => {
       Toast.show({
         type: 'success',
         text1: 'Avatar selected',
-        text2: 'Tap Save to upload',
+        text2: finalUri.slice(0, 60),
+        visibilityTime: 6000,
       });
     } catch (err: any) {
       console.warn('[avatar] picker failed:', err);
