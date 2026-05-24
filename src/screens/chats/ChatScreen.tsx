@@ -718,18 +718,16 @@ const ChatScreen = ({ route, navigation }: Props) => {
     return (typeof msg.sender === 'object' ? msg.sender.id : msg.sender) === user?.id;
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   // Tapping a search result scrolls to that message in the chat.
   // Find its index in the reversed list, then scroll. If the message isn't
   // in the currently-loaded slice, we'd need to fetch it (out of scope for v1
   // — for now the result just closes the search and hopes it's visible).
+  //
+  // NOTE: this hook MUST stay above the `if (loading) return ...` early
+  // return below. React requires the same number of hooks on every render;
+  // putting a useCallback after a conditional return triggers the
+  // "Rendered more hooks than during the previous render" error on the
+  // first → second render transition.
   const handleSearchResultTap = useCallback(
     (msg: Message) => {
       setSearchVisible(false);
@@ -743,6 +741,14 @@ const ChatScreen = ({ route, navigation }: Props) => {
     },
     [reversedMessages],
   );
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
