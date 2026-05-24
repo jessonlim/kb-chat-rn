@@ -219,6 +219,10 @@ export const STRINGS = {
   'contacts.empty':           { en: 'No contacts yet', zh: '暂无联系人' },
   'contacts.emptyHint':       { en: 'Tap the + button above to find users and send friend requests', zh: '点击上方 + 按钮查找用户并发送好友请求' },
   'contacts.newFriends':      { en: 'New Friends',    zh: '新的朋友' },
+  'contacts.groupChats':      { en: 'Group Chats',    zh: '群聊' },
+  'contacts.tags':            { en: 'Tags',           zh: '标签' },
+  'contacts.friendCount':     { en: '{n} friends',    zh: '{n} 位朋友' },
+  'group.notInAnyHint':       { en: "You're not in any group chats yet", zh: '还没有加入任何群聊' },
   'contacts.pending':         { en: '{n} pending',    zh: '{n} 个待处理' },
 
   // User profile modal

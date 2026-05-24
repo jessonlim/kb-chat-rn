@@ -13,6 +13,7 @@ import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
 import NewFriendsScreen from '../screens/contacts/NewFriendsScreen';
 import UserProfileScreen from '../screens/contacts/UserProfileScreen';
+import GroupChatsListScreen from '../screens/contacts/GroupChatsListScreen';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import ChannelsScreen from '../screens/discover/ChannelsScreen';
 import ChannelDetailScreen from '../screens/discover/ChannelDetailScreen';
@@ -173,6 +174,11 @@ const ContactsStackScreen = () => {
         name="UserProfile"
         component={UserProfileScreen as any}
         options={{ title: t('profile.title') }}
+      />
+      <ContactsStack.Screen
+        name="GroupChats"
+        component={GroupChatsListScreen as any}
+        options={{ title: t('contacts.groupChats') }}
       />
     </ContactsStack.Navigator>
   );

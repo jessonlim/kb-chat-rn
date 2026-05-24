@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import contactService from '../../services/contactService';
 import socketService from '../../services/socketService';
 import Avatar from '../../components/common/Avatar';
@@ -162,28 +163,67 @@ const ContactsScreen = ({ navigation }: Props) => {
     </View>
   );
 
+  // Three "header rows" — special entries that always show at the top,
+  // mirroring WeChat's Contacts layout.
   const renderHeader = () => (
-    <TouchableOpacity
-      style={styles.newFriendsRow}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('NewFriends')}
-    >
-      <View style={styles.newFriendsIcon}>
-        <Ionicons name="person-add" size={22} color="#fff" />
-      </View>
-      <Text style={styles.newFriendsText}>{t('contacts.newFriends')}</Text>
-      <View style={styles.newFriendsRight}>
-        {pendingCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {pendingCount > 99 ? '99+' : pendingCount}
-            </Text>
-          </View>
-        )}
+    <View>
+      <TouchableOpacity
+        style={styles.specialRow}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('NewFriends')}
+      >
+        <View style={[styles.specialIcon, { backgroundColor: '#f59e0b' }]}>
+          <Ionicons name="person-add" size={22} color="#fff" />
+        </View>
+        <Text style={styles.specialLabel}>{t('contacts.newFriends')}</Text>
+        <View style={styles.specialRight}>
+          {pendingCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </Text>
+            </View>
+          )}
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.specialRow, styles.specialRowBorder]}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('GroupChats')}
+      >
+        <View style={[styles.specialIcon, { backgroundColor: colors.success }]}>
+          <Ionicons name="people" size={22} color="#fff" />
+        </View>
+        <Text style={styles.specialLabel}>{t('contacts.groupChats')}</Text>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.specialRow, styles.specialRowBorder]}
+        activeOpacity={0.7}
+        onPress={() => {
+          Toast.show({ type: 'info', text1: t('contacts.tags'), text2: t('common.soon') });
+        }}
+      >
+        <View style={[styles.specialIcon, { backgroundColor: colors.info }]}>
+          <Ionicons name="pricetag" size={20} color="#fff" />
+        </View>
+        <Text style={styles.specialLabel}>{t('contacts.tags')}</Text>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
+    </View>
   );
+
+  const renderFooter = () =>
+    contacts.length > 0 ? (
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          {t('contacts.friendCount', { n: contacts.length })}
+        </Text>
+      </View>
+    ) : null;
 
   if (loading) {
     return (
@@ -201,6 +241,8 @@ const ContactsScreen = ({ navigation }: Props) => {
         renderItem={renderContact}
         renderSectionHeader={renderSectionHeader}
         ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={64} color={colors.textMuted} />
@@ -218,7 +260,6 @@ const ContactsScreen = ({ navigation }: Props) => {
             colors={[colors.primary]}
           />
         }
-        stickySectionHeadersEnabled={false}
       />
     </View>
   );
@@ -235,34 +276,44 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // New Friends row
-  newFriendsRow: {
+  // Special rows (New Friends, Group Chats, Tags) — WeChat-style
+  specialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
   },
-  newFriendsIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
+  specialRowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  specialIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  newFriendsText: {
+  specialLabel: {
     flex: 1,
     fontSize: fontSize.md,
-    fontWeight: '600',
+    fontWeight: '500',
     color: colors.textPrimary,
-    marginLeft: spacing.md,
   },
-  newFriendsRight: {
+  specialRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  // Footer (friend count)
+  footer: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
   },
   badge: {
     backgroundColor: colors.danger,
