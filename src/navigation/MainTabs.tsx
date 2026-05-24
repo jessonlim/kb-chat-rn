@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
+import Toast from 'react-native-toast-message';
+import QuickActionMenu from '../components/common/QuickActionMenu';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,30 +45,75 @@ const ChatsStackScreen = () => {
   const { t } = useT();
   const { colors } = useTheme();
   const stackScreenOptions = useStackScreenOptions();
+  const [menuVisible, setMenuVisible] = useState(false);
+  // We capture the latest screen navigation via the headerRight callback
+  // so the menu's actions can use it without recreating the menu each render.
+  const navRef = React.useRef<any>(null);
+
+  const buildActions = () => {
+    const nav = navRef.current;
+    if (!nav) return [];
+    // .getParent() climbs from ChatStack → MainTabs so we can jump tabs
+    const tabs = nav.getParent?.();
+    return [
+      {
+        key: 'newChat',
+        icon: 'chatbubble-ellipses-outline' as const,
+        label: t('quick.newChat'),
+        onPress: () => nav.navigate('NewChat'),
+      },
+      {
+        key: 'addContacts',
+        icon: 'person-add-outline' as const,
+        label: t('quick.addContacts'),
+        onPress: () => {
+          if (tabs) tabs.navigate('ContactsTab', { screen: 'NewFriends' });
+        },
+      },
+      {
+        key: 'scan',
+        icon: 'scan-outline' as const,
+        label: t('quick.scan'),
+        onPress: () =>
+          Toast.show({ type: 'info', text1: t('quick.scan'), text2: t('common.soon') }),
+      },
+      {
+        key: 'money',
+        icon: 'cash-outline' as const,
+        label: t('quick.money'),
+        onPress: () =>
+          Toast.show({ type: 'info', text1: t('quick.money'), text2: t('common.soon') }),
+      },
+    ];
+  };
+
   return (
     <ChatsStack.Navigator screenOptions={stackScreenOptions}>
       <ChatsStack.Screen
         name="ChatList"
         component={ChatListScreen}
-        options={({ navigation }) => ({
-          title: t('chats.title'),
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 14, paddingRight: 16 }}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('CreateGroup')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('NewChat')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          ),
-        })}
+        options={({ navigation }) => {
+          navRef.current = navigation;
+          return {
+            title: t('chats.title'),
+            headerRight: () => (
+              <>
+                <TouchableOpacity
+                  onPress={() => setMenuVisible(true)}
+                  activeOpacity={0.7}
+                  style={{ paddingRight: 16 }}
+                >
+                  <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
+                </TouchableOpacity>
+                <QuickActionMenu
+                  visible={menuVisible}
+                  onClose={() => setMenuVisible(false)}
+                  actions={buildActions()}
+                />
+              </>
+            ),
+          };
+        }}
       />
       <ChatsStack.Screen
         name="ChatScreen"
