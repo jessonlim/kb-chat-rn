@@ -1,3 +1,9 @@
+// LiveKit must register its WebRTC globals BEFORE any other RN-WebRTC code
+// is imported. This patches `RTCPeerConnection`, `mediaDevices`, etc. onto
+// the global scope so livekit-client (designed for the web) works in RN.
+import { registerGlobals } from '@livekit/react-native';
+registerGlobals();
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

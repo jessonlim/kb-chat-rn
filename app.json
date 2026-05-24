@@ -13,7 +13,7 @@
       "backgroundColor": "#dc2626"
     },
     "plugins": [
-      "@config-plugins/react-native-webrtc",
+      "@livekit/react-native-expo-plugin",
       "expo-dev-client",
       "expo-font",
       ["react-native-full-screen-notification-incoming-call", { "statusBarColor": "#000000" }]

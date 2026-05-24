@@ -1,0 +1,384 @@
+// GroupCallContext — multi-participant voice/video via LiveKit.
+// Ported from the web app's GroupCallContext, adapted for React Native:
+//   - Uses InCallManager for audio routing (instead of the web app's audioMode)
+//   - LiveKit RN SDK uses livekit-client + @livekit/react-native-webrtc
+//   - State machine: idle -> incoming -> joining -> in_call -> idle
+//
+// Backend signaling stays identical to the web version:
+//   - emit 'group_call_start' { chatId, type } to ring everyone
+//   - emit 'group_call_end' { chatId } to tell others we left
+//   - listen for 'group_call_start' to know when someone is calling us
+//   - listen for 'group_call_end' to clear an unanswered incoming call
+
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import type { ReactNode } from 'react';
+import {
+  Room,
+  RoomEvent,
+  Track,
+  type RemoteParticipant,
+  type Participant,
+} from 'livekit-client';
+import InCallManager from 'react-native-incall-manager';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '../stores/authStore';
+import { useT } from '../i18n/I18nContext';
+import socketService from '../services/socketService';
+import groupCallService from '../services/groupCallService';
+import { storage } from '../services/api';
+
+export type GroupCallState = 'idle' | 'incoming' | 'joining' | 'in_call';
+export type GroupCallType = 'voice' | 'video';
+
+export interface GroupCallStarter {
+  _id: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+}
+
+interface GroupCallContextType {
+  state: GroupCallState;
+  type: GroupCallType | null;
+  chatId: string | null;
+  groupName: string;
+  starter: GroupCallStarter | null;
+  room: Room | null;
+  participants: Participant[];
+  isMuted: boolean;
+  isCameraOff: boolean;
+  isSpeakerOn: boolean;
+  durationSec: number;
+  startGroupCall: (chatId: string, type: GroupCallType, groupName?: string) => Promise<void>;
+  joinGroupCall: () => Promise<void>;
+  declineIncoming: () => void;
+  leaveGroupCall: () => Promise<void>;
+  toggleMute: () => void;
+  toggleCamera: () => void;
+  toggleSpeaker: () => void;
+}
+
+const GroupCallContext = createContext<GroupCallContextType | undefined>(undefined);
+
+export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+  const { t } = useT();
+  const [state, setState] = useState<GroupCallState>('idle');
+  const [type, setType] = useState<GroupCallType | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState('');
+  const [starter, setStarter] = useState<GroupCallStarter | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [durationSec, setDurationSec] = useState(0);
+  const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Refs for socket handlers (so they always see latest state without re-binding)
+  const stateRef = useRef(state);
+  const chatIdRef = useRef(chatId);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
+
+  // ── Timer helpers ─────────────────────────────────────────────────
+  const stopDurationTimer = () => {
+    if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+    durationTimerRef.current = null;
+  };
+  const startDurationTimer = () => {
+    stopDurationTimer();
+    setDurationSec(0);
+    const startedAt = Date.now();
+    durationTimerRef.current = setInterval(() => {
+      setDurationSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+  };
+
+  // ── Cleanup: tear down everything ─────────────────────────────────
+  const cleanup = useCallback(async () => {
+    stopDurationTimer();
+    try { InCallManager.stopRingtone(); } catch { /* noop */ }
+    try { InCallManager.stop(); } catch { /* noop */ }
+    if (room) {
+      try { await room.disconnect(); } catch { /* noop */ }
+    }
+    setRoom(null);
+    setParticipants([]);
+    setIsMuted(false);
+    setIsCameraOff(false);
+    setIsSpeakerOn(false);
+    setDurationSec(0);
+    setState('idle');
+    setType(null);
+    setChatId(null);
+    setGroupName('');
+    setStarter(null);
+  }, [room]);
+
+  // ── Connect to the LiveKit room ───────────────────────────────────
+  const connectToRoom = useCallback(
+    async (targetChatId: string, callType: GroupCallType): Promise<Room> => {
+      const { token, url } = await groupCallService.getToken(targetChatId);
+      const r = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      // Keep participant list in sync as people join / leave / mute
+      const refreshParticipants = () => {
+        const all: Participant[] = [
+          r.localParticipant,
+          ...Array.from(r.remoteParticipants.values()),
+        ];
+        setParticipants(all);
+      };
+
+      r.on(RoomEvent.ParticipantConnected, refreshParticipants);
+      r.on(RoomEvent.ParticipantDisconnected, (_p: RemoteParticipant) => {
+        refreshParticipants();
+        // If we're the last one, end the call
+        if (r.remoteParticipants.size === 0) {
+          Toast.show({ type: 'info', text1: t('groupCall.everyoneLeft') });
+          cleanup();
+        }
+      });
+      r.on(RoomEvent.TrackMuted, refreshParticipants);
+      r.on(RoomEvent.TrackUnmuted, refreshParticipants);
+      r.on(RoomEvent.TrackPublished, refreshParticipants);
+      r.on(RoomEvent.TrackUnpublished, refreshParticipants);
+      r.on(RoomEvent.LocalTrackPublished, refreshParticipants);
+      r.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
+      r.on(RoomEvent.Disconnected, () => { cleanup(); });
+
+      await r.connect(url, token);
+
+      // Publish our identity so other participants see our name + avatar
+      if (user) {
+        await r.localParticipant.setMetadata(JSON.stringify({
+          displayName: user.displayName,
+          username: user.username,
+          avatar: user.avatar || '',
+        }));
+      }
+
+      // Turn on mic always, camera only for video calls
+      await r.localParticipant.setMicrophoneEnabled(true);
+      if (callType === 'video') {
+        await r.localParticipant.setCameraEnabled(true);
+      }
+
+      refreshParticipants();
+      return r;
+    },
+    [user, t, cleanup],
+  );
+
+  // ── Audio routing helper (reads user pref for default speaker) ───
+  const applyAudioRouting = (callType: GroupCallType) => {
+    const useSpeaker = callType === 'video' || (storage.getBoolean('pref.defaultSpeakerOn') ?? false);
+    // InCallManager.start sets the right Android audio mode for a call
+    try {
+      InCallManager.start({ media: callType === 'video' ? 'video' : 'audio' });
+      InCallManager.setForceSpeakerphoneOn(useSpeaker);
+      setIsSpeakerOn(useSpeaker);
+    } catch (err) {
+      console.warn('audio routing failed', err);
+    }
+  };
+
+  // ── Caller flow: start a new group call ──────────────────────────
+  const startGroupCall = useCallback(
+    async (targetChatId: string, callType: GroupCallType, name?: string) => {
+      if (stateRef.current !== 'idle' || !user) return;
+      setState('joining');
+      setType(callType);
+      setChatId(targetChatId);
+      setGroupName(name || '');
+      try {
+        const r = await connectToRoom(targetChatId, callType);
+        setRoom(r);
+        setState('in_call');
+        startDurationTimer();
+        applyAudioRouting(callType);
+        // Tell the rest of the chat that a call is starting (they'll ring)
+        socketService.getSocket()?.emit('group_call_start', {
+          chatId: targetChatId,
+          type: callType,
+        });
+      } catch (err: any) {
+        Toast.show({
+          type: 'error',
+          text1: err?.response?.data?.message || err?.message || t('call.failed'),
+        });
+        cleanup();
+      }
+    },
+    [user, connectToRoom, cleanup, t],
+  );
+
+  // ── Callee flow: accept an incoming call ─────────────────────────
+  const joinGroupCall = useCallback(async () => {
+    if (stateRef.current !== 'incoming' || !chatIdRef.current || !type) return;
+    const targetChatId = chatIdRef.current;
+    const callType = type;
+    setState('joining');
+    try {
+      const r = await connectToRoom(targetChatId, callType);
+      setRoom(r);
+      setState('in_call');
+      startDurationTimer();
+      applyAudioRouting(callType);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.message || t('call.failed'),
+      });
+      cleanup();
+    }
+  }, [type, connectToRoom, cleanup, t]);
+
+  const declineIncoming = useCallback(() => {
+    if (stateRef.current !== 'incoming') return;
+    cleanup();
+  }, [cleanup]);
+
+  const leaveGroupCall = useCallback(async () => {
+    const cId = chatIdRef.current;
+    await cleanup();
+    if (cId) {
+      socketService.getSocket()?.emit('group_call_end', { chatId: cId });
+    }
+  }, [cleanup]);
+
+  // ── Controls ─────────────────────────────────────────────────────
+  const toggleMute = useCallback(() => {
+    if (!room) return;
+    const next = !isMuted;
+    void room.localParticipant.setMicrophoneEnabled(!next);
+    setIsMuted(next);
+  }, [room, isMuted]);
+
+  const toggleCamera = useCallback(() => {
+    if (!room) return;
+    const next = !isCameraOff;
+    void room.localParticipant.setCameraEnabled(!next);
+    setIsCameraOff(next);
+  }, [room, isCameraOff]);
+
+  const toggleSpeaker = useCallback(() => {
+    setIsSpeakerOn((prev) => {
+      const next = !prev;
+      try { InCallManager.setForceSpeakerphoneOn(next); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  // ── Socket: handle incoming-call and call-ended broadcasts ───────
+  useEffect(() => {
+    if (!user) return;
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    const onStart = (data: {
+      chatId: string;
+      type: GroupCallType;
+      groupName: string;
+      starter: GroupCallStarter;
+    }) => {
+      // Already in another call → ignore (could queue, but simpler to drop)
+      if (stateRef.current !== 'idle') return;
+      setState('incoming');
+      setType(data.type);
+      setChatId(data.chatId);
+      setGroupName(data.groupName);
+      setStarter(data.starter);
+    };
+
+    const onEnd = (data: { chatId: string }) => {
+      // The incoming call was canceled before we picked up
+      if (stateRef.current === 'incoming' && data.chatId === chatIdRef.current) {
+        cleanup();
+      }
+    };
+
+    socket.on('group_call_start', onStart);
+    socket.on('group_call_end', onEnd);
+    return () => {
+      socket.off('group_call_start', onStart);
+      socket.off('group_call_end', onEnd);
+    };
+  }, [user, cleanup]);
+
+  // ── Ringtone for incoming/outgoing calls ─────────────────────────
+  useEffect(() => {
+    try {
+      if (state === 'incoming') {
+        // 30s ringtone, default vibrate pattern, no iOS category override
+        InCallManager.startRingtone('_BUNDLE_', [500, 1000], '', 30);
+      } else if (state === 'joining') {
+        InCallManager.startRingback('_BUNDLE_');
+      } else {
+        InCallManager.stopRingtone();
+        InCallManager.stopRingback();
+      }
+    } catch { /* noop */ }
+    return () => {
+      try {
+        InCallManager.stopRingtone();
+        InCallManager.stopRingback();
+      } catch { /* noop */ }
+    };
+  }, [state]);
+
+  return (
+    <GroupCallContext.Provider
+      value={{
+        state,
+        type,
+        chatId,
+        groupName,
+        starter,
+        room,
+        participants,
+        isMuted,
+        isCameraOff,
+        isSpeakerOn,
+        durationSec,
+        startGroupCall,
+        joinGroupCall,
+        declineIncoming,
+        leaveGroupCall,
+        toggleMute,
+        toggleCamera,
+        toggleSpeaker,
+      }}
+    >
+      {children}
+    </GroupCallContext.Provider>
+  );
+};
+
+export const useGroupCall = () => {
+  const ctx = useContext(GroupCallContext);
+  if (!ctx) throw new Error('useGroupCall must be used within GroupCallProvider');
+  return ctx;
+};
+
+// Helper: return the camera VideoTrack for a participant, or null if none
+export const getCameraTrack = (p: Participant) => {
+  for (const pub of p.videoTrackPublications.values()) {
+    if (pub.source === Track.Source.Camera && pub.track && !pub.isMuted) {
+      return pub.track;
+    }
+  }
+  return null;
+};

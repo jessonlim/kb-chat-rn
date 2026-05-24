@@ -11,7 +11,7 @@ import {
   SafeAreaView,
   Dimensions,
 } from 'react-native';
-import { RTCView } from 'react-native-webrtc';
+import { RTCView } from '@livekit/react-native-webrtc';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../common/Avatar';

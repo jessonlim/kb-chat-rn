@@ -5,12 +5,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { AuthContext, useAuthProvider } from './src/stores/authStore';
 import { CallProvider } from './src/context/CallContext';
+import { GroupCallProvider } from './src/context/GroupCallContext';
 import { I18nProvider } from './src/i18n/I18nContext';
 import { navigationRef } from './src/navigation/navigationRef';
 import useNotifications from './src/hooks/useNotifications';
 import RootNavigator from './src/navigation/RootNavigator';
 import CallScreen from './src/components/call/CallScreen';
 import IncomingCallOverlay from './src/components/call/IncomingCallOverlay';
+import GroupCallScreen from './src/components/call/GroupCallScreen';
 
 export default function App() {
   const auth = useAuthProvider();
@@ -23,13 +25,16 @@ export default function App() {
       <I18nProvider>
         <AuthContext.Provider value={auth}>
           <CallProvider>
-            <NavigationContainer ref={navigationRef}>
-              <RootNavigator />
-              <StatusBar style="light" />
-            </NavigationContainer>
-            {/* Call overlays — rendered above everything */}
-            <CallScreen />
-            <IncomingCallOverlay />
+            <GroupCallProvider>
+              <NavigationContainer ref={navigationRef}>
+                <RootNavigator />
+                <StatusBar style="light" />
+              </NavigationContainer>
+              {/* Call overlays — rendered above everything */}
+              <CallScreen />
+              <IncomingCallOverlay />
+              <GroupCallScreen />
+            </GroupCallProvider>
           </CallProvider>
           <Toast />
         </AuthContext.Provider>

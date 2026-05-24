@@ -16,6 +16,7 @@ import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
 import { useCall } from '../../context/CallContext';
+import { useGroupCall } from '../../context/GroupCallContext';
 import MessageBubble from '../../components/chat/MessageBubble';
 import MessageInput from '../../components/chat/MessageInput';
 import MessageActions, { type MessageAction } from '../../components/chat/MessageActions';
@@ -35,6 +36,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const { chatId } = route.params;
   const { user } = useAuth();
   const { startCall, callState } = useCall();
+  const { startGroupCall, state: groupCallState } = useGroupCall();
   const { t } = useT();
 
   const formatLastSeen = useCallback((dateStr: string): string => {
@@ -103,16 +105,38 @@ const ChatScreen = ({ route, navigation }: Props) => {
     if (chat.type === 'group') {
       const memberCount = chat.participants.length;
       const onlineCount = chat.participants.filter((p) => p.isOnline).length;
+      const groupTitle = chat.groupName || t('group.info');
+      const canStartCall = groupCallState === 'idle';
       navigation.setOptions({
         headerTitle: () => (
           <View style={styles.headerTitle}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {chat.groupName || t('group.info')}
+              {groupTitle}
             </Text>
             <Text style={styles.headerSub}>
               {t('group.membersCount', { n: memberCount })}
               {onlineCount > 0 ? ` · ${onlineCount} ${t('chat.online')}` : ''}
             </Text>
+          </View>
+        ),
+        headerRight: () => (
+          <View style={styles.headerCallButtons}>
+            <TouchableOpacity
+              onPress={() => canStartCall && startGroupCall(chatId, 'voice', groupTitle)}
+              activeOpacity={0.7}
+              style={styles.headerCallBtn}
+              disabled={!canStartCall}
+            >
+              <Ionicons name="call-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => canStartCall && startGroupCall(chatId, 'video', groupTitle)}
+              activeOpacity={0.7}
+              style={styles.headerCallBtn}
+              disabled={!canStartCall}
+            >
+              <Ionicons name="videocam-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
+            </TouchableOpacity>
           </View>
         ),
       });
@@ -159,7 +183,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         });
       }
     }
-  }, [chat, navigation, user?.id, callState, startCall, chatId]);
+  }, [chat, navigation, user?.id, callState, startCall, chatId, groupCallState, startGroupCall, t]);
 
   // Update other user's online status from socket
   useEffect(() => {

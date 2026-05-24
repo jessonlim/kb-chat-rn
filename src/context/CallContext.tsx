@@ -14,7 +14,7 @@ import {
   RTCIceCandidate,
   mediaDevices,
   MediaStream,
-} from 'react-native-webrtc';
+} from '@livekit/react-native-webrtc';
 import InCallManager from 'react-native-incall-manager';
 import socketService from '../services/socketService';
 import callService from '../services/callService';
