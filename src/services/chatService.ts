@@ -28,6 +28,15 @@ const chatService = {
     return data;
   },
 
+  /** Forward a message: re-send its content + attachments to another chat. */
+  forwardMessageRest: async (
+    chatId: string,
+    body: { content?: string; type?: string; attachments?: import('../types').Attachment[] },
+  ): Promise<MessageResponse> => {
+    const { data } = await api.post<MessageResponse>(`/api/chats/${chatId}/messages`, body);
+    return data;
+  },
+
   createGroup: async (body: {
     groupName: string;
     memberIds: string[];
@@ -82,6 +91,28 @@ const chatService = {
 
   toggleStar: async (chatId: string, messageId: string): Promise<{ ok: boolean; starred: boolean }> => {
     const { data } = await api.post(`/api/chats/${chatId}/messages/${messageId}/star`);
+    return data;
+  },
+
+  /** GET /api/chats/:chatId/messages/search?q=... — case-insensitive search */
+  searchChatMessages: async (
+    chatId: string,
+    query: string,
+  ): Promise<{ messages: import('../types').Message[] }> => {
+    const { data } = await api.get(`/api/chats/${chatId}/messages/search`, {
+      params: { q: query },
+    });
+    return data;
+  },
+
+  /** GET /api/chats/:chatId/media — all media messages (images + videos) */
+  listMediaInChat: async (
+    chatId: string,
+    opts?: { type?: 'image' | 'video'; before?: string; limit?: number },
+  ): Promise<{ messages: import('../types').Message[] }> => {
+    const { data } = await api.get(`/api/chats/${chatId}/media`, {
+      params: opts,
+    });
     return data;
   },
 };

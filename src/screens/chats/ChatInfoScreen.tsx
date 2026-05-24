@@ -170,13 +170,22 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
       </View>
 
-      {/* ── Search ───────────────────────────────────────── */}
+      {/* ── Search + Shared Media ────────────────────────── */}
       <View style={styles.section}>
         <Row
           icon="search-outline"
           label={t('chatInfo.searchHistory')}
-          onPress={() => showSoon(t('chatInfo.searchHistory'))}
+          onPress={() => navigation.navigate('ChatScreen', { chatId, openSearch: true })}
           chevron
+          colors={colors}
+          styles={styles}
+        />
+        <Row
+          icon="images-outline"
+          label={t('chatInfo.sharedMedia')}
+          onPress={() => navigation.navigate('SharedMedia', { chatId })}
+          chevron
+          bordered
           colors={colors}
           styles={styles}
         />

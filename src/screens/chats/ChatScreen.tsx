@@ -9,6 +9,7 @@ import {
   Text,
   Alert,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ExpoClipboard from 'expo-clipboard';
@@ -35,6 +36,8 @@ interface Props {
 
 const ChatScreen = ({ route, navigation }: Props) => {
   const { chatId } = route.params;
+  // openSearch can be passed via route params when navigating from ChatInfo
+  const openSearchOnMount = (route.params as any).openSearch as boolean | undefined;
   const { user } = useAuth();
   const { startCall, callState } = useCall();
   const { startGroupCall, state: groupCallState } = useGroupCall();
@@ -84,6 +87,42 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+
+  // In-chat search state
+  const [searchVisible, setSearchVisible] = useState(!!openSearchOnMount);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced search — fire 350ms after the user stops typing
+  useEffect(() => {
+    if (!searchVisible) {
+      setSearchResults([]);
+      return;
+    }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { messages: results } = await chatService.searchChatMessages(chatId, q);
+        setSearchResults(results);
+      } catch (err) {
+        console.warn('Search failed:', err);
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchQuery, searchVisible, chatId]);
 
   // Load chat info + initial messages
   useEffect(() => {
@@ -143,6 +182,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
               disabled={!canStartCall}
             >
               <Ionicons name="videocam-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSearchVisible((v) => !v)}
+              activeOpacity={0.7}
+              style={styles.headerCallBtn}
+            >
+              <Ionicons name="search" size={20} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate('ChatInfo', { chatId })}
@@ -646,7 +692,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
           break;
 
         case 'forward':
-          // Forward — Phase 5+ (would navigate to a chat picker)
+          navigation.navigate('ForwardMessage', { message: actionMessage });
           break;
 
         case 'react':
@@ -680,12 +726,93 @@ const ChatScreen = ({ route, navigation }: Props) => {
     );
   }
 
+  // Tapping a search result scrolls to that message in the chat.
+  // Find its index in the reversed list, then scroll. If the message isn't
+  // in the currently-loaded slice, we'd need to fetch it (out of scope for v1
+  // — for now the result just closes the search and hopes it's visible).
+  const handleSearchResultTap = useCallback(
+    (msg: Message) => {
+      setSearchVisible(false);
+      setSearchQuery('');
+      const idx = reversedMessages.findIndex((m) => m._id === msg._id);
+      if (idx >= 0 && flatListRef.current) {
+        try {
+          flatListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+        } catch { /* ignore — message not measured yet */ }
+      }
+    },
+    [reversedMessages],
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
+      {searchVisible && (
+        <View style={styles.searchBar}>
+          <View style={styles.searchInputWrap}>
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <TextInput
+              autoFocus
+              style={styles.searchInput}
+              placeholder={t('search.placeholder')}
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {!!searchQuery && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              setSearchVisible(false);
+              setSearchQuery('');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.searchCancel}>{t('common.cancel')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {searchVisible && searchQuery.trim().length >= 2 && (
+        <View style={styles.searchResults}>
+          {searching ? (
+            <ActivityIndicator color={colors.primary} style={{ padding: spacing.md }} />
+          ) : searchResults.length === 0 ? (
+            <Text style={styles.searchEmpty}>{t('search.noResults')}</Text>
+          ) : (
+            <FlatList
+              data={searchResults}
+              keyExtractor={(m) => m._id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.searchResultRow}
+                  activeOpacity={0.7}
+                  onPress={() => handleSearchResultTap(item)}
+                >
+                  <Text style={styles.searchResultContent} numberOfLines={2}>
+                    {item.content || ''}
+                  </Text>
+                  <Text style={styles.searchResultTime}>
+                    {new Date(item.createdAt || '').toLocaleDateString([], {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         // inverted means: data[0] sits at the visual bottom, last entry at top.
@@ -796,6 +923,68 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     paddingHorizontal: spacing.lg,
     paddingVertical: 4,
     backgroundColor: colors.bgHeader,
+  },
+  // In-chat search bar (rendered above the message list)
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.bgHeader,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgInput,
+    borderRadius: 18,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+    paddingVertical: 2,
+  },
+  searchCancel: {
+    fontSize: fontSize.md,
+    color: colors.primary,
+    paddingHorizontal: spacing.xs,
+  },
+  searchResults: {
+    maxHeight: 280,
+    backgroundColor: colors.bgCard,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  searchResultRow: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  searchResultContent: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+  },
+  searchResultTime: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+  },
+  searchEmpty: {
+    padding: spacing.lg,
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
   },
   typingText: {
     fontSize: fontSize.xs,

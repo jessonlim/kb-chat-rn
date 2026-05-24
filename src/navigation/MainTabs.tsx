@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ChatListScreen from '../screens/chats/ChatListScreen';
 import ChatScreen from '../screens/chats/ChatScreen';
 import ChatInfoScreen from '../screens/chats/ChatInfoScreen';
+import SharedMediaScreen from '../screens/chats/SharedMediaScreen';
+import ForwardMessageScreen from '../screens/chats/ForwardMessageScreen';
 import NewChatScreen from '../screens/chats/NewChatScreen';
 import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
@@ -126,6 +128,16 @@ const ChatsStackScreen = () => {
         name="ChatInfo"
         component={ChatInfoScreen as any}
         options={{ title: t('chatInfo.title') }}
+      />
+      <ChatsStack.Screen
+        name="SharedMedia"
+        component={SharedMediaScreen as any}
+        options={{ title: t('media.title') }}
+      />
+      <ChatsStack.Screen
+        name="ForwardMessage"
+        component={ForwardMessageScreen as any}
+        options={{ title: t('forward.title') }}
       />
       <ChatsStack.Screen
         name="NewChat"
