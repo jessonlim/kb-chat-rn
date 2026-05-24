@@ -8,6 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import EmojiPicker from 'rn-emoji-keyboard';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Message, Attachment } from '../../types';
@@ -40,6 +41,7 @@ const MessageInput = ({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState('');
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const typingRef = useRef(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<TextInput>(null);
@@ -174,6 +176,19 @@ const MessageInput = ({
         </View>
       )}
 
+      {/* Emoji picker modal */}
+      <EmojiPicker
+        open={emojiOpen}
+        onClose={() => setEmojiOpen(false)}
+        onEmojiSelected={(emoji) => {
+          // Append the picked emoji to the current input text
+          setText((prev) => prev + emoji.emoji);
+        }}
+        // Stay open after picking so the user can pick several in a row
+        enableSearchBar
+        categoryPosition="top"
+      />
+
       {/* Input row */}
       <View style={styles.container}>
         {/* Attachment button */}
@@ -195,6 +210,15 @@ const MessageInput = ({
           multiline
           maxLength={10000}
         />
+
+        {/* Emoji picker button — opens the modal */}
+        <TouchableOpacity
+          style={styles.iconButton}
+          activeOpacity={0.7}
+          onPress={() => setEmojiOpen(true)}
+        >
+          <Ionicons name="happy-outline" size={24} color={colors.textMuted} />
+        </TouchableOpacity>
 
         {hasText ? (
           <TouchableOpacity style={styles.sendButton} onPress={handleSend} activeOpacity={0.7}>

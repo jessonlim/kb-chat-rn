@@ -135,34 +135,80 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     );
   }
 
-  // For private chats, "other" is the participant that isn't us.
-  // For group chats, we'll just show the first few members in the tile row.
-  const otherUsers: User[] =
-    chat.type === 'private'
-      ? chat.participants.filter((p) => p.id !== user?.id)
-      : chat.participants.slice(0, 6);
+  // For private chats: just the other participant. For groups: all members.
+  // Note: chat.participants includes the current user too; for private chats
+  // we filter that out, for groups we keep everyone (so the user sees their
+  // own tile too, matching WeChat).
+  const isGroup = chat.type === 'group';
+  const otherUsers: User[] = isGroup
+    ? chat.participants
+    : chat.participants.filter((p) => p.id !== user?.id);
+
+  const handleAddPeople = () => {
+    if (isGroup) {
+      navigation.navigate('AddGroupMembers', {
+        chatId,
+        existingMemberIds: chat.participants.map((p) => p.id),
+      });
+    } else {
+      // For 1-on-1 chats, "+" would upgrade to a group — not built yet
+      showSoon(t('chatInfo.addPeople'));
+    }
+  };
+
+  const handleLeaveGroup = () => {
+    Alert.alert(t('group.leave'), t('group.leaveConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('group.leave'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await chatService.leaveGroup(chatId);
+            Toast.show({ type: 'success', text1: t('group.left') });
+            navigation.popToTop();
+          } catch (err: any) {
+            Toast.show({
+              type: 'error',
+              text1: err?.response?.data?.message || t('common.failed'),
+            });
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* ── Participant tiles ────────────────────────────── */}
       <View style={styles.tilesWrap}>
         {otherUsers.map((u) => (
-          <View key={u.id} style={styles.tile}>
+          <TouchableOpacity
+            key={u.id}
+            style={styles.tile}
+            activeOpacity={0.7}
+            onPress={() => {
+              // Don't navigate to your own profile
+              if (u.id === user?.id) return;
+              const tabs = navigation.getParent?.();
+              if (tabs) tabs.navigate('ContactsTab', { screen: 'UserProfile', params: { userId: u.id } });
+            }}
+          >
             <Avatar
               name={u.displayName || u.username}
               src={u.avatar}
               size={56}
             />
             <Text style={styles.tileName} numberOfLines={1}>
-              {u.displayName || u.username}
+              {u.id === user?.id ? t('common.you') : (u.displayName || u.username)}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))}
-        {/* "+" to add people — placeholder for the "upgrade to group" flow */}
+        {/* "+" to add more members */}
         <TouchableOpacity
           style={styles.tile}
           activeOpacity={0.7}
-          onPress={() => showSoon(t('chatInfo.addPeople'))}
+          onPress={handleAddPeople}
         >
           <View style={styles.addTile}>
             <Ionicons name="add" size={28} color={colors.textSecondary} />
@@ -255,6 +301,22 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           styles={styles}
         />
       </View>
+
+      {/* Leave Group — only for group chats */}
+      {isGroup && (
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.row}
+            activeOpacity={0.7}
+            onPress={handleLeaveGroup}
+          >
+            <Ionicons name="exit-outline" size={22} color={colors.danger} />
+            <Text style={[styles.rowLabel, { color: colors.danger }]}>
+              {t('group.leave')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 };
