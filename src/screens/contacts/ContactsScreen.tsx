@@ -36,19 +36,25 @@ const ContactsScreen = ({ navigation }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadContacts = useCallback(async () => {
-    try {
-      const [contactsRes, pendingRes] = await Promise.all([
-        contactService.getContacts(),
-        contactService.getPendingRequests(),
-      ]);
-      setContacts(contactsRes.contacts);
-      setPendingCount(pendingRes.requests.length);
-    } catch (err) {
-      console.warn('Failed to load contacts:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    // Use allSettled so one failure doesn't blank the other section.
+    // Previously a single 404 on the pending endpoint hid the entire
+    // contact list because the catch block reset state to default.
+    const [contactsRes, pendingRes] = await Promise.allSettled([
+      contactService.getContacts(),
+      contactService.getPendingRequests(),
+    ]);
+    if (contactsRes.status === 'fulfilled') {
+      setContacts(contactsRes.value.contacts);
+    } else {
+      console.warn('getContacts failed:', contactsRes.reason);
     }
+    if (pendingRes.status === 'fulfilled') {
+      setPendingCount(pendingRes.value.requests.length);
+    } else {
+      console.warn('getPendingRequests failed:', pendingRes.reason);
+    }
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {

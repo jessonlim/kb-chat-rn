@@ -13,9 +13,9 @@ const contactService = {
     return data;
   },
 
-  /** GET /api/contacts/pending — incoming friend requests */
+  /** GET /api/contacts/requests — incoming friend requests */
   getPendingRequests: async (): Promise<FriendRequestsResponse> => {
-    const { data } = await api.get<FriendRequestsResponse>('/api/contacts/pending');
+    const { data } = await api.get<FriendRequestsResponse>('/api/contacts/requests');
     return data;
   },
 
@@ -27,19 +27,19 @@ const contactService = {
     return data;
   },
 
-  /** POST /api/contacts/accept — accept a pending request */
+  /** POST /api/contacts/requests/:requestId/accept */
   acceptRequest: async (requestId: string): Promise<{ message: string }> => {
-    const { data } = await api.post<{ message: string }>('/api/contacts/accept', {
-      requestId,
-    });
+    const { data } = await api.post<{ message: string }>(
+      `/api/contacts/requests/${requestId}/accept`,
+    );
     return data;
   },
 
-  /** POST /api/contacts/reject — reject a pending request */
+  /** POST /api/contacts/requests/:requestId/reject */
   rejectRequest: async (requestId: string): Promise<{ message: string }> => {
-    const { data } = await api.post<{ message: string }>('/api/contacts/reject', {
-      requestId,
-    });
+    const { data } = await api.post<{ message: string }>(
+      `/api/contacts/requests/${requestId}/reject`,
+    );
     return data;
   },
 
@@ -52,7 +52,7 @@ const contactService = {
   /** GET /api/contacts/status/:userId — get relationship status */
   getStatus: async (userId: string): Promise<FriendRequestStatusResponse> => {
     const { data } = await api.get<FriendRequestStatusResponse>(
-      `/api/contacts/status/${userId}`
+      `/api/contacts/status/${userId}`,
     );
     return data;
   },
