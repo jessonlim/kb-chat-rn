@@ -1,11 +1,12 @@
 // Audio player for voice/audio messages inside chat bubbles.
 // Shows play/pause, a progress bar, and duration.
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 
 interface Props {
@@ -21,6 +22,8 @@ const formatDuration = (ms: number): string => {
 };
 
 const AudioPlayer = ({ url, isOwn }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { uri } = useMediaUrl(url);
   const [isPlaying, setIsPlaying] = useState(false);
   const [durationMs, setDurationMs] = useState(0);
@@ -127,7 +130,7 @@ const AudioPlayer = ({ url, isOwn }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

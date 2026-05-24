@@ -1,7 +1,7 @@
 // Fullscreen image viewer modal.
 // Dark background, close button at top, swipe-down to dismiss.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Image,
@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing } from '../../utils/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -24,6 +25,8 @@ interface Props {
 }
 
 const ImageViewer = ({ visible, uri, onClose }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!uri) return null;
 
   return (
@@ -65,7 +68,7 @@ const ImageViewer = ({ visible, uri, onClose }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: '#000',

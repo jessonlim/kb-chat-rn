@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { useAuth } from '../../stores/authStore';
 import userService from '../../services/userService';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
   navigation: any;
@@ -26,6 +27,8 @@ interface Props {
 const ProfileEditScreen = ({ navigation }: Props) => {
   const { user, updateUser } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [about, setAbout] = useState(user?.about || '');
@@ -163,7 +166,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

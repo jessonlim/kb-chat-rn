@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
   navigation: any;
@@ -22,6 +23,8 @@ interface MenuItem {
 
 const DiscoverScreen = ({ navigation }: Props) => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const menuItems: MenuItem[] = [
     { icon: 'megaphone-outline', label: t('discover.channels'), screen: 'Channels' },
@@ -84,7 +87,7 @@ const DiscoverScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

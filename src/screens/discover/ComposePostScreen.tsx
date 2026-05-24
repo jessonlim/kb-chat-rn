@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import channelService from '../../services/channelService';
 import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { ChannelPostAttachment } from '../../types';
 
 const MAX_PHOTOS = 9;
@@ -40,6 +41,8 @@ let nextPhotoId = 0;
 const ComposePostScreen = ({ navigation, route }: Props) => {
   const { channelId } = route.params;
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -234,7 +237,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

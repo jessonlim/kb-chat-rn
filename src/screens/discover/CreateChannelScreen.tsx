@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
   navigation: any;
@@ -26,6 +27,8 @@ interface Props {
 
 const CreateChannelScreen = ({ navigation }: Props) => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -181,7 +184,7 @@ const CreateChannelScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

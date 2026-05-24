@@ -7,6 +7,7 @@ import { AuthContext, useAuthProvider } from './src/stores/authStore';
 import { CallProvider } from './src/context/CallContext';
 import { GroupCallProvider } from './src/context/GroupCallContext';
 import { I18nProvider } from './src/i18n/I18nContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { navigationRef } from './src/navigation/navigationRef';
 import useNotifications from './src/hooks/useNotifications';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -22,7 +23,8 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
         <AuthContext.Provider value={auth}>
           <CallProvider>
             <GroupCallProvider>
@@ -39,6 +41,7 @@ export default function App() {
           <Toast />
         </AuthContext.Provider>
       </I18nProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

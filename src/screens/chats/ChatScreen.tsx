@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   FlatList,
@@ -24,7 +24,8 @@ import AttachmentMenu from '../../components/chat/AttachmentMenu';
 import VoiceRecorder from '../../components/chat/VoiceRecorder';
 import ImageViewer from '../../components/chat/ImageViewer';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize } from '../../utils/theme';
 import type { Chat, Message, User, Attachment, SendMessageAck } from '../../types';
 
 interface Props {
@@ -38,6 +39,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const { startCall, callState } = useCall();
   const { startGroupCall, state: groupCallState } = useGroupCall();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const formatLastSeen = useCallback((dateStr: string): string => {
     if (!dateStr) return '';
@@ -745,7 +748,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import Toast from 'react-native-toast-message';
 import { storage } from '../../services/api';
 import userService from '../../services/userService';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme, type ThemePreference } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
   navigation: any;
@@ -35,6 +36,9 @@ type FriendPolicy = 'anyone' | 'friends_of_friends' | 'nobody';
 
 const SettingsScreen = ({ navigation }: Props) => {
   const { lang, setLang, t } = useT();
+  const { theme, setTheme } = useTheme();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // ── Local prefs ─────────────────────────────────────
   const [notifications, setNotifications] = useState(true);
@@ -128,6 +132,31 @@ const SettingsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // ── Helper component (inside parent so it captures `colors` + `styles`) ──
+  interface ToggleRowProps {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    subtext?: string;
+    value: boolean;
+    onChange: (next: boolean) => void;
+    bordered?: boolean;
+  }
+  const ToggleRow = ({ icon, label, subtext, value, onChange, bordered }: ToggleRowProps) => (
+    <View style={[styles.toggleRow, bordered && styles.bordered]}>
+      <Ionicons name={icon} size={22} color={colors.textSecondary} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {subtext ? <Text style={styles.subText}>{subtext}</Text> : null}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: colors.bgInput, true: colors.primary }}
+        thumbColor="#fff"
+      />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* ─── Display ─── */}
@@ -162,16 +191,36 @@ const SettingsScreen = ({ navigation }: Props) => {
           </TouchableOpacity>
         </View>
 
-        {/* Theme — placeholder until light theme is implemented */}
+        {/* Theme — Auto / Light / Dark picker */}
         <View style={[styles.policyHeader, styles.bordered]}>
           <Ionicons name="color-palette-outline" size={22} color={colors.textSecondary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.policyTitle}>{t('display.theme')}</Text>
-            <Text style={styles.policyDesc}>{t('common.soon')}</Text>
+            <Text style={styles.policyDesc}>{t('display.themeDesc')}</Text>
           </View>
         </View>
+        <View style={styles.segmentRow}>
+          {(['auto', 'light', 'dark'] as ThemePreference[]).map((opt) => {
+            const labelKey =
+              opt === 'auto' ? 'display.themeAuto' :
+              opt === 'light' ? 'display.themeLight' :
+              'display.themeDark';
+            return (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.segment, theme === opt && styles.segmentActive]}
+                activeOpacity={0.7}
+                onPress={() => setTheme(opt)}
+              >
+                <Text style={[styles.segmentText, theme === opt && styles.segmentTextActive]}>
+                  {t(labelKey as any)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* Font size — placeholder */}
+        {/* Font size — placeholder (out of scope for this pass) */}
         <View style={[styles.policyHeader, styles.bordered]}>
           <Ionicons name="text-outline" size={22} color={colors.textSecondary} />
           <View style={{ flex: 1 }}>
@@ -310,32 +359,7 @@ const SettingsScreen = ({ navigation }: Props) => {
   );
 };
 
-// ── Helper component ───────────────────────────────────────────────
-interface ToggleRowProps {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  subtext?: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-  bordered?: boolean;
-}
-const ToggleRow = ({ icon, label, subtext, value, onChange, bordered }: ToggleRowProps) => (
-  <View style={[styles.toggleRow, bordered && styles.bordered]}>
-    <Ionicons name={icon} size={22} color={colors.textSecondary} />
-    <View style={{ flex: 1 }}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {subtext ? <Text style={styles.subText}>{subtext}</Text> : null}
-    </View>
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      trackColor={{ false: colors.bgInput, true: colors.primary }}
-      thumbColor="#fff"
-    />
-  </View>
-);
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgDark },
   content: {
     paddingHorizontal: spacing.lg,

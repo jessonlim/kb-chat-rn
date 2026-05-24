@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import channelService from '../../services/channelService';
 import Avatar from '../../components/common/Avatar';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Channel } from '../../types';
 
 interface Props {
@@ -24,6 +25,8 @@ type Tab = 'mine' | 'discover';
 
 const ChannelsScreen = ({ navigation }: Props) => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [tab, setTab] = useState<Tab>('mine');
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,10 +61,58 @@ const ChannelsScreen = ({ navigation }: Props) => {
     return unsubscribe;
   }, [navigation, load]);
 
+  // ── Channel row component (inside parent so it captures colors/styles) ──
+  const ChannelRow = ({
+    channel,
+    onPress,
+  }: {
+    channel: Channel;
+    onPress: () => void;
+  }) => {
+    const { uri: avatarUri } = useMediaUrl(channel.avatar || '');
+
+    return (
+      <TouchableOpacity
+        style={styles.channelRow}
+        activeOpacity={0.7}
+        onPress={onPress}
+      >
+        <Avatar
+          name={channel.name}
+          src={avatarUri || undefined}
+          size={48}
+        />
+        <View style={styles.channelInfo}>
+          <View style={styles.channelNameRow}>
+            <Text style={styles.channelName} numberOfLines={1}>
+              {channel.name}
+            </Text>
+            {channel.isOwner && (
+              <View style={styles.ownerBadge}>
+                <Text style={styles.ownerBadgeText}>{t('channels.owner')}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.channelDesc} numberOfLines={1}>
+            {channel.description || `@${channel.owner.username}`}
+          </Text>
+          <View style={styles.subscriberRow}>
+            <Ionicons name="people-outline" size={12} color={colors.textMuted} />
+            <Text style={styles.subscriberText}>
+              {channel.subscriberCount === 1
+                ? t('channels.subscribers', { n: channel.subscriberCount })
+                : t('channels.subscribersPlural', { n: channel.subscriberCount })}
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+    );
+  };
+
   const renderChannel = ({ item }: { item: Channel }) => (
     <ChannelRow
       channel={item}
-      t={t}
       onPress={() =>
         navigation.navigate('ChannelDetail', { channelId: item._id })
       }
@@ -148,59 +199,7 @@ const ChannelsScreen = ({ navigation }: Props) => {
   );
 };
 
-// ── Channel row component ───────────────────────────────────────────
-
-const ChannelRow = ({
-  channel,
-  onPress,
-  t,
-}: {
-  channel: Channel;
-  onPress: () => void;
-  t: (key: any, vars?: Record<string, string | number>) => string;
-}) => {
-  const { uri: avatarUri } = useMediaUrl(channel.avatar || '');
-
-  return (
-    <TouchableOpacity
-      style={styles.channelRow}
-      activeOpacity={0.7}
-      onPress={onPress}
-    >
-      <Avatar
-        name={channel.name}
-        src={avatarUri || undefined}
-        size={48}
-      />
-      <View style={styles.channelInfo}>
-        <View style={styles.channelNameRow}>
-          <Text style={styles.channelName} numberOfLines={1}>
-            {channel.name}
-          </Text>
-          {channel.isOwner && (
-            <View style={styles.ownerBadge}>
-              <Text style={styles.ownerBadgeText}>{t('channels.owner')}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.channelDesc} numberOfLines={1}>
-          {channel.description || `@${channel.owner.username}`}
-        </Text>
-        <View style={styles.subscriberRow}>
-          <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-          <Text style={styles.subscriberText}>
-            {channel.subscriberCount === 1
-              ? t('channels.subscribers', { n: channel.subscriberCount })
-              : t('channels.subscribersPlural', { n: channel.subscriberCount })}
-          </Text>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-    </TouchableOpacity>
-  );
-};
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

@@ -25,18 +25,24 @@ import AccountSecurityScreen from '../screens/me/AccountSecurityScreen';
 import AboutScreen from '../screens/me/AboutScreen';
 import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
 import { useT } from '../i18n/I18nContext';
-import { colors, fontSize } from '../utils/theme';
+import { useTheme } from '../context/ThemeContext';
+import { fontSize } from '../utils/theme';
 
-const stackScreenOptions = {
-  headerStyle: { backgroundColor: colors.bgHeader },
-  headerTintColor: colors.textPrimary,
-  headerBackButtonDisplayMode: 'minimal' as const,
+const useStackScreenOptions = () => {
+  const { colors } = useTheme();
+  return {
+    headerStyle: { backgroundColor: colors.bgHeader },
+    headerTintColor: colors.textPrimary,
+    headerBackButtonDisplayMode: 'minimal' as const,
+  };
 };
 
 // ── Chats tab stack ──────────────────────────────────────────────────
 const ChatsStack = createStackNavigator();
 const ChatsStackScreen = () => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const stackScreenOptions = useStackScreenOptions();
   return (
     <ChatsStack.Navigator screenOptions={stackScreenOptions}>
       <ChatsStack.Screen
@@ -78,6 +84,7 @@ const ChatsStackScreen = () => {
 const ContactsStack = createStackNavigator();
 const ContactsStackScreen = () => {
   const { t } = useT();
+  const stackScreenOptions = useStackScreenOptions();
   return (
     <ContactsStack.Navigator screenOptions={stackScreenOptions}>
       <ContactsStack.Screen
@@ -103,6 +110,8 @@ const ContactsStackScreen = () => {
 const DiscoverStack = createStackNavigator();
 const DiscoverStackScreen = () => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const stackScreenOptions = useStackScreenOptions();
   return (
     <DiscoverStack.Navigator screenOptions={stackScreenOptions}>
       <DiscoverStack.Screen
@@ -170,6 +179,7 @@ const DiscoverStackScreen = () => {
 const MeStack = createStackNavigator();
 const MeStackScreen = () => {
   const { t } = useT();
+  const stackScreenOptions = useStackScreenOptions();
   return (
     <MeStack.Navigator screenOptions={stackScreenOptions}>
       <MeStack.Screen
@@ -216,6 +226,7 @@ const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
   const { t } = useT();
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

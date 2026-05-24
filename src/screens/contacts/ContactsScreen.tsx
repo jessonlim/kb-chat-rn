@@ -13,7 +13,8 @@ import contactService from '../../services/contactService';
 import socketService from '../../services/socketService';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
 interface Props {
@@ -27,6 +28,8 @@ interface Section {
 
 const ContactsScreen = ({ navigation }: Props) => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [contacts, setContacts] = useState<User[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -215,7 +218,7 @@ const ContactsScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

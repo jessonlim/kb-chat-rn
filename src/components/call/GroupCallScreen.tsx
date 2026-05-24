@@ -22,7 +22,7 @@ import { useGroupCall, getCameraTrack } from '../../context/GroupCallContext';
 import { useAuth } from '../../stores/authStore';
 import { useT } from '../../i18n/I18nContext';
 import Avatar from '../common/Avatar';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 const formatDuration = (s: number): string => {
   const mins = Math.floor(s / 60);

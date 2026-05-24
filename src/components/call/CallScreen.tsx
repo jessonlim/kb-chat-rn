@@ -2,7 +2,7 @@
 // Voice: dark background + avatar + controls.
 // Video: remote stream fullscreen + local PiP + controls.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import { RTCView } from '@livekit/react-native-webrtc';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../common/Avatar';
-import { colors, fontSize, spacing } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { fontSize, spacing } from '../../utils/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PIP_W = 120;
@@ -56,6 +57,32 @@ const CallScreen = () => {
     toggleSpeaker,
     toggleCamera,
   } = useCall();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  // ── Reusable control button (inside parent to capture styles) ──
+  const ControlButton = ({
+    icon,
+    label,
+    onPress,
+    active,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    onPress: () => void;
+    active: boolean;
+  }) => (
+    <TouchableOpacity
+      style={[styles.controlBtn, active && styles.controlBtnActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Ionicons name={icon} size={24} color={active ? '#000' : '#fff'} />
+      <Text style={[styles.controlLabel, active && styles.controlLabelActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   // Only show when we're actively in a call (not idle, not ringing as callee)
   if (callState === 'idle' || callState === 'ringing') return null;
@@ -186,31 +213,7 @@ const CallScreen = () => {
   );
 };
 
-// ── Reusable control button ──────────────────────────────────────
-const ControlButton = ({
-  icon,
-  label,
-  onPress,
-  active,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  active: boolean;
-}) => (
-  <TouchableOpacity
-    style={[styles.controlBtn, active && styles.controlBtnActive]}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <Ionicons name={icon} size={24} color={active ? '#000' : '#fff'} />
-    <Text style={[styles.controlLabel, active && styles.controlLabelActive]}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0a0a0a',

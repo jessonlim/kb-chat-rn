@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
 const CreateGroupScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Step 1: select members   Step 2: enter group name + create
   const [step, setStep] = useState<1 | 2>(1);
@@ -328,7 +331,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

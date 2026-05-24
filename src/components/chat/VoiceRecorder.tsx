@@ -1,11 +1,12 @@
 // Voice recorder overlay — appears when mic button is pressed.
 // Shows a red pulsing dot, elapsed time, and cancel/send buttons.
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { uploadFile } from '../../services/uploadService';
 import type { Attachment } from '../../types';
 
@@ -21,6 +22,8 @@ const formatElapsed = (seconds: number): string => {
 };
 
 const VoiceRecorder = ({ onSend, onCancel }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [uploading, setUploading] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -165,7 +168,7 @@ const VoiceRecorder = ({ onSend, onCancel }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

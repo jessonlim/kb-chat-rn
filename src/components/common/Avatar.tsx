@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { colors } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { API_URL } from '../../services/api';
 
 interface Props {
@@ -33,6 +33,7 @@ const resolveUri = (src: string): string => {
 };
 
 const Avatar = ({ name, src, size = 48, online }: Props) => {
+  const { colors } = useTheme();
   const uri = src ? resolveUri(src) : '';
   const initials = (name || '?')[0].toUpperCase();
   const bg = getColor(name || '?');

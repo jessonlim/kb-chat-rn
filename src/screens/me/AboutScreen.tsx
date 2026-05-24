@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 const AboutScreen = () => {
   const { t, lang } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const openLink = (url: string) => Linking.openURL(url).catch(() => {});
 
   const linkItems = [
@@ -80,7 +83,7 @@ const AboutScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgDark },
   content: {
     paddingHorizontal: spacing.lg,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Message } from '../../types';
 
 export type MessageAction =
@@ -36,19 +37,22 @@ interface ActionItem {
   ownOnly?: boolean;
 }
 
-const ACTIONS: ActionItem[] = [
-  { key: 'reply', label: 'Reply', icon: 'arrow-undo-outline' },
-  { key: 'copy', label: 'Copy', icon: 'copy-outline' },
-  { key: 'edit', label: 'Edit', icon: 'create-outline', ownOnly: true },
-  { key: 'forward', label: 'Forward', icon: 'arrow-redo-outline' },
-  { key: 'star', label: 'Star', icon: 'star-outline' },
-  { key: 'react', label: 'React', icon: 'happy-outline' },
-  { key: 'delete', label: 'Delete', icon: 'trash-outline', color: colors.danger, ownOnly: true },
-];
-
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const ACTIONS: ActionItem[] = [
+    { key: 'reply', label: 'Reply', icon: 'arrow-undo-outline' },
+    { key: 'copy', label: 'Copy', icon: 'copy-outline' },
+    { key: 'edit', label: 'Edit', icon: 'create-outline', ownOnly: true },
+    { key: 'forward', label: 'Forward', icon: 'arrow-redo-outline' },
+    { key: 'star', label: 'Star', icon: 'star-outline' },
+    { key: 'react', label: 'React', icon: 'happy-outline' },
+    { key: 'delete', label: 'Delete', icon: 'trash-outline', color: colors.danger, ownOnly: true },
+  ];
+
   if (!message) return null;
 
   const filteredActions = ACTIONS.filter((a) => {
@@ -126,7 +130,7 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,

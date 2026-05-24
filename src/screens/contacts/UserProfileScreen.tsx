@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,8 @@ import { useAuth } from '../../stores/authStore';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User, ContactStatus } from '../../types';
 
 interface Props {
@@ -29,6 +30,8 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   const { user: me } = useAuth();
   const { startCall, callState } = useCall();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [profile, setProfile] = useState<User | null>(null);
   const [status, setStatus] = useState<ContactStatus>('none');
@@ -334,7 +337,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

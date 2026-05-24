@@ -1,7 +1,7 @@
 // IncomingCallOverlay — shown when someone is calling us.
 // Full-screen overlay with caller info + Accept / Decline buttons.
 
-import React, { useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../common/Avatar';
-import { colors, fontSize, spacing } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { fontSize, spacing } from '../../utils/theme';
 
 const IncomingCallOverlay = () => {
   const { callState, callType, remoteUser, acceptCall, rejectCall } = useCall();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Pulse animation for the avatar ring
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -108,7 +111,7 @@ const IncomingCallOverlay = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(10, 10, 10, 0.97)',

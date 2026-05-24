@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Moment, MomentComment } from '../../types';
 
 interface Props {
@@ -26,7 +27,7 @@ interface Props {
 
 type TFn = (key: any, vars?: Record<string, string | number>) => string;
 
-// ── Time formatter ──────────────────────────────────────────────────
+// ── Time formatter (pure helper) ────────────────────────────────────
 const formatRelative = (iso: string, t: TFn): string => {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -41,6 +42,8 @@ const formatRelative = (iso: string, t: TFn): string => {
 
 // ── Moment image component ──────────────────────────────────────────
 const MomentImage = ({ url }: { url: string }) => {
+  const { colors } = useTheme();
+  const imgStyles = useMemo(() => makeImgStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
 
   if (loading || !uri) {
@@ -56,7 +59,7 @@ const MomentImage = ({ url }: { url: string }) => {
   );
 };
 
-const imgStyles = StyleSheet.create({
+const makeImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   image: {
     width: '100%',
     aspectRatio: 1,
@@ -89,6 +92,8 @@ const MomentCard = ({
   onDeleteComment: (commentId: string) => void;
 }) => {
   const { t } = useT();
+  const { colors } = useTheme();
+  const cardStyles = useMemo(() => makeCardStyles(colors), [colors]);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const liked = moment.likes.includes(currentUserId);
@@ -258,7 +263,7 @@ const MomentCard = ({
   );
 };
 
-const cardStyles = StyleSheet.create({
+const makeCardStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     backgroundColor: colors.bgCard,
     padding: spacing.lg,
@@ -367,6 +372,8 @@ const cardStyles = StyleSheet.create({
 const MomentsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -528,7 +535,7 @@ const MomentsScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

@@ -1,7 +1,7 @@
 // Attachment menu — bottom sheet that appears when tapping the "+" button.
 // Options: Photo Library, Camera, Video, Document.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { compressImage } from '../../utils/imageCompression';
 import { uploadFile, type UploadResult } from '../../services/uploadService';
 import type { Attachment } from '../../types';
@@ -44,6 +45,8 @@ const OPTIONS: MenuOption[] = [
 ];
 
 const AttachmentMenu = ({ visible, onClose, onAttachmentReady }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const requestPermission = async (
     type: 'camera' | 'library'
   ): Promise<boolean> => {
@@ -216,7 +219,7 @@ const AttachmentMenu = ({ visible, onClose, onAttachmentReady }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,

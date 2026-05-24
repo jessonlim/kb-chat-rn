@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,8 @@ import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Channel, ChannelPost, ChannelComment } from '../../types';
 
 interface Props {
@@ -29,7 +30,7 @@ interface Props {
 
 type TFn = (key: any, vars?: Record<string, string | number>) => string;
 
-// ── Time formatter ──────────────────────────────────────────────────
+// ── Time formatter (pure helper) ────────────────────────────────────
 const formatPostTime = (iso: string, t: TFn): string => {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -44,6 +45,8 @@ const formatPostTime = (iso: string, t: TFn): string => {
 
 // ── Post image component (resolves media URLs) ─────────────────────
 const PostImage = ({ url, onPress }: { url: string; onPress: () => void }) => {
+  const { colors } = useTheme();
+  const postImgStyles = useMemo(() => makePostImgStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
 
   if (loading || !uri) {
@@ -65,7 +68,7 @@ const PostImage = ({ url, onPress }: { url: string; onPress: () => void }) => {
   );
 };
 
-const postImgStyles = StyleSheet.create({
+const makePostImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   image: {
     width: '100%',
     aspectRatio: 1,
@@ -95,6 +98,8 @@ const CommentsSection = ({
 }) => {
   const { user } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const commentStyles = useMemo(() => makeCommentStyles(colors), [colors]);
   const [comments, setComments] = useState<ChannelComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -230,7 +235,7 @@ const CommentsSection = ({
   );
 };
 
-const commentStyles = StyleSheet.create({
+const makeCommentStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
@@ -297,6 +302,8 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
   const { channelId } = route.params;
   const { user } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [channel, setChannel] = useState<Channel | null>(null);
   const [posts, setPosts] = useState<ChannelPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -331,6 +338,29 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
     load();
   }, [load]);
 
+  const handleDeleteChannel = useCallback(() => {
+    if (!channel) return;
+    Alert.alert(
+      t('channels.delete'),
+      t('channels.deleteConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await channelService.remove(channel._id);
+              navigation.goBack();
+            } catch (err) {
+              console.warn('Failed to delete channel:', err);
+            }
+          },
+        },
+      ]
+    );
+  }, [channel, navigation, t]);
+
   // Update header with channel name + actions
   useEffect(() => {
     if (!channel) return;
@@ -358,7 +388,7 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
           </View>
         ) : null,
     });
-  }, [channel, navigation]);
+  }, [channel, navigation, colors, handleDeleteChannel]);
 
   const handleSubscribe = async () => {
     if (!channel) return;
@@ -390,29 +420,6 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
     } catch (err) {
       console.warn('Subscribe/unsubscribe failed:', err);
     }
-  };
-
-  const handleDeleteChannel = () => {
-    if (!channel) return;
-    Alert.alert(
-      t('channels.delete'),
-      t('channels.deleteConfirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await channelService.remove(channel._id);
-              navigation.goBack();
-            } catch (err) {
-              console.warn('Failed to delete channel:', err);
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleLikePost = async (post: ChannelPost) => {
@@ -718,7 +725,7 @@ const ChannelAvatar = ({
   return <Avatar name={name} src={uri || undefined} size={56} />;
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   center: {
     flex: 1,
     backgroundColor: colors.bgDark,

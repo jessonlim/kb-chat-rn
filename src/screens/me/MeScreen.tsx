@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../stores/authStore';
 import { useT } from '../../i18n/I18nContext';
+import { useTheme } from '../../context/ThemeContext';
 import Avatar from '../../components/common/Avatar';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
   navigation: any;
@@ -26,6 +27,8 @@ interface MenuItem {
 const MeScreen = ({ navigation }: Props) => {
   const { user, logout } = useAuth();
   const { t } = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const handleSignOut = () => {
     Alert.alert(t('me.logout'), '', [
@@ -118,7 +121,7 @@ const MeScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import AudioPlayer from './AudioPlayer';
 import type { Message, User } from '../../types';
@@ -55,6 +56,8 @@ const ImageAttachment = ({
   isOwn: boolean;
   onPress?: (uri: string) => void;
 }) => {
+  const { colors } = useTheme();
+  const imgStyles = useMemo(() => makeImgStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
 
   if (loading || !uri) {
@@ -76,7 +79,7 @@ const ImageAttachment = ({
   );
 };
 
-const imgStyles = StyleSheet.create({
+const makeImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrapper: {
     borderRadius: borderRadius.md,
     overflow: 'hidden',
@@ -104,6 +107,8 @@ const VideoAttachment = ({
   url: string;
   isOwn: boolean;
 }) => {
+  const { colors } = useTheme();
+  const vidStyles = useMemo(() => makeVidStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
 
   return (
@@ -125,7 +130,7 @@ const VideoAttachment = ({
   );
 };
 
-const vidStyles = StyleSheet.create({
+const makeVidStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   wrapper: {
     borderRadius: borderRadius.md,
     overflow: 'hidden',
@@ -160,6 +165,8 @@ const FileAttachment = ({
   size: number;
   isOwn: boolean;
 }) => {
+  const { colors } = useTheme();
+  const fileStyles = useMemo(() => makeFileStyles(colors), [colors]);
   return (
     <View style={fileStyles.row}>
       <View style={[fileStyles.iconBox, isOwn ? fileStyles.iconBoxOwn : fileStyles.iconBoxOther]}>
@@ -175,7 +182,7 @@ const FileAttachment = ({
   );
 };
 
-const fileStyles = StyleSheet.create({
+const makeFileStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -213,6 +220,8 @@ const fileStyles = StyleSheet.create({
 // ── Main bubble ───────────────────────────────────────────────────────
 
 const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePress }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const sender = typeof message.sender === 'object' ? message.sender : null;
 
   const handleLongPress = () => {
@@ -330,7 +339,7 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePre
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   row: {
     paddingHorizontal: spacing.md,
     marginBottom: 4,
