@@ -37,17 +37,14 @@ const userService = {
     mimeType: string,
     body: UpdateProfileBody
   ): Promise<UserProfileResponse> => {
-    const formData = new FormData();
-    formData.append('avatar', {
-      uri: fileUri,
-      type: mimeType,
-      name: fileName,
-    } as any);
-    if (body.displayName !== undefined) formData.append('displayName', body.displayName);
-    if (body.about !== undefined) formData.append('about', body.about);
-
-    const { data } = await api.put<UserProfileResponse>('/api/users/profile', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    // Backend's PUT /api/users/profile takes the avatar as a URL string
+    // (not a file). So we upload the file separately to /api/uploads first,
+    // then send the returned URL with the rest of the profile fields.
+    const { uploadFile } = await import('./uploadService');
+    const uploaded = await uploadFile(fileUri, fileName, mimeType);
+    const { data } = await api.put<UserProfileResponse>('/api/users/profile', {
+      ...body,
+      avatar: uploaded.url,
     });
     return data;
   },

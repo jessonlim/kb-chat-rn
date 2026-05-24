@@ -7,8 +7,12 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  Modal,
+  Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
@@ -30,6 +34,8 @@ const ChatListScreen = ({ navigation }: Props) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Long-press action sheet: which chat is targeted (null = closed)
+  const [menuChat, setMenuChat] = useState<Chat | null>(null);
 
   // Strip any duplicate chat IDs — defensive against backend or race conditions
   // that could otherwise crash FlatList with "two children with the same key".
@@ -198,6 +204,8 @@ const ChatListScreen = ({ navigation }: Props) => {
       <TouchableOpacity
         style={styles.chatRow}
         activeOpacity={0.7}
+        onLongPress={() => setMenuChat(chat)}
+        delayLongPress={300}
         onPress={() => {
           // Optimistically clear the unread badge so the UI updates instantly.
           // The backend confirms via the messages_read socket event when
@@ -257,6 +265,79 @@ const ChatListScreen = ({ navigation }: Props) => {
     );
   };
 
+  // ── Long-press action handlers ──────────────────────────────────
+  // Each handler does an optimistic local update, then calls the backend.
+  // On failure, we toast and revert. The action sheet always closes first.
+
+  const closeMenu = useCallback(() => setMenuChat(null), []);
+
+  const handleMarkUnread = useCallback(async (chat: Chat) => {
+    closeMenu();
+    setChats((prev) =>
+      prev.map((c) =>
+        c._id === chat._id ? { ...c, unreadCount: Math.max(1, c.unreadCount || 0) } : c,
+      ),
+    );
+    try {
+      await chatService.markChatUnread(chat._id);
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
+    }
+  }, [closeMenu, t]);
+
+  const handleTogglePin = useCallback(async (chat: Chat) => {
+    closeMenu();
+    const next = !chat.isPinned;
+    setChats((prev) =>
+      [...prev]
+        .map((c) => (c._id === chat._id ? { ...c, isPinned: next } : c))
+        .sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        }),
+    );
+    try {
+      await chatService.togglePin(chat._id);
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
+    }
+  }, [closeMenu, t]);
+
+  const handleHideOrDelete = useCallback(
+    (chat: Chat, kind: 'hide' | 'delete') => {
+      closeMenu();
+      const titleKey = kind === 'delete' ? 'chat.deleteChat' : 'chat.hideChat';
+      const confirmKey = kind === 'delete' ? 'chat.confirmDeleteChat' : 'chat.hideChat';
+      Alert.alert(t(titleKey), t(confirmKey), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t(titleKey),
+          style: 'destructive',
+          onPress: async () => {
+            // Optimistically remove from list
+            setChats((prev) => prev.filter((c) => c._id !== chat._id));
+            try {
+              await chatService.deleteChatForMe(chat._id);
+              Toast.show({
+                type: 'success',
+                text1: t(kind === 'delete' ? 'chat.deleted' : 'chat.hidden'),
+              });
+            } catch (err: any) {
+              // Restore on failure
+              setChats((prev) => [...prev, chat]);
+              Toast.show({
+                type: 'error',
+                text1: err?.response?.data?.message || t('common.failed'),
+              });
+            }
+          },
+        },
+      ]);
+    },
+    [closeMenu, t],
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -288,9 +369,115 @@ const ChatListScreen = ({ navigation }: Props) => {
         }
         contentContainerStyle={chats.length === 0 ? { flex: 1 } : undefined}
       />
+
+      {/* Long-press action sheet — slides up from the bottom. */}
+      <Modal
+        visible={!!menuChat}
+        transparent
+        animationType="fade"
+        onRequestClose={closeMenu}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={closeMenu}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <Text style={styles.sheetTitle} numberOfLines={1}>
+              {menuChat ? getChatName(menuChat) : ''}
+            </Text>
+            <SheetRow
+              icon={
+                menuChat && (menuChat.unreadCount || 0) > 0
+                  ? 'mail-open-outline'
+                  : 'mail-unread-outline'
+              }
+              label={
+                menuChat && (menuChat.unreadCount || 0) > 0
+                  ? t('chat.markRead')
+                  : t('chat.markUnread')
+              }
+              onPress={() => {
+                if (!menuChat) return;
+                if ((menuChat.unreadCount || 0) > 0) {
+                  // Already unread — mark as read (uses the existing mark-read endpoint)
+                  closeMenu();
+                  setChats((prev) =>
+                    prev.map((c) => (c._id === menuChat._id ? { ...c, unreadCount: 0 } : c)),
+                  );
+                  chatService.markChatRead(menuChat._id).catch(() => {});
+                } else {
+                  handleMarkUnread(menuChat);
+                }
+              }}
+              colors={colors}
+              styles={styles}
+            />
+            <SheetRow
+              icon={menuChat?.isPinned ? 'pin' : 'pin-outline'}
+              label={menuChat?.isPinned ? t('chat.unpin') : t('chat.pin')}
+              onPress={() => menuChat && handleTogglePin(menuChat)}
+              colors={colors}
+              styles={styles}
+            />
+            <SheetRow
+              icon="eye-off-outline"
+              label={t('chat.hideChat')}
+              onPress={() => menuChat && handleHideOrDelete(menuChat, 'hide')}
+              colors={colors}
+              styles={styles}
+            />
+            <SheetRow
+              icon="trash-outline"
+              label={t('chat.deleteChat')}
+              destructive
+              onPress={() => menuChat && handleHideOrDelete(menuChat, 'delete')}
+              colors={colors}
+              styles={styles}
+            />
+            <TouchableOpacity
+              style={styles.sheetCancel}
+              activeOpacity={0.7}
+              onPress={closeMenu}
+            >
+              <Text style={styles.sheetCancelText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
+
+// Single row inside the bottom action sheet
+const SheetRow = ({
+  icon,
+  label,
+  onPress,
+  destructive,
+  colors,
+  styles,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  destructive?: boolean;
+  colors: ReturnType<typeof useTheme>['colors'];
+  styles: ReturnType<typeof makeStyles>;
+}) => (
+  <TouchableOpacity style={styles.sheetRow} activeOpacity={0.7} onPress={onPress}>
+    <Ionicons
+      name={icon}
+      size={22}
+      color={destructive ? colors.danger : colors.textSecondary}
+    />
+    <Text
+      style={[
+        styles.sheetRowLabel,
+        destructive ? { color: colors.danger } : undefined,
+      ]}
+    >
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: {
@@ -371,6 +558,52 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     fontSize: fontSize.sm,
     color: colors.textMuted,
     marginTop: spacing.xs,
+  },
+  // Long-press action sheet
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.bgCard,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    paddingTop: spacing.md,
+    paddingBottom: 40,
+  },
+  sheetTitle: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 16,
+    gap: spacing.md,
+  },
+  sheetRowLabel: {
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+  },
+  sheetCancel: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.md,
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.bgInput,
+    alignItems: 'center',
+  },
+  sheetCancelText: {
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+    fontWeight: '600',
   },
 });
 

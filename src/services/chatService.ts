@@ -89,6 +89,11 @@ const chatService = {
     return data;
   },
 
+  markChatUnread: async (chatId: string): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/mark-unread`);
+    return data;
+  },
+
   toggleStar: async (chatId: string, messageId: string): Promise<{ ok: boolean; starred: boolean }> => {
     const { data } = await api.post(`/api/chats/${chatId}/messages/${messageId}/star`);
     return data;
