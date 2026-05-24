@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,13 +51,20 @@ const ChatsStackScreen = () => {
         options={({ navigation }) => ({
           title: t('chats.title'),
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('NewChat')}
-              activeOpacity={0.7}
-              style={{ paddingRight: 16 }}
-            >
-              <Ionicons name="create-outline" size={24} color={colors.primary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 14, paddingRight: 16 }}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('CreateGroup')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="people-outline" size={24} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('NewChat')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="create-outline" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           ),
         })}
       />
@@ -84,13 +91,25 @@ const ChatsStackScreen = () => {
 const ContactsStack = createStackNavigator();
 const ContactsStackScreen = () => {
   const { t } = useT();
+  const { colors } = useTheme();
   const stackScreenOptions = useStackScreenOptions();
   return (
     <ContactsStack.Navigator screenOptions={stackScreenOptions}>
       <ContactsStack.Screen
         name="ContactsList"
         component={ContactsScreen as any}
-        options={{ title: t('contacts.title') }}
+        options={({ navigation }) => ({
+          title: t('contacts.title'),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('NewFriends')}
+              activeOpacity={0.7}
+              style={{ paddingRight: 16 }}
+            >
+              <Ionicons name="person-add-outline" size={22} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        })}
       />
       <ContactsStack.Screen
         name="NewFriends"

@@ -70,6 +70,10 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
+  // Reversed view of messages for the inverted FlatList. Memoised so the
+  // list doesn't re-render every parent render.
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
+
   // Message actions state
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
   const [showActions, setShowActions] = useState(false);
@@ -659,7 +663,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
     >
       <FlatList
         ref={flatListRef}
-        data={messages}
+        // inverted means: data[0] sits at the visual bottom, last entry at top.
+        // We keep state in chronological order (oldest → newest) and reverse
+        // here so newest messages land at the bottom of the screen, where the
+        // FlatList naturally starts. No flicker — no scrollToEnd needed.
+        data={reversedMessages}
         keyExtractor={(m) => m._id}
         renderItem={({ item }) => (
           <MessageBubble
@@ -671,10 +679,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
           />
         )}
         contentContainerStyle={styles.messageList}
+        inverted
+        // With inverted, "end" = top of screen = OLDER messages → load more there
         onEndReachedThreshold={0.1}
-        onStartReached={() => loadMore()}
-        inverted={false}
-        ListHeaderComponent={
+        onEndReached={() => loadMore()}
+        ListFooterComponent={
           loadingMore ? (
             <ActivityIndicator
               size="small"
@@ -683,10 +692,6 @@ const ChatScreen = ({ route, navigation }: Props) => {
             />
           ) : null
         }
-        // Auto-scroll to bottom on new message
-        onContentSizeChange={() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }}
       />
 
       {/* Typing indicator */}
