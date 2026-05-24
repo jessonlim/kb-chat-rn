@@ -52,7 +52,13 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
   return (
     <View style={{ width: size, height: size }}>
       {showImage ? (
+        // `key={uri}` makes React mount a FRESH <Image> for every new URI.
+        // Without this, a stale onError event from the previous URI's load
+        // can fire AFTER we've already updated the src, flipping imageFailed
+        // back to true and hiding the new (working) image. Picking a new
+        // avatar would never show because the old URL's 404 keeps winning.
         <Image
+          key={uri}
           source={{ uri }}
           style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
           onError={(e) => {
