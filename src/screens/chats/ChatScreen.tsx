@@ -234,18 +234,29 @@ const ChatScreen = ({ route, navigation }: Props) => {
     };
   }, [chat]);
 
-  // Join socket room
+  // Join socket room + mark chat as read.
+  //
+  // We do TWO things to clear the unread count, because each path covers a
+  // different failure case:
+  //   1. REST call (chatService.markChatRead) — guaranteed to reach the
+  //      backend and persist to the DB, even if the socket isn't connected
+  //      yet. This is the reliable path that makes the badge stay cleared
+  //      after a reload.
+  //   2. Socket emit ('mark_chat_read') — broadcasts to OTHER clients in
+  //      the chat room so their checkmarks (sent/delivered/read) update
+  //      instantly. The REST handler doesn't broadcast.
   useEffect(() => {
     const socket = socketService.getSocket();
-    if (!socket) return;
-
-    socket.emit('join_chat', chatId);
-
-    // Mark as read
-    socket.emit('mark_chat_read', { chatId });
-
+    if (socket) {
+      socket.emit('join_chat', chatId);
+      socket.emit('mark_chat_read', { chatId });
+    }
+    // Always hit the REST endpoint as a reliable backup. Fire-and-forget.
+    chatService.markChatRead(chatId).catch((err) => {
+      console.warn('[chat] markChatRead REST failed:', err?.response?.data || err?.message);
+    });
     return () => {
-      socket.emit('leave_chat', chatId);
+      socket?.emit('leave_chat', chatId);
     };
   }, [chatId]);
 
