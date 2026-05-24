@@ -58,11 +58,29 @@ const ProfileEditScreen = ({ navigation }: Props) => {
         mediaTypes: ['images'],
         quality: 0.9,
       });
-      if (result.canceled || !result.assets || !result.assets[0]) {
-        return; // user cancelled
+
+      // Debug toast so we can see what the picker actually returned.
+      // Remove once the flow is verified working on real devices.
+      Toast.show({
+        type: 'info',
+        text1: 'Picker returned',
+        text2: `canceled=${result.canceled} · assets=${(result as any).assets?.length ?? 0}`,
+      });
+
+      if (result.canceled) {
+        return; // user explicitly tapped cancel
+      }
+      if (!result.assets || !result.assets[0]) {
+        Toast.show({ type: 'error', text1: 'Picker returned no asset' });
+        return;
       }
 
       const asset = result.assets[0];
+      Toast.show({
+        type: 'info',
+        text1: 'Got asset',
+        text2: `${asset.width}x${asset.height} · ${(asset.uri || '').slice(0, 40)}…`,
+      });
       const w = asset.width || 0;
       const h = asset.height || 0;
 
@@ -92,6 +110,11 @@ const ProfileEditScreen = ({ navigation }: Props) => {
       setAvatarUri(finalUri);
       setAvatarFileName('avatar.jpg');
       setAvatarMimeType('image/jpeg');
+      Toast.show({
+        type: 'success',
+        text1: 'Avatar selected',
+        text2: 'Tap Save to upload',
+      });
     } catch (err: any) {
       console.warn('[avatar] picker failed:', err);
       Toast.show({
