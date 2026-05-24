@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { API_URL } from '../../services/api';
@@ -37,13 +37,21 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
   const uri = src ? resolveUri(src) : '';
   const initials = (name || '?')[0].toUpperCase();
   const bg = getColor(name || '?');
+  // If the image URL 404s (old avatar pointing at a deleted file), fall back
+  // to the coloured-initial bubble instead of showing nothing.
+  const [imageFailed, setImageFailed] = useState(false);
+  // Reset the failure flag when the URL changes (user uploaded a new avatar)
+  useEffect(() => { setImageFailed(false); }, [uri]);
+
+  const showImage = !!uri && !imageFailed;
 
   return (
     <View style={{ width: size, height: size }}>
-      {uri ? (
+      {showImage ? (
         <Image
           source={{ uri }}
           style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
