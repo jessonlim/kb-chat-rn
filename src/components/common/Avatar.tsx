@@ -25,10 +25,26 @@ const getColor = (name: string): string => {
 
 const resolveUri = (src: string): string => {
   if (!src) return '';
-  if (src.startsWith('http://') || src.startsWith('https://')) return src;
+  // Already a full URL — return as-is. Includes:
+  //   - http(s):// remote URLs
+  //   - file:///   local files (e.g. expo-image-manipulator output during
+  //                an in-flight avatar pick)
+  //   - content:// Android content provider URIs (image-picker results)
+  //   - data:      base64 inline images
+  //   - ph://      iOS Photos library
+  if (
+    src.startsWith('http://') ||
+    src.startsWith('https://') ||
+    src.startsWith('file://') ||
+    src.startsWith('content://') ||
+    src.startsWith('data:') ||
+    src.startsWith('ph://')
+  ) {
+    return src;
+  }
   // s3:// paths would need signed URL resolution — skip for now
   if (src.startsWith('s3://')) return '';
-  // Local path — prefix with API URL
+  // Otherwise it's a relative path from the backend (e.g. /uploads/...)
   return `${API_URL}${src}`;
 };
 
@@ -42,10 +58,6 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
   const [imageFailed, setImageFailed] = useState(false);
   // Reset the failure flag when the URL changes (user uploaded a new avatar)
   useEffect(() => { setImageFailed(false); }, [uri]);
-  // Debug — log every time we get a new URI so we can see what's coming through
-  useEffect(() => {
-    if (uri) console.log('[Avatar] uri:', uri);
-  }, [uri]);
 
   const showImage = !!uri && !imageFailed;
 
@@ -57,15 +69,13 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
         // can fire AFTER we've already updated the src, flipping imageFailed
         // back to true and hiding the new (working) image. Picking a new
         // avatar would never show because the old URL's 404 keeps winning.
+        // key={uri} mounts a fresh Image on each URI change so a stale
+        // onError from the previous source can't flip imageFailed.
         <Image
           key={uri}
           source={{ uri }}
           style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
-          onError={(e) => {
-            console.warn('[Avatar] image failed to load:', uri, e?.nativeEvent);
-            setImageFailed(true);
-          }}
-          onLoad={() => console.log('[Avatar] image loaded:', uri)}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
