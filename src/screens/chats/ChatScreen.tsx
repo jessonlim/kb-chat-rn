@@ -144,6 +144,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
             >
               <Ionicons name="videocam-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ChatInfo', { chatId })}
+              activeOpacity={0.7}
+              style={styles.headerCallBtn}
+            >
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         ),
       });
@@ -184,6 +191,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
                 disabled={callState !== 'idle'}
               >
                 <Ionicons name="videocam-outline" size={22} color={callState === 'idle' ? colors.primary : colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ChatInfo', { chatId })}
+                activeOpacity={0.7}
+                style={styles.headerCallBtn}
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color={colors.primary} />
               </TouchableOpacity>
             </View>
           ),

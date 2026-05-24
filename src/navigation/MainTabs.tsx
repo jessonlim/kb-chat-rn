@@ -7,6 +7,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import ChatListScreen from '../screens/chats/ChatListScreen';
 import ChatScreen from '../screens/chats/ChatScreen';
+import ChatInfoScreen from '../screens/chats/ChatInfoScreen';
 import NewChatScreen from '../screens/chats/NewChatScreen';
 import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
@@ -119,6 +120,11 @@ const ChatsStackScreen = () => {
         name="ChatScreen"
         component={ChatScreen as any}
         options={{ title: t('tab.chats') }}
+      />
+      <ChatsStack.Screen
+        name="ChatInfo"
+        component={ChatInfoScreen as any}
+        options={{ title: t('chatInfo.title') }}
       />
       <ChatsStack.Screen
         name="NewChat"
