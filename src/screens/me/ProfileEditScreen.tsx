@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../../stores/authStore';
 import userService from '../../services/userService';
 import Avatar from '../../components/common/Avatar';
@@ -38,15 +39,41 @@ const ProfileEditScreen = ({ navigation }: Props) => {
   const [saving, setSaving] = useState(false);
 
   const handlePickAvatar = async () => {
+    // NOTE: allowsEditing is intentionally false. The built-in editor uses
+    // the OS-native cropper which is buggy on some Samsung devices — the
+    // CROP button doesn't return the image to the app. We do our own
+    // square crop via expo-image-manipulator below, which works everywhere.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.9,
     });
+    if (result.canceled || !result.assets[0]) return;
 
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
+    const asset = result.assets[0];
+
+    // Center-crop to a square + resize down so the upload is small.
+    // expo-image-manipulator gives back a fresh local file we can upload.
+    const w = asset.width || 0;
+    const h = asset.height || 0;
+    const size = Math.min(w, h);
+    const originX = Math.max(0, (w - size) / 2);
+    const originY = Math.max(0, (h - size) / 2);
+
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [
+          { crop: { originX, originY, width: size, height: size } },
+          { resize: { width: 512, height: 512 } },
+        ],
+        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      setAvatarUri(manipulated.uri);
+      setAvatarFileName('avatar.jpg');
+      setAvatarMimeType('image/jpeg');
+    } catch (err) {
+      // Fall back to the original image if cropping fails for any reason
+      console.warn('avatar crop failed, using original:', err);
       setAvatarUri(asset.uri);
       setAvatarFileName(asset.fileName || 'avatar.jpg');
       setAvatarMimeType(asset.mimeType || 'image/jpeg');
