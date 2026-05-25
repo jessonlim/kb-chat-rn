@@ -24,6 +24,7 @@ import MessageActions, { type MessageAction } from '../../components/chat/Messag
 import AttachmentMenu from '../../components/chat/AttachmentMenu';
 import VoiceRecorder from '../../components/chat/VoiceRecorder';
 import ImageViewer from '../../components/chat/ImageViewer';
+import VideoViewer from '../../components/chat/VideoViewer';
 import SelectionToolbar from '../../components/chat/SelectionToolbar';
 import MessageInfoModal from '../../components/chat/MessageInfoModal';
 import StickerPicker from '../../components/chat/StickerPicker';
@@ -109,6 +110,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerVideo, setViewerVideo] = useState<string | null>(null);
   const [showStickers, setShowStickers] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
@@ -368,16 +370,42 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
     const onReceiveMessage = (data: { message: Message }) => {
       if (data.message.chat !== chatId) return;
-      setMessages((prev) => [...prev, data.message]);
 
-      // Mark as read since we're in the chat
-      socket.emit('mark_chat_read', { chatId });
-
-      // Send delivery receipt
+      // The server broadcasts `receive_message` to the entire chat room,
+      // INCLUDING the sender. Without dedup, the sender ends up with two
+      // copies of every message they send: one from the optimistic
+      // ack-callback replacement, and one from this broadcast.
+      //
+      // We handle three cases:
+      // 1. The message is already in state (by real _id) — we already
+      //    processed it via the ack. Skip.
+      // 2. We have a temp/optimistic message from ourselves pending —
+      //    replace it in place with this real one.
+      // 3. Genuine incoming from someone else — append.
       const senderId =
         typeof data.message.sender === 'object'
           ? data.message.sender.id
           : data.message.sender;
+
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === data.message._id)) {
+          return prev; // already have it
+        }
+        if (senderId === user?.id) {
+          const tempIdx = prev.findIndex((m) => m._id.startsWith('temp-'));
+          if (tempIdx >= 0) {
+            const next = [...prev];
+            next[tempIdx] = data.message;
+            return next;
+          }
+        }
+        return [...prev, data.message];
+      });
+
+      // Mark as read since we're in the chat
+      socket.emit('mark_chat_read', { chatId });
+
+      // Send delivery receipt for messages from others
       if (senderId !== user?.id) {
         socket.emit('message_delivered', {
           messageId: data.message._id,
@@ -804,6 +832,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
     setViewerImage(uri);
   }, []);
 
+  // Video tap handler — open fullscreen player
+  const handleVideoPress = useCallback((uri: string) => {
+    setViewerVideo(uri);
+  }, []);
+
   // Bubble tap handler — currently only used for contact cards (open the
   // referenced user's profile). Other types ignore the tap.
   const handleBubblePress = useCallback(
@@ -1153,6 +1186,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
             showSenderName={isGroup}
             onLongPress={handleLongPress}
             onImagePress={handleImagePress}
+            onVideoPress={handleVideoPress}
             onPress={handleBubblePress}
             selectMode={selectMode}
             selected={selectedIds.has(item._id)}
@@ -1278,6 +1312,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
         visible={!!viewerImage}
         uri={viewerImage}
         onClose={() => setViewerImage(null)}
+      />
+
+      {/* Fullscreen video player */}
+      <VideoViewer
+        visible={!!viewerVideo}
+        uri={viewerVideo}
+        onClose={() => setViewerVideo(null)}
       />
 
       {/* Message info modal — read receipts + delivery list */}

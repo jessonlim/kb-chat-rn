@@ -23,6 +23,7 @@ interface Props {
   showSenderName?: boolean;
   onLongPress?: (message: Message) => void;
   onImagePress?: (uri: string) => void;
+  onVideoPress?: (uri: string) => void;
   // Multi-select integration. When `selectMode` is true the bubble
   // becomes a single-tap toggle (long-press is disabled) and we render
   // a checkbox circle on the leading side.
@@ -118,16 +119,23 @@ const makeImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleS
 const VideoAttachment = ({
   url,
   isOwn,
+  onPress,
 }: {
   url: string;
   isOwn: boolean;
+  onPress?: (uri: string) => void;
 }) => {
   const { colors } = useTheme();
   const vidStyles = useMemo(() => makeVidStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
 
   return (
-    <View style={vidStyles.wrapper}>
+    <TouchableOpacity
+      style={vidStyles.wrapper}
+      activeOpacity={0.85}
+      onPress={() => uri && onPress?.(uri)}
+      disabled={!uri}
+    >
       {loading || !uri ? (
         <View style={vidStyles.placeholder}>
           <ActivityIndicator size="small" color={colors.primary} />
@@ -141,7 +149,7 @@ const VideoAttachment = ({
           </View>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -397,6 +405,7 @@ const MessageBubble = ({
   showSenderName,
   onLongPress,
   onImagePress,
+  onVideoPress,
   selectMode,
   selected,
   onSelectToggle,
@@ -516,7 +525,7 @@ const MessageBubble = ({
         )}
 
         {message.type === 'video' && attachment && (
-          <VideoAttachment url={attachment.url} isOwn={isOwn} />
+          <VideoAttachment url={attachment.url} isOwn={isOwn} onPress={onVideoPress} />
         )}
 
         {message.type === 'audio' && attachment && (
