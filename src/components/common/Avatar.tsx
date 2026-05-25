@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { API_URL } from '../../services/api';
+import { useMediaUrl } from '../../hooks/useMediaUrl';
 
 interface Props {
   name: string;
@@ -23,40 +23,21 @@ const getColor = (name: string): string => {
   return palette[Math.abs(hash) % palette.length];
 };
 
-const resolveUri = (src: string): string => {
-  if (!src) return '';
-  // Already a full URL — return as-is. Includes:
-  //   - http(s):// remote URLs
-  //   - file:///   local files (e.g. expo-image-manipulator output during
-  //                an in-flight avatar pick)
-  //   - content:// Android content provider URIs (image-picker results)
-  //   - data:      base64 inline images
-  //   - ph://      iOS Photos library
-  if (
-    src.startsWith('http://') ||
-    src.startsWith('https://') ||
-    src.startsWith('file://') ||
-    src.startsWith('content://') ||
-    src.startsWith('data:') ||
-    src.startsWith('ph://')
-  ) {
-    return src;
-  }
-  // s3:// paths would need signed URL resolution — skip for now
-  if (src.startsWith('s3://')) return '';
-  // Otherwise it's a relative path from the backend (e.g. /uploads/...)
-  return `${API_URL}${src}`;
-};
-
 const Avatar = ({ name, src, size = 48, online }: Props) => {
   const { colors } = useTheme();
-  const uri = src ? resolveUri(src) : '';
+  // useMediaUrl handles every URL flavour the backend can throw at us:
+  //   - http(s):// — use directly
+  //   - s3://      — async fetch a signed S3 URL (memoised)
+  //   - /uploads/  — prefix with API_URL
+  //   - file:// / content:// / data: / ph:// — pass through to Image
+  const { uri: resolvedUri } = useMediaUrl(src);
+  const uri = resolvedUri || '';
   const initials = (name || '?')[0].toUpperCase();
   const bg = getColor(name || '?');
-  // If the image URL 404s (old avatar pointing at a deleted file), fall back
-  // to the coloured-initial bubble instead of showing nothing.
+  // If the resolved image URL fails to load (404, network, etc.), fall back
+  // to the coloured-initial bubble.
   const [imageFailed, setImageFailed] = useState(false);
-  // Reset the failure flag when the URL changes (user uploaded a new avatar)
+  // Reset failure when the URI changes (user picked a new avatar / it loaded)
   useEffect(() => { setImageFailed(false); }, [uri]);
 
   const showImage = !!uri && !imageFailed;
@@ -64,11 +45,6 @@ const Avatar = ({ name, src, size = 48, online }: Props) => {
   return (
     <View style={{ width: size, height: size }}>
       {showImage ? (
-        // `key={uri}` makes React mount a FRESH <Image> for every new URI.
-        // Without this, a stale onError event from the previous URI's load
-        // can fire AFTER we've already updated the src, flipping imageFailed
-        // back to true and hiding the new (working) image. Picking a new
-        // avatar would never show because the old URL's 404 keeps winning.
         // key={uri} mounts a fresh Image on each URI change so a stale
         // onError from the previous source can't flip imageFailed.
         <Image
