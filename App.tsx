@@ -10,6 +10,7 @@ import { I18nProvider } from './src/i18n/I18nContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { navigationRef } from './src/navigation/navigationRef';
 import useNotifications from './src/hooks/useNotifications';
+import { useEasUpdateInfo } from './src/hooks/useEasUpdateInfo';
 import RootNavigator from './src/navigation/RootNavigator';
 import CallScreen from './src/components/call/CallScreen';
 import IncomingCallOverlay from './src/components/call/IncomingCallOverlay';
@@ -20,6 +21,10 @@ export default function App() {
 
   // Initialize push notifications when logged in
   useNotifications(!!auth.user);
+
+  // EAS Update visibility — toasts current build state on launch and
+  // when a new OTA update finishes downloading. Plain hook with no UI.
+  useEasUpdateInfo();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
