@@ -2,7 +2,17 @@
 // Connects with JWT auth, auto-reconnects, refreshes token on auth error.
 
 import { io, Socket } from 'socket.io-client';
+import Toast from 'react-native-toast-message';
 import { API_URL, storage } from './api';
+
+// DEBUG: surface socket lifecycle as Toasts so we can diagnose connection
+// problems on a standalone APK (where Metro console.log isn't reachable).
+// Strip these once we've confirmed sending works.
+const SHOW_SOCKET_DEBUG = true;
+const debugToast = (text1: string, text2?: string, type: 'info' | 'success' | 'error' = 'info') => {
+  if (!SHOW_SOCKET_DEBUG) return;
+  Toast.show({ type, text1, text2, position: 'top', visibilityTime: 2500 });
+};
 
 class SocketService {
   private socket: Socket | null = null;
@@ -15,9 +25,13 @@ class SocketService {
     if (this.socket?.connected || this.connecting) return;
 
     const token = storage.getString('accessToken');
-    if (!token) return;
+    if (!token) {
+      debugToast('Socket: no token', 'Skip connect', 'error');
+      return;
+    }
 
     this.connecting = true;
+    debugToast('Socket: connecting…', `to ${API_URL}`);
 
     // Build #15 regression: some testers report send_message ack never
     // returns. The previous build used `transports: ['websocket']` which
@@ -36,17 +50,21 @@ class SocketService {
 
     this.socket.on('connect', () => {
       this.connecting = false;
-      console.log('[socket] connected', this.socket?.io.engine.transport.name);
+      const transport = this.socket?.io.engine.transport.name;
+      console.log('[socket] connected', transport);
+      debugToast('✅ Socket connected', `via ${transport}`, 'success');
     });
 
     this.socket.on('disconnect', (reason) => {
       this.connecting = false;
       console.log('[socket] disconnected:', reason);
+      debugToast('⚠️ Socket disconnected', reason, 'error');
     });
 
     this.socket.on('connect_error', async (err) => {
       this.connecting = false;
       console.warn('[socket] connect error:', err.message);
+      debugToast('❌ Socket error', err.message, 'error');
       // If the token is expired, try refreshing
       if (err.message === 'Invalid token' || err.message === 'Authentication required') {
         try {
