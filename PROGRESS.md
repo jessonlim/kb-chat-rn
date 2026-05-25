@@ -115,8 +115,14 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 - Play Store listing
 
 ## Latest builds
-- Dev APK #13: https://expo.dev/artifacts/eas/aiyqhusQYgWsVwLsSVU3EM.apk (197 MB, dev-client + Metro)
-- Tunnel URL: `http://hpl2q0e-limjesson-8081.exp.direct` (when Metro is running)
+- **Production APK #14** (preview profile, standalone, no Metro): https://expo.dev/artifacts/eas/daBWRrttTJrAEeF8hLaVRS.apk · 145 MB — **use this for distribution**
+- Dev APK #13 (development profile, needs Metro tunnel): https://expo.dev/artifacts/eas/aiyqhusQYgWsVwLsSVU3EM.apk · 197 MB
+- Tunnel URL when developing: `http://hpl2q0e-limjesson-8081.exp.direct`
+
+## Build profiles in eas.json
+- `development` — dev-client + Metro tunnel, source maps, ~200 MB (for active development)
+- `preview` — production bundle in APK form, signed, no Metro, ~145 MB (for sharing with testers)
+- `production` — AAB format for Play Store upload (untested)
 
 ## Key gotchas if you come back to this
 
