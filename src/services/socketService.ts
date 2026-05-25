@@ -5,10 +5,11 @@ import { io, Socket } from 'socket.io-client';
 import Toast from 'react-native-toast-message';
 import { API_URL, storage } from './api';
 
-// DEBUG: surface socket lifecycle as Toasts so we can diagnose connection
-// problems on a standalone APK (where Metro console.log isn't reachable).
-// Strip these once we've confirmed sending works.
-const SHOW_SOCKET_DEBUG = true;
+// Diagnostic toasts kept off by default. Flip to true if a tester
+// reports send_message stuck and you need to see socket lifecycle
+// on-device. (Confirmed root cause was network blocking WebSocket;
+// polling-first config keeps the connection alive on any network.)
+const SHOW_SOCKET_DEBUG = false;
 const debugToast = (text1: string, text2?: string, type: 'info' | 'success' | 'error' = 'info') => {
   if (!SHOW_SOCKET_DEBUG) return;
   Toast.show({ type, text1, text2, position: 'top', visibilityTime: 2500 });
