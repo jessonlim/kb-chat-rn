@@ -41,22 +41,14 @@ const ProfileEditScreen = ({ navigation }: Props) => {
 
   const handlePickAvatar = async () => {
     try {
-      // Make sure we have permission first (some OS versions need this)
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== 'granted') {
-        Toast.show({
-          type: 'error',
-          text1: 'Permission needed',
-          text2: 'Allow photo access to set an avatar',
-        });
-        return;
-      }
-
+      // Modern Android (API 33+) uses the system Photo Picker which doesn't
+      // require READ_MEDIA_IMAGES permission. Skipping the explicit
+      // permission request avoids a class of "permission denied" failures
+      // on devices where the runtime permission flow is flaky.
       // No built-in crop — Samsung's native editor doesn't return the image.
       // We crop in JS via expo-image-manipulator below.
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.9,
+        mediaTypes: 'images',
       });
       if (result.canceled || !result.assets || !result.assets[0]) {
         return;
@@ -97,7 +89,8 @@ const ProfileEditScreen = ({ navigation }: Props) => {
       Toast.show({
         type: 'error',
         text1: 'Could not load photo',
-        text2: err?.message || 'Unknown error',
+        text2: String(err?.message || err?.code || err || 'Unknown error').slice(0, 80),
+        visibilityTime: 8000,
       });
     }
   };
