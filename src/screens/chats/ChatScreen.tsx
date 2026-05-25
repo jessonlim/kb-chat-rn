@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import * as ExpoClipboard from 'expo-clipboard';
 import chatService from '../../services/chatService';
@@ -52,6 +53,12 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  // True height of the stack-navigator header. With edge-to-edge enabled,
+  // KeyboardAvoidingView measures from the top of the screen (not from
+  // below the header), so we have to pass this as the offset or the
+  // input bar lifts by (keyboard - headerHeight) instead of by the full
+  // keyboard height.
+  const headerHeight = useHeaderHeight();
 
   const formatLastSeen = useCallback((dateStr: string): string => {
     if (!dateStr) return '';
@@ -1105,16 +1112,17 @@ const ChatScreen = ({ route, navigation }: Props) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      // iOS uses 'padding' (adds padding-bottom = keyboard height).
-      // Android needs 'height' (shrinks the View) when the app is
-      // edge-to-edge enabled (app.json has edgeToEdgeEnabled: true).
-      // Without this, the keyboard slides over the input bar and the
-      // user can't see what they're typing.
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      // Offset accounts for the stack-navigator header. 90 was fine on
-      // iOS; on Android with edge-to-edge we want a smaller value or
-      // 0 — the header is already excluded from the KAV measurement.
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      // 'padding' on both platforms is the most reliable behaviour: it
+      // adds bottom-padding equal to the keyboard height, lifting the
+      // input bar out from under the keyboard regardless of edge-to-edge
+      // or windowSoftInputMode quirks.
+      //
+      // The offset must equal the header height so KAV doesn't double-
+      // count the area above the screen content. useHeaderHeight from
+      // @react-navigation/elements gives us the exact value the stack
+      // navigator is using.
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}
     >
       {searchVisible && (
         <View style={styles.searchBar}>
