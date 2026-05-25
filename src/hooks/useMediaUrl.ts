@@ -1,27 +1,88 @@
 // Hook to resolve any attachment URL format to a displayable URI.
 //
-// The backend can return URLs in three formats:
-// 1. Full URL   — https://... or http://... → use directly
-// 2. S3 key     — s3://bucket/key → call /api/uploads/signed-url to get a signed URL
-// 3. Relative   — /uploads/filename → prefix with API_URL
+// The backend can return URLs in four formats:
+// 1. Full URL    — https://... or http://...                   → use directly
+// 2. S3 key      — s3://bucket/key → call /api/uploads/signed-url
+// 3. Relative    — /uploads/filename → prefix with API_URL
+// 4. Local URI   — file:// / content:// / data: / ph://        → pass through
 //
-// Signed S3 URLs are cached in a Map so we don't re-fetch on every render.
+// Signed S3 URLs are cached in BOTH a module Map (instant on subsequent
+// renders) AND MMKV (survives app reloads — so avatars don't have to
+// re-fetch on every cold start). The MMKV cache is hydrated synchronously
+// on module load, so the first render already has the cached URL if one
+// exists.
 
 import { useState, useEffect, useRef } from 'react';
 import { API_URL, storage } from '../services/api';
 
-// Module-level cache — shared across all component instances
+// In-memory cache, hydrated from MMKV on module load.
+// Once an entry expires we drop it from both caches.
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
-// How long to cache S3 signed URLs (25 min — they usually last 30 min)
-const CACHE_TTL_MS = 25 * 60 * 1000;
+// How long to cache S3 signed URLs. The backend mints them with a 1h TTL
+// by default — keep ours a bit shorter so we refresh before they expire.
+const CACHE_TTL_MS = 50 * 60 * 1000;
+const MMKV_KEY = 'cache.signedUrls.v1';
+
+// ── Hydrate the in-memory cache from MMKV on module load ─────────────
+(function hydrateFromStorage() {
+  try {
+    const raw = storage.getString(MMKV_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, { url: string; expiresAt: number }>;
+    const now = Date.now();
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (entry?.expiresAt > now) signedUrlCache.set(key, entry);
+    }
+  } catch (err) {
+    console.warn('[useMediaUrl] failed to hydrate cache:', err);
+  }
+})();
+
+// Schedule a debounced persist so we're not writing on every cache update.
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const persistCache = () => {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    try {
+      const now = Date.now();
+      const obj: Record<string, { url: string; expiresAt: number }> = {};
+      for (const [key, entry] of signedUrlCache.entries()) {
+        if (entry.expiresAt > now) obj[key] = entry;
+      }
+      storage.set(MMKV_KEY, JSON.stringify(obj));
+    } catch (err) {
+      console.warn('[useMediaUrl] failed to persist cache:', err);
+    }
+  }, 500);
+};
+
+const setCached = (key: string, url: string) => {
+  signedUrlCache.set(key, { url, expiresAt: Date.now() + CACHE_TTL_MS });
+  persistCache();
+};
 
 /**
  * Resolve a raw attachment URL to something React Native's <Image> can display.
  * Returns { uri, loading, error }.
  */
 export const useMediaUrl = (rawUrl: string | undefined) => {
-  const [uri, setUri] = useState<string | null>(null);
+  // Initialise with the cached value synchronously when possible so the
+  // very first render already has the URI — no flash of empty / fallback.
+  const initialUri = (() => {
+    if (!rawUrl) return null;
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
+    if (rawUrl.startsWith('s3://')) {
+      const key = rawUrl.slice(5);
+      const cached = signedUrlCache.get(key);
+      if (cached && cached.expiresAt > Date.now()) return cached.url;
+      return null;
+    }
+    if (rawUrl.startsWith('/')) return `${API_URL}${rawUrl}`;
+    return rawUrl; // file://, content://, data:, ph://
+  })();
+
+  const [uri, setUri] = useState<string | null>(initialUri);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -39,17 +100,15 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
       return;
     }
 
-    // 1. Full URL — use directly
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       setUri(rawUrl);
       return;
     }
 
-    // 2. S3 key — fetch signed URL
     if (rawUrl.startsWith('s3://')) {
-      const key = rawUrl.slice(5); // strip "s3://"
+      const key = rawUrl.slice(5);
 
-      // Check cache first
+      // Cache hit? Use it immediately.
       const cached = signedUrlCache.get(key);
       if (cached && cached.expiresAt > Date.now()) {
         setUri(cached.url);
@@ -71,10 +130,7 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
           if (!mountedRef.current) return;
           const signedUrl = data.url || data.signedUrl;
           if (signedUrl) {
-            signedUrlCache.set(key, {
-              url: signedUrl,
-              expiresAt: Date.now() + CACHE_TTL_MS,
-            });
+            setCached(key, signedUrl);
             setUri(signedUrl);
           } else {
             setError('No signed URL returned');
@@ -91,13 +147,11 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
       return;
     }
 
-    // 3. Relative path — prefix with API_URL
     if (rawUrl.startsWith('/')) {
       setUri(`${API_URL}${rawUrl}`);
       return;
     }
 
-    // Fallback — treat as a full URL
     setUri(rawUrl);
   }, [rawUrl]);
 
@@ -106,7 +160,7 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
 
 /**
  * Non-hook version for one-off resolution (e.g. inside callbacks).
- * Returns the resolved URL string.
+ * Returns the resolved URL string. Shares the same persistent cache.
  */
 export const resolveMediaUrl = async (rawUrl: string): Promise<string> => {
   if (!rawUrl) return '';
@@ -128,9 +182,7 @@ export const resolveMediaUrl = async (rawUrl: string): Promise<string> => {
     if (!res.ok) throw new Error(`Signed URL fetch failed (${res.status})`);
     const data = await res.json();
     const signedUrl = data.url || data.signedUrl;
-    if (signedUrl) {
-      signedUrlCache.set(key, { url: signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });
-    }
+    if (signedUrl) setCached(key, signedUrl);
     return signedUrl || '';
   }
 
