@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { Video, ResizeMode } from 'expo-av';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import AudioPlayer from './AudioPlayer';
 import LinkPreview, { extractUrl } from './LinkPreview';
@@ -142,8 +143,20 @@ const VideoAttachment = ({
         </View>
       ) : (
         <View style={vidStyles.placeholder}>
-          {/* Video thumbnail — we show a play overlay on a dark bg */}
-          <Image source={{ uri }} style={vidStyles.thumb} resizeMode="cover" />
+          {/* First-frame thumbnail: render a paused <Video> in cover mode.
+              A plain <Image source={{ uri: videoFile }}> can't decode a
+              video file — that's why our previous thumbnail was blank.
+              Setting shouldPlay=false freezes on the first frame. */}
+          <Video
+            source={{ uri }}
+            style={vidStyles.thumb}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            isMuted
+            // Prevents the player from buffering more than needed for the
+            // first frame; we don't actually play it here.
+            positionMillis={0}
+          />
           <View style={vidStyles.playOverlay}>
             <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.85)" />
           </View>

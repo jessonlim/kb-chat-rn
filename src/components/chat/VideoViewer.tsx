@@ -72,8 +72,11 @@ const makeStyles = () =>
       zIndex: 10,
     },
     video: {
+      // Fill the screen — ResizeMode.CONTAIN will letterbox the video
+      // to its native aspect ratio (portrait or landscape) without
+      // squashing or cropping.
       width: '100%',
-      aspectRatio: 16 / 9,
+      height: '100%',
     },
   });
 
