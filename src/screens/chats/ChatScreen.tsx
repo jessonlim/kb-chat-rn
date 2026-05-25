@@ -658,9 +658,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const handleSendSticker = useCallback(
     (url: string) => {
       // The sticker URL goes in the first attachment so the bubble can
-      // resolve it through useMediaUrl just like an image.
+      // resolve it through useMediaUrl just like an image. NOTE: the
+      // attachment.type field is the message BUCKET ('image' / 'sticker'
+      // / etc), not the MIME type — backend uses it for the Message
+      // model's `type` enum. Putting 'image/png' here would fail enum
+      // validation and silently drop the message.
       handleSendStructured('sticker', '', [
-        { url, type: 'image/png', name: 'sticker', size: 0 },
+        { url, type: 'sticker', name: 'sticker', size: 0 },
       ]);
     },
     [handleSendStructured]

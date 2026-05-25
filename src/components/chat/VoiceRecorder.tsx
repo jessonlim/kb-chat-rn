@@ -122,9 +122,15 @@ const VoiceRecorder = ({ onSend, onCancel }: Props) => {
       const fileName = `voice_${Date.now()}.m4a`;
       const result = await uploadFile(uri, fileName, 'audio/mp4');
 
+      // IMPORTANT: attachment.type holds the message bucket ('audio'),
+      // NOT the MIME type. The backend's send_message handler uses this
+      // field as the Message.type enum. Putting 'audio/mp4' here causes
+      // Mongoose enum validation to fail → the message never persists.
+      // Backend's POST /api/uploads already returns result.type='audio'
+      // for any audio MIME, so we use that.
       const attachment: Attachment = {
         url: result.url,
-        type: 'audio/mp4',
+        type: result.type || 'audio',
         name: fileName,
         size: result.size || 0,
       };
