@@ -136,9 +136,17 @@ The RN client now expects (and falls back gracefully from) these endpoints:
 - Cross-device sync of remarks + tags (currently local-only)
 
 ## Latest builds
-- **Build #14 (preview profile, standalone APK)** — https://expo.dev/artifacts/eas/daBWRrttTJrAEeF8hLaVRS.apk · 145 MB
-- **Build #15** — IN PROGRESS — adds expo-camera, expo-location, react-native-svg (needed for QR, location, sticker pack)
+- **🆕 Build #15 (preview profile, standalone APK)** — https://expo.dev/artifacts/eas/caswxnjbK9SDYYPScedCwY.apk
+  - Includes all 17 WeChat parity features
+  - Adds native deps: expo-camera, expo-location, react-native-svg
+  - Built 2026-05-25 on EAS Starter plan (~8m30s, $1-2 of build credits)
+- Build #14 (superseded) — https://expo.dev/artifacts/eas/daBWRrttTJrAEeF8hLaVRS.apk · 145 MB
 - Dev APK #13 (development profile, needs Metro tunnel): https://expo.dev/artifacts/eas/aiyqhusQYgWsVwLsSVU3EM.apk · 197 MB
+
+## EAS account
+- Plan: **Starter** (upgraded 2026-05-25 from Free tier when monthly quota hit)
+- Build credits: ~$45 → ~20-25 Android builds remaining
+- Dashboard: https://expo.dev/accounts/meka-games/projects/kb-chat-rn
 
 ## Build profiles in eas.json
 - `development` — dev-client + Metro tunnel, source maps, ~200 MB (for active development)
