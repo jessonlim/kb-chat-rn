@@ -61,6 +61,17 @@ const ScanQRScreen = ({ navigation }: Props) => {
       setHandling(true);
 
       const scannedUserId = match[1];
+
+      // DEBUG: surface raw scanned data + extracted ID so we can see
+      // exactly what's going wrong when "user not found" fires.
+      Toast.show({
+        type: 'info',
+        text1: '🔍 Scanned',
+        text2: `id="${scannedUserId.slice(0, 12)}…" len=${scannedUserId.length}`,
+        position: 'top',
+        visibilityTime: 4000,
+      });
+
       if (user && scannedUserId === user.id) {
         Toast.show({ type: 'info', text1: t('qr.cantScanSelf') });
         setHandling(false);
@@ -72,10 +83,32 @@ const ScanQRScreen = ({ navigation }: Props) => {
         const { user: scannedUser } = await userService.getUserById(scannedUserId);
         // Replace the scanner so back goes to where we came from, not back
         // to the camera.
-        navigation.replace('UserProfile', { userId: scannedUser.id });
-      } catch (err) {
+        // Defensive: backend may return { user: { _id, ... } } without the
+        // `id` virtual depending on .select() projection. Fall back to _id.
+        const targetId = (scannedUser as any).id || (scannedUser as any)._id;
+        if (!targetId) {
+          Toast.show({
+            type: 'error',
+            text1: '⚠️ User has no ID',
+            text2: 'response: ' + JSON.stringify(scannedUser).slice(0, 100),
+            visibilityTime: 5000,
+          });
+          setHandling(false);
+          setTimeout(() => { handlingRef.current = false; }, 1500);
+          return;
+        }
+        navigation.replace('UserProfile', { userId: targetId });
+      } catch (err: any) {
         console.warn('[ScanQR] lookup failed:', err);
-        Toast.show({ type: 'error', text1: t('qr.userNotFound') });
+        // Surface the actual HTTP status / error
+        const status = err?.response?.status;
+        const msg = err?.response?.data?.message || err?.message || 'unknown';
+        Toast.show({
+          type: 'error',
+          text1: `❌ Lookup failed (${status || '?'})`,
+          text2: `${msg} · id=${scannedUserId.slice(0, 12)}…`,
+          visibilityTime: 5000,
+        });
         setHandling(false);
         setTimeout(() => { handlingRef.current = false; }, 1500);
       }
