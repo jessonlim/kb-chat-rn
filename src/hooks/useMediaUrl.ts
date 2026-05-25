@@ -13,7 +13,22 @@
 // exists.
 
 import { useState, useEffect, useRef } from 'react';
+import Toast from 'react-native-toast-message';
 import { API_URL, storage } from '../services/api';
+
+// DEBUG: surface signed-URL fetch failures. Avatars use the same hook so
+// if you see these toasts spamming, something's wrong with /api/uploads/signed-url.
+const SHOW_MEDIA_DEBUG = true;
+let lastErrToastAt = 0;
+const dt = (text1: string, text2?: string) => {
+  if (!SHOW_MEDIA_DEBUG) return;
+  // Debounce: at most one error toast per 4s, otherwise it spams when many
+  // bubbles try to resolve at once.
+  const now = Date.now();
+  if (now - lastErrToastAt < 4000) return;
+  lastErrToastAt = now;
+  Toast.show({ type: 'error', text1, text2, position: 'top', visibilityTime: 3000 });
+};
 
 // In-memory cache, hydrated from MMKV on module load.
 // Once an entry expires we drop it from both caches.
@@ -123,7 +138,10 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => {
-          if (!res.ok) throw new Error(`Signed URL fetch failed (${res.status})`);
+          if (!res.ok) {
+            dt('❌ Signed URL HTTP', `${res.status} for ${key.slice(0, 30)}`);
+            throw new Error(`Signed URL fetch failed (${res.status})`);
+          }
           return res.json();
         })
         .then((data) => {
@@ -133,11 +151,13 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
             setCached(key, signedUrl);
             setUri(signedUrl);
           } else {
+            dt('❌ Signed URL empty', key.slice(0, 30));
             setError('No signed URL returned');
           }
         })
         .catch((err) => {
           if (!mountedRef.current) return;
+          dt('❌ Signed URL error', err?.message || 'unknown');
           setError(err.message);
         })
         .finally(() => {

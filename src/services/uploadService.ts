@@ -1,7 +1,16 @@
 // Upload service — sends files to the backend via multipart/form-data.
 // Uses XMLHttpRequest (not axios) so we get real upload progress in React Native.
 
+import Toast from 'react-native-toast-message';
 import { API_URL, storage } from './api';
+
+// DEBUG: surface upload progress + failure reasons. Once we confirm uploads
+// work in production, gate behind a flag like SHOW_SOCKET_DEBUG.
+const SHOW_UPLOAD_DEBUG = true;
+const dt = (text1: string, text2?: string, type: 'info' | 'success' | 'error' = 'info') => {
+  if (!SHOW_UPLOAD_DEBUG) return;
+  Toast.show({ type, text1, text2, position: 'top', visibilityTime: 3000 });
+};
 
 export interface UploadResult {
   url: string;
@@ -34,9 +43,12 @@ export const uploadFile = (
   return new Promise((resolve, reject) => {
     const token = storage.getString('accessToken');
     if (!token) {
+      dt('Upload: no token', 'Not authenticated', 'error');
       reject(new Error('Not authenticated'));
       return;
     }
+
+    dt('Upload: starting', `${mimeType} ${fileName}`);
 
     const formData = new FormData();
     // React Native's FormData accepts { uri, type, name } objects
@@ -73,20 +85,25 @@ export const uploadFile = (
             name: data.name || data.file?.name || fileName,
             size: data.size || data.file?.size || 0,
           };
+          dt('✅ Upload OK', `${result.url.slice(0, 40)}…`, 'success');
           resolve(result);
         } catch {
+          dt('❌ Upload bad JSON', xhr.responseText.slice(0, 60), 'error');
           reject(new Error('Invalid upload response'));
         }
       } else {
+        dt('❌ Upload HTTP error', `${xhr.status}: ${xhr.responseText.slice(0, 80)}`, 'error');
         reject(new Error(`Upload failed (${xhr.status})`));
       }
     };
 
     xhr.onerror = () => {
+      dt('❌ Upload network error', `to ${API_URL}/api/uploads`, 'error');
       reject(new Error('Upload network error'));
     };
 
     xhr.ontimeout = () => {
+      dt('❌ Upload timeout', '120s', 'error');
       reject(new Error('Upload timed out'));
     };
 
