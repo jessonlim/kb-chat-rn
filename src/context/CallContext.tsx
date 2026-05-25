@@ -16,6 +16,7 @@ import {
   MediaStream,
 } from '@livekit/react-native-webrtc';
 import InCallManager from 'react-native-incall-manager';
+import { AppState } from 'react-native';
 import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
@@ -561,14 +562,21 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       setIsSpeaker(data.type === 'video');
       setCallState('ringing');
 
-      // Show native full-screen incoming call notification (lock screen / background)
-      callkeepService.showIncomingCall({
-        callerId: data.callerId,
-        callerName: callerInfo.displayName,
-        avatar: callerInfo.avatar,
-        callType: data.type,
-        chatId: data.chatId,
-      });
+      // Show native full-screen incoming call notification ONLY when the
+      // app isn't currently in the foreground. In foreground the JS
+      // IncomingCallOverlay handles the ringing UI; layering the native
+      // full-screen-notification on top of it crashes on some Samsung
+      // devices (including the Fold Z 6) and is redundant anyway.
+      const isForeground = AppState.currentState === 'active';
+      if (!isForeground) {
+        callkeepService.showIncomingCall({
+          callerId: data.callerId,
+          callerName: callerInfo.displayName,
+          avatar: callerInfo.avatar,
+          callType: data.type,
+          chatId: data.chatId,
+        });
+      }
 
       // Play ringtone
       try {
