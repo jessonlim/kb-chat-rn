@@ -150,7 +150,17 @@ const ChatScreen = ({ route, navigation }: Props) => {
     };
   }, [searchQuery, searchVisible, chatId]);
 
-  // Load chat info + initial messages
+  // Load chat info + initial messages.
+  //
+  // Backend returns messages in OLDEST-first order (it sorts newest-first
+  // then reverses). We store state in that same chronological order so
+  // appending real-time receives (`[...prev, newMsg]`) keeps newest at
+  // the end. The render uses `reversedMessages = [...messages].reverse()`
+  // to feed the inverted FlatList so newest lands at the visual bottom.
+  //
+  // The previous .reverse() on the API response was a leftover from an
+  // earlier API contract and was producing an off-screen ordering bug —
+  // chats appeared empty even when messages existed in the DB.
   useEffect(() => {
     const init = async () => {
       try {
@@ -159,10 +169,15 @@ const ChatScreen = ({ route, navigation }: Props) => {
           chatService.getMessages(chatId),
         ]);
         setChat(chatRes.chat);
-        setMessages(msgRes.messages.reverse()); // API returns newest first
+        setMessages(msgRes.messages);
         if (msgRes.messages.length < 50) setHasMore(false);
-      } catch (err) {
+        // Diagnostic — strip after confirming fix lands
+        if (msgRes.messages.length === 0) {
+          Toast.show({ type: 'info', text1: 'Loaded 0 messages', text2: 'Empty chat', visibilityTime: 2000 });
+        }
+      } catch (err: any) {
         console.warn('Failed to load chat:', err);
+        Toast.show({ type: 'error', text1: 'Load chat failed', text2: err?.message || 'unknown', visibilityTime: 3000 });
       } finally {
         setLoading(false);
       }
@@ -756,7 +771,9 @@ const ChatScreen = ({ route, navigation }: Props) => {
     socketService.emit('typing_stop', { chatId });
   }, [chatId]);
 
-  // Load older messages
+  // Load older messages (chronological pagination — prepend to state).
+  // Backend already returns oldest-first, so we prepend directly without
+  // reversing. State invariant: messages[] is always oldest → newest.
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return;
     setLoadingMore(true);
@@ -764,7 +781,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
       const oldest = messages[0];
       const { messages: older } = await chatService.getMessages(chatId, oldest._id);
       if (older.length < 50) setHasMore(false);
-      setMessages((prev) => [...older.reverse(), ...prev]);
+      setMessages((prev) => [...older, ...prev]);
     } catch {
       // Ignore
     } finally {
