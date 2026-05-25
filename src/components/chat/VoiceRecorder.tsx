@@ -114,12 +114,17 @@ const VoiceRecorder = ({ onSend, onCancel }: Props) => {
         playsInSilentModeIOS: true,
       });
 
+      // The Expo Audio recorder produces an MP4-container AAC file (.m4a
+       // extension). The backend's multer fileFilter accepts 'audio/mp4'
+       // and 'audio/x-m4a' but NOT 'audio/m4a' (non-standard variant).
+       // Send the IANA-standard 'audio/mp4' which is unambiguous and on
+       // the whitelist.
       const fileName = `voice_${Date.now()}.m4a`;
-      const result = await uploadFile(uri, fileName, 'audio/m4a');
+      const result = await uploadFile(uri, fileName, 'audio/mp4');
 
       const attachment: Attachment = {
         url: result.url,
-        type: 'audio/m4a',
+        type: 'audio/mp4',
         name: fileName,
         size: result.size || 0,
       };
