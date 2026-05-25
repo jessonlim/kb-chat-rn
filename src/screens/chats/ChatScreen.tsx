@@ -487,6 +487,22 @@ const ChatScreen = ({ route, navigation }: Props) => {
       // Clear reply state
       if (replyTo) setReplyTo(null);
 
+      // Failsafe timeout — if the server doesn't ack within 15s, flip the
+      // optimistic message from 'sending' to 'failed' so the user sees
+      // a clear failure state instead of an indefinite "..." spinner.
+      // Cleared inside the ack callback below if we hear back in time.
+      let timeoutFired = false;
+      const ackTimeout = setTimeout(() => {
+        timeoutFired = true;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId && m.status === 'sending'
+              ? { ...m, status: 'failed' as const }
+              : m
+          )
+        );
+      }, 15_000);
+
       socket.emit(
         'send_message',
         {
@@ -496,6 +512,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
           ...(replyTo ? { replyTo: replyTo._id } : {}),
         },
         (ack: SendMessageAck) => {
+          clearTimeout(ackTimeout);
+          if (timeoutFired) return; // already gave up
           if (ack.ok && ack.message) {
             // Replace optimistic with real message
             setMessages((prev) =>

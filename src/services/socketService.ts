@@ -6,31 +6,46 @@ import { API_URL, storage } from './api';
 
 class SocketService {
   private socket: Socket | null = null;
+  // Multi-call protection: connect() is invoked from multiple authStore
+  // entry points. We don't want to abandon a still-connecting socket and
+  // open a second one. So we also gate against the connecting state.
+  private connecting = false;
 
   connect() {
-    if (this.socket?.connected) return;
+    if (this.socket?.connected || this.connecting) return;
 
     const token = storage.getString('accessToken');
     if (!token) return;
 
+    this.connecting = true;
+
+    // Build #15 regression: some testers report send_message ack never
+    // returns. The previous build used `transports: ['websocket']` which
+    // is faster but fails silently on networks that block WebSocket (some
+    // ISPs, captive portals, corporate VPNs). Allow polling fallback so
+    // socket.io can negotiate whichever transport actually works.
     this.socket = io(API_URL, {
       auth: { token },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
+      timeout: 20_000,
     });
 
     this.socket.on('connect', () => {
-      console.log('[socket] connected');
+      this.connecting = false;
+      console.log('[socket] connected', this.socket?.io.engine.transport.name);
     });
 
     this.socket.on('disconnect', (reason) => {
+      this.connecting = false;
       console.log('[socket] disconnected:', reason);
     });
 
     this.socket.on('connect_error', async (err) => {
+      this.connecting = false;
       console.warn('[socket] connect error:', err.message);
       // If the token is expired, try refreshing
       if (err.message === 'Invalid token' || err.message === 'Authentication required') {
