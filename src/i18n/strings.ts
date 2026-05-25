@@ -42,6 +42,17 @@ export const STRINGS = {
   'common.soon':              { en: 'Soon',           zh: '即将推出' },
   'common.you':               { en: 'You',            zh: '我' },
   'common.someone':           { en: 'Someone',        zh: '某人' },
+  'common.allow':             { en: 'Allow',          zh: '允许' },
+  'common.error':             { en: 'Error',          zh: '错误' },
+  'common.retry':             { en: 'Retry',          zh: '重试' },
+  'common.edit':              { en: 'Edit',           zh: '编辑' },
+  'common.remove':            { en: 'Remove',         zh: '移除' },
+  'common.ok':                { en: 'OK',             zh: '确定' },
+  'common.more':              { en: 'More',           zh: '更多' },
+  'common.select':            { en: 'Select',         zh: '选择' },
+  'common.selectAll':         { en: 'Select all',     zh: '全选' },
+  'common.deselectAll':       { en: 'Deselect all',   zh: '取消全选' },
+  'common.selected':          { en: '{n} selected',   zh: '已选 {n}' },
 
   // Tabs
   'tab.chats':                { en: 'Chats',          zh: '聊天' },
@@ -143,6 +154,7 @@ export const STRINGS = {
   'msg.reply':                { en: 'Reply',          zh: '回复' },
   'msg.copy':                 { en: 'Copy',           zh: '复制' },
   'msg.edit':                 { en: 'Edit',           zh: '编辑' },
+  'msg.react':                { en: 'React',          zh: '点赞' },
   'msg.deleteForMe':          { en: 'Delete for me',  zh: '仅对我删除' },
   'msg.deleteForEveryone':    { en: 'Delete for everyone', zh: '撤回' },
   'msg.deletedPlaceholder':   { en: 'This message was deleted', zh: '此消息已被撤回' },
@@ -654,6 +666,99 @@ export const STRINGS = {
   'app.tagline':              { en: 'Send and receive messages in real time. Search for a user above to start chatting.',
                                 zh: '即时收发消息。在上方搜索用户开始聊天。' },
   'app.empty.title':          { en: 'KB Chat Web',    zh: 'KB Chat 网页版' },
+
+  // Friend remarks (rename a contact for yourself)
+  'remark.title':             { en: 'Set remark',                  zh: '设置备注' },
+  'remark.label':             { en: 'Remark',                      zh: '备注名' },
+  'remark.placeholder':       { en: 'Enter a remark',              zh: '输入备注' },
+  'remark.hint':              { en: 'Only you can see this name.', zh: '仅你可见。' },
+  'remark.cleared':           { en: 'Remark cleared',              zh: '备注已清除' },
+  'remark.saved':             { en: 'Remark saved',                zh: '备注已保存' },
+  'remark.failed':            { en: 'Could not save remark',       zh: '保存失败' },
+
+  // Global search (across chats / contacts / channels / moments)
+  'globalSearch.title':       { en: 'Search',                      zh: '搜索' },
+  'globalSearch.placeholder': { en: 'Search messages, friends, channels…', zh: '搜索消息、朋友、频道...' },
+  'globalSearch.section.contacts': { en: 'Contacts',               zh: '联系人' },
+  'globalSearch.section.chats':    { en: 'Chats',                  zh: '聊天' },
+  'globalSearch.section.messages': { en: 'Messages',               zh: '消息' },
+  'globalSearch.section.channels': { en: 'Channels',               zh: '视频号' },
+  'globalSearch.section.moments':  { en: 'Moments',                zh: '朋友圈' },
+  'globalSearch.empty':       { en: 'No results',                  zh: '无结果' },
+  'globalSearch.hint':        { en: 'Type to search across the whole app.', zh: '输入关键词进行全局搜索。' },
+
+  // Multi-select messages
+  'select.toolbar.title':     { en: '{n} selected',                zh: '已选 {n} 条' },
+  'select.action.forward':    { en: 'Forward',                     zh: '转发' },
+  'select.action.delete':     { en: 'Delete',                      zh: '删除' },
+  'select.action.star':       { en: 'Star',                        zh: '收藏' },
+  'select.action.copy':       { en: 'Copy',                        zh: '复制' },
+  'select.deleteConfirm':     { en: 'Delete {n} messages?',        zh: '删除 {n} 条消息？' },
+  'select.copied':            { en: 'Copied to clipboard',         zh: '已复制到剪贴板' },
+  'select.menu':              { en: 'Multi-select',                zh: '多选' },
+
+  // Stickers
+  'sticker.title':            { en: 'Stickers',                    zh: '表情' },
+  'sticker.recent':           { en: 'Recent',                      zh: '最近' },
+  'sticker.empty':            { en: 'No stickers',                 zh: '暂无表情' },
+  'sticker.packKB':           { en: 'KB Chat Pack',                zh: 'KB Chat 表情包' },
+
+  // Location sharing
+  'location.title':           { en: 'Location',                    zh: '位置' },
+  'location.share':           { en: 'Send Location',               zh: '发送位置' },
+  'location.current':         { en: 'My current location',         zh: '我的当前位置' },
+  'location.open':            { en: 'Open in maps',                zh: '在地图中打开' },
+  'location.permissionDenied':{ en: 'Location permission denied',  zh: '位置权限被拒绝' },
+
+  // Contact card sharing (in chat)
+  'contactCard.title':        { en: 'Share Contact',               zh: '分享联系人' },
+  'contactCard.pick':         { en: 'Choose a contact to send',    zh: '选择要分享的联系人' },
+  'contactCard.send':         { en: 'Send Contact',                zh: '发送' },
+  'contactCard.preview':      { en: 'Contact card',                zh: '联系人' },
+  'contactCard.viewProfile':  { en: 'View profile',                zh: '查看资料' },
+
+  // Message info modal
+  'msgInfo.title':            { en: 'Message info',                zh: '消息信息' },
+  'msgInfo.readBy':           { en: 'Read by',                     zh: '已读' },
+  'msgInfo.deliveredTo':      { en: 'Delivered to',                zh: '已送达' },
+  'msgInfo.pending':          { en: 'Pending',                     zh: '待发送' },
+  'msgInfo.sent':             { en: 'Sent {time}',                 zh: '发送于 {time}' },
+
+  // Link preview
+  'linkPreview.failed':       { en: 'Failed to load preview',      zh: '加载预览失败' },
+
+  // Voice-to-text
+  'voiceToText.transcribe':   { en: 'Convert to text',             zh: '转为文字' },
+  'voiceToText.transcribing': { en: 'Transcribing…',               zh: '转换中…' },
+  'voiceToText.failed':       { en: 'Transcription failed',        zh: '转换失败' },
+
+  // Translation
+  'translate.action':         { en: 'Translate',                   zh: '翻译' },
+  'translate.translating':    { en: 'Translating…',                zh: '翻译中…' },
+  'translate.failed':         { en: 'Translation failed',          zh: '翻译失败' },
+  'translate.original':       { en: 'Show original',               zh: '显示原文' },
+  'translate.detected':       { en: 'Translated from {lang}',      zh: '由 {lang} 翻译' },
+
+  // Font scaling
+  'font.title':               { en: 'Font size',                   zh: '字体大小' },
+  'font.small':               { en: 'Small',                       zh: '小' },
+  'font.medium':              { en: 'Medium',                      zh: '中' },
+  'font.large':               { en: 'Large',                       zh: '大' },
+  'font.xlarge':              { en: 'Extra large',                 zh: '特大' },
+  'font.preview':             { en: 'The quick brown fox',         zh: '示例文字大小' },
+
+  // Tags for contacts
+  'tag.title':                { en: 'Tags',                        zh: '标签' },
+  'tag.add':                  { en: 'Add tag',                     zh: '添加标签' },
+  'tag.placeholder':          { en: 'Tag name (e.g. Family)',      zh: '标签名（如：家人）' },
+  'tag.empty':                { en: 'No tags yet. Add a tag to organise your contacts.', zh: '暂无标签。添加标签来分组好友。' },
+  'tag.contactsInTag':        { en: '{n} contacts',                zh: '{n} 位联系人' },
+
+  // Hidden chats manager
+  'hidden.title':             { en: 'Hidden chats',                zh: '不显示的聊天' },
+  'hidden.empty':             { en: 'No hidden chats',             zh: '暂无隐藏聊天' },
+  'hidden.unhide':            { en: 'Unhide',                      zh: '取消隐藏' },
+  'hidden.unhidden':          { en: 'Chat unhidden',               zh: '已取消隐藏' },
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

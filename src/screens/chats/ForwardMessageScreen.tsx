@@ -25,12 +25,18 @@ import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Chat, Message, User } from '../../types';
 
 interface Props {
-  route: { params: { message: Message } };
+  // Backwards-compatible: either a single message (legacy) or an array.
+  route: { params: { message?: Message; messages?: Message[] } };
   navigation: any;
 }
 
 const ForwardMessageScreen = ({ route, navigation }: Props) => {
-  const { message } = route.params;
+  // Normalise so the rest of the screen always works with an array.
+  const messagesToForward: Message[] = useMemo(() => {
+    if (route.params.messages && route.params.messages.length) return route.params.messages;
+    if (route.params.message) return [route.params.message];
+    return [];
+  }, [route.params.message, route.params.messages]);
   const { user } = useAuth();
   const { t } = useT();
   const { colors } = useTheme();
@@ -93,17 +99,23 @@ const ForwardMessageScreen = ({ route, navigation }: Props) => {
   };
 
   const handleSend = async () => {
-    if (selected.size === 0 || sending) return;
+    if (selected.size === 0 || sending || messagesToForward.length === 0) return;
     setSending(true);
     try {
-      // Forward to each selected chat in parallel
-      const body = {
-        content: message.content,
-        type: message.type || 'text',
-        attachments: message.attachments,
-      };
+      // For each selected chat, forward every message in original order.
+      // We do chats in parallel but messages within a chat sequentially so
+      // they arrive in the right order (the backend stamps `createdAt` on
+      // arrival, not from the client).
       await Promise.all(
-        Array.from(selected).map((chatId) => chatService.forwardMessageRest(chatId, body)),
+        Array.from(selected).map(async (chatId) => {
+          for (const m of messagesToForward) {
+            await chatService.forwardMessageRest(chatId, {
+              content: m.content,
+              type: m.type || 'text',
+              attachments: m.attachments,
+            });
+          }
+        })
       );
       Toast.show({ type: 'success', text1: t('forward.sent') });
       navigation.goBack();

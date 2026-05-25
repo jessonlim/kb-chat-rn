@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useT } from '../../i18n/I18nContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Message } from '../../types';
 
@@ -19,13 +20,21 @@ export type MessageAction =
   | 'delete'
   | 'forward'
   | 'star'
-  | 'react';
+  | 'react'
+  | 'select'
+  | 'info'
+  | 'translate'
+  | 'transcribe';
 
 interface Props {
   visible: boolean;
   message: Message | null;
   isOwn: boolean;
   onAction: (action: MessageAction) => void;
+  // Called with the chosen emoji string when the user taps a quick-react
+  // chip. If omitted, the parent should fall back to handling 'react' as
+  // the legacy 👍 reaction.
+  onReact?: (emoji: string) => void;
   onClose: () => void;
 }
 
@@ -39,18 +48,23 @@ interface ActionItem {
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) => {
+const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose }: Props) => {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const ACTIONS: ActionItem[] = [
-    { key: 'reply', label: 'Reply', icon: 'arrow-undo-outline' },
-    { key: 'copy', label: 'Copy', icon: 'copy-outline' },
-    { key: 'edit', label: 'Edit', icon: 'create-outline', ownOnly: true },
-    { key: 'forward', label: 'Forward', icon: 'arrow-redo-outline' },
-    { key: 'star', label: 'Star', icon: 'star-outline' },
-    { key: 'react', label: 'React', icon: 'happy-outline' },
-    { key: 'delete', label: 'Delete', icon: 'trash-outline', color: colors.danger, ownOnly: true },
+    { key: 'reply', label: t('msg.reply'), icon: 'arrow-undo-outline' },
+    { key: 'copy', label: t('msg.copy'), icon: 'copy-outline' },
+    { key: 'edit', label: t('msg.edit'), icon: 'create-outline', ownOnly: true },
+    { key: 'forward', label: t('msg.forward'), icon: 'arrow-redo-outline' },
+    { key: 'star', label: t('msg.star'), icon: 'star-outline' },
+    { key: 'react', label: t('msg.react'), icon: 'happy-outline' },
+    { key: 'select', label: t('select.menu'), icon: 'checkmark-circle-outline' },
+    { key: 'translate', label: t('translate.action'), icon: 'language-outline' },
+    { key: 'transcribe', label: t('voiceToText.transcribe'), icon: 'mic-outline' },
+    { key: 'info', label: t('msgInfo.title'), icon: 'information-circle-outline', ownOnly: true },
+    { key: 'delete', label: t('common.delete'), icon: 'trash-outline', color: colors.danger, ownOnly: true },
   ];
 
   if (!message) return null;
@@ -61,6 +75,12 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
     if (a.key === 'copy' && !message.content) return false;
     // Can't edit deleted messages
     if (a.key === 'edit' && message.deleted) return false;
+    // Can't translate non-text messages
+    if (a.key === 'translate' && (message.type !== 'text' || !message.content)) return false;
+    // Transcribe is only meaningful for voice messages
+    if (a.key === 'transcribe' && message.type !== 'audio') return false;
+    // Can't get info for messages still sending or already deleted
+    if (a.key === 'info' && (message.status === 'sending' || message.deleted)) return false;
     return true;
   });
 
@@ -73,7 +93,9 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          {/* Quick reactions row */}
+          {/* Quick reactions row — each chip sends its own emoji.
+              We close the sheet via the parent's onClose because reacting
+              shouldn't dismiss to an action handler. */}
           <View style={styles.reactionsRow}>
             {QUICK_REACTIONS.map((emoji) => (
               <TouchableOpacity
@@ -81,9 +103,9 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
                 style={styles.reactionButton}
                 activeOpacity={0.7}
                 onPress={() => {
-                  onAction('react');
-                  // The parent will handle sending the specific emoji
-                  // For now, we emit 'react' and let the parent deal with it
+                  if (onReact) onReact(emoji);
+                  else onAction('react'); // legacy fallback
+                  onClose();
                 }}
               >
                 <Text style={styles.reactionEmoji}>{emoji}</Text>
@@ -108,7 +130,7 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
               />
               <Text style={[styles.actionLabel, action.color ? { color: action.color } : null]}>
                 {action.key === 'star' && message.starredBy?.length
-                  ? 'Unstar'
+                  ? t('msg.unstar')
                   : action.label}
               </Text>
             </TouchableOpacity>
@@ -122,7 +144,7 @@ const MessageActions = ({ visible, message, isOwn, onAction, onClose }: Props) =
             onPress={onClose}
           >
             <Ionicons name="close-outline" size={22} color={colors.textMuted} />
-            <Text style={[styles.actionLabel, { color: colors.textMuted }]}>Cancel</Text>
+            <Text style={[styles.actionLabel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

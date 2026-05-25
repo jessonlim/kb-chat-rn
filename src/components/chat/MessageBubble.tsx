@@ -6,12 +6,15 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import AudioPlayer from './AudioPlayer';
+import LinkPreview, { extractUrl } from './LinkPreview';
 import type { Message, User } from '../../types';
 
 interface Props {
@@ -20,6 +23,18 @@ interface Props {
   showSenderName?: boolean;
   onLongPress?: (message: Message) => void;
   onImagePress?: (uri: string) => void;
+  // Multi-select integration. When `selectMode` is true the bubble
+  // becomes a single-tap toggle (long-press is disabled) and we render
+  // a checkbox circle on the leading side.
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelectToggle?: (message: Message) => void;
+  // Tapping the bubble itself (when not in select mode). Optional —
+  // currently used by location messages to open in maps.
+  onPress?: (message: Message) => void;
+  // Optional translated version of the text — rendered as a faint
+  // sub-text below the original when present.
+  translation?: string;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -217,20 +232,199 @@ const makeFileStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleS
   },
 });
 
+// ── Sticker / Location / Contact card sub-components ────────────────
+
+// Stickers are stored as image attachments with type='sticker'. We render
+// them larger than a regular image and skip the bubble padding.
+const StickerAttachment = ({ url }: { url: string }) => {
+  const { uri } = useMediaUrl(url);
+  if (!uri) return null;
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: 140, height: 140, backgroundColor: 'transparent' }}
+      resizeMode="contain"
+    />
+  );
+};
+
+// Location messages encode their data in `content` as JSON:
+//   { "lat": 3.1234, "lng": 101.6789, "name": "Optional venue name" }
+const LocationAttachment = ({ message, isOwn }: { message: Message; isOwn: boolean }) => {
+  const { colors } = useTheme();
+  let lat = 0;
+  let lng = 0;
+  let name = '';
+  try {
+    const parsed = JSON.parse(message.content || '{}');
+    lat = parsed.lat || 0;
+    lng = parsed.lng || 0;
+    name = parsed.name || '';
+  } catch {
+    /* ignore */
+  }
+
+  const openInMaps = () => {
+    const url =
+      Platform.OS === 'ios'
+        ? `maps:0,0?q=${lat},${lng}`
+        : `geo:${lat},${lng}?q=${lat},${lng}`;
+    Linking.openURL(url).catch(() => {
+      // Fall back to Google Maps web
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`);
+    });
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={openInMaps}
+      activeOpacity={0.85}
+      style={{
+        width: 220,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      }}
+    >
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isOwn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+        }}
+      >
+        <Ionicons name="location" size={22} color={isOwn ? '#fff' : colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: fontSize.sm,
+            color: isOwn ? colors.bubbleSentText : colors.bubbleReceivedText,
+            fontWeight: '600',
+          }}
+          numberOfLines={1}
+        >
+          {name || 'Location'}
+        </Text>
+        <Text
+          style={{
+            fontSize: fontSize.xs,
+            color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textMuted,
+            marginTop: 2,
+          }}
+          numberOfLines={1}
+        >
+          {lat.toFixed(4)}, {lng.toFixed(4)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// Contact card messages encode the shared user in `content` as JSON:
+//   { "userId": "...", "username": "...", "displayName": "...", "avatar": "..." }
+const ContactCardAttachment = ({ message, isOwn }: { message: Message; isOwn: boolean }) => {
+  const { colors } = useTheme();
+  let card: { userId?: string; username?: string; displayName?: string; avatar?: string } = {};
+  try {
+    card = JSON.parse(message.content || '{}');
+  } catch {
+    /* ignore */
+  }
+  const { uri } = useMediaUrl(card.avatar);
+  return (
+    <View
+      style={{
+        width: 220,
+        paddingVertical: spacing.xs,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        {uri ? (
+          <Image source={{ uri }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+        ) : (
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>
+              {(card.displayName || card.username || '?').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: fontSize.sm,
+              fontWeight: '600',
+              color: isOwn ? colors.bubbleSentText : colors.bubbleReceivedText,
+            }}
+            numberOfLines={1}
+          >
+            {card.displayName || card.username}
+          </Text>
+          <Text
+            style={{
+              fontSize: fontSize.xs,
+              color: isOwn ? 'rgba(255,255,255,0.6)' : colors.textMuted,
+              marginTop: 2,
+            }}
+            numberOfLines={1}
+          >
+            @{card.username}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 // ── Main bubble ───────────────────────────────────────────────────────
 
-const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePress }: Props) => {
-  const { colors } = useTheme();
+const MessageBubble = ({
+  message,
+  isOwn,
+  showSenderName,
+  onLongPress,
+  onImagePress,
+  selectMode,
+  selected,
+  onSelectToggle,
+  onPress,
+  translation,
+}: Props) => {
+  const { colors, fontScaleMultiplier } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const sender = typeof message.sender === 'object' ? message.sender : null;
 
   const handleLongPress = () => {
+    // While in select mode we suppress long-press so we don't open the
+    // message-action sheet on top of the selection toolbar.
+    if (selectMode) return;
     if (onLongPress && !message.deleted && message.type !== 'system') {
       onLongPress(message);
     }
   };
 
-  // System messages (user joined, etc.)
+  const handlePress = () => {
+    if (selectMode) {
+      if (onSelectToggle) onSelectToggle(message);
+      return;
+    }
+    if (onPress) onPress(message);
+  };
+
+  // System messages (user joined, etc.) — not selectable, no checkbox
   if (message.type === 'system') {
     return (
       <View style={styles.systemRow}>
@@ -239,14 +433,32 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePre
     );
   }
 
+  // Render the selection checkbox to the left of every row when in select
+  // mode. Wraps the entire row in a Pressable so taps anywhere in the row
+  // (including outside the bubble) toggle selection.
+  const checkbox = selectMode ? (
+    <View style={styles.selectionCheckbox}>
+      <Ionicons
+        name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+        size={22}
+        color={selected ? colors.primary : colors.textMuted}
+      />
+    </View>
+  ) : null;
+
   // Deleted messages
   if (message.deleted) {
     return (
-      <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
+      <TouchableOpacity
+        activeOpacity={selectMode ? 0.6 : 1}
+        onPress={selectMode && onSelectToggle ? () => onSelectToggle(message) : undefined}
+        style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther, selected && styles.selectedRow]}
+      >
+        {checkbox}
         <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther, styles.deleted]}>
           <Text style={styles.deletedText}>This message was deleted</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -261,9 +473,11 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePre
     <TouchableOpacity
       activeOpacity={0.8}
       onLongPress={handleLongPress}
+      onPress={handlePress}
       delayLongPress={300}
-      style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}
+      style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther, selected && styles.selectedRow]}
     >
+      {checkbox}
       <View
         style={[
           styles.bubble,
@@ -317,11 +531,49 @@ const MessageBubble = ({ message, isOwn, showSenderName, onLongPress, onImagePre
           />
         )}
 
-        {/* Text content */}
-        {message.content ? (
-          <Text style={[styles.content, isOwn ? styles.contentOwn : styles.contentOther]}>
+        {/* Sticker — rendered as a transparent image, no bubble background.
+            We still wrap it in the bubble so meta/timestamp fits below. */}
+        {message.type === 'sticker' && attachment && (
+          <StickerAttachment url={attachment.url} />
+        )}
+
+        {/* Location — static "card" with a pin + name + lat/lng */}
+        {message.type === 'location' && (
+          <LocationAttachment message={message} isOwn={isOwn} />
+        )}
+
+        {/* Contact card — shared user reference */}
+        {message.type === 'contact' && (
+          <ContactCardAttachment message={message} isOwn={isOwn} />
+        )}
+
+        {/* Text content — fontSize scales with the user's font-scale pref */}
+        {message.content && (message.type === 'text' || !message.type) ? (
+          <Text
+            style={[
+              styles.content,
+              isOwn ? styles.contentOwn : styles.contentOther,
+              { fontSize: fontSize.md * fontScaleMultiplier },
+            ]}
+          >
             {message.content}
           </Text>
+        ) : null}
+
+        {/* Inline OG link preview — only for text messages with a URL */}
+        {(message.type === 'text' || !message.type) && (() => {
+          const url = extractUrl(message.content);
+          return url ? <LinkPreview url={url} isOwn={isOwn} /> : null;
+        })()}
+
+        {/* Translation line — appears as a small italic block below the
+            original message text when the parent supplies one. */}
+        {translation ? (
+          <View style={[styles.translationWrap, isOwn ? styles.translationWrapOwn : styles.translationWrapOther]}>
+            <Text style={[styles.translationText, isOwn ? styles.contentOwn : styles.contentOther]}>
+              {translation}
+            </Text>
+          </View>
         ) : null}
 
         {/* Timestamp + status */}
@@ -343,12 +595,24 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   row: {
     paddingHorizontal: spacing.md,
     marginBottom: 4,
-  },
-  rowOwn: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  rowOwn: {
+    justifyContent: 'flex-end',
+  },
   rowOther: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  selectedRow: {
+    backgroundColor: colors.primary + '12', // ~7% opacity tint
+  },
+  selectionCheckbox: {
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+    marginBottom: 4,
   },
   bubble: {
     maxWidth: '80%',
@@ -410,6 +674,23 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
   contentOther: {
     color: colors.bubbleReceivedText,
+  },
+  translationWrap: {
+    marginTop: 6,
+    paddingTop: 6,
+    paddingHorizontal: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  translationWrapOwn: {
+    borderTopColor: 'rgba(255,255,255,0.25)',
+  },
+  translationWrapOther: {
+    borderTopColor: colors.border,
+  },
+  translationText: {
+    fontSize: fontSize.sm,
+    fontStyle: 'italic',
+    opacity: 0.85,
   },
   meta: {
     flexDirection: 'row',

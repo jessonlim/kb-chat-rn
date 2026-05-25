@@ -16,6 +16,9 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 - react-native-full-screen-notification-incoming-call (CallKeep lock-screen UI)
 - rn-emoji-keyboard
 - expo-image-manipulator
+- **expo-camera** (QR scanner)
+- **expo-location** (location sharing)
+- **react-native-svg + react-native-qrcode-svg** (QR generation)
 - babel-preset-expo@~54.0.10 (MUST match SDK version)
 
 ## What works today
@@ -28,7 +31,7 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 ### Chats
 - Real-time 1-on-1 messaging (text, image, video, voice, file)
 - Group chat with admin controls
-- Reply / Edit / Delete / Star / Forward / 👍 React
+- Reply / Edit / Delete / Star / Forward / **Multi-react** (👍 ❤️ 😂 😮 😢 🙏 quick chips)
 - Typing indicator
 - Read receipts (single + double check)
 - Unread badges that actually clear (and stay cleared) on reload
@@ -37,8 +40,17 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 - In-chat search (replaces "Coming soon" placeholder)
 - Shared media gallery (per chat)
 - Long-press chat row → Mark unread/read, Sticky on Top, Hide, Delete
-- Chat list quick action menu (+ icon → New Chat / Add Contacts / Scan / Money)
+- Chat list quick action menu (+ icon → New Chat / Add Contacts / **Scan QR** / Money)
 - Chat opens straight to latest message (no flicker)
+- **Multi-select messages** — long-press → "Multi-select" → checkbox-tap to add → batch Forward / Delete / Star / Copy
+- **Sticker picker** — built-in "KB Chat Pack" of 30 expressive OpenMoji stickers
+- **Location sharing** — captures current GPS + reverse-geocoded address, tap bubble to open in maps
+- **Contact card sharing** — pick a friend → sends a tappable card → recipient taps to view profile
+- **Message info modal** — long-press → "Info" → per-participant delivery + read receipt list
+- **Link previews** — first URL in any text message auto-fetches OG metadata (title/image/site)
+- **Translation** — long-press → "Translate" — auto-detects Chinese↔English direction
+- **Voice-to-text** — long-press a voice message → "Convert to text" → Whisper-style transcription
+- **GIF picker (Tenor)** — search + trending grid via backend `/api/gifs` proxy
 
 ### ChatInfo (3-dot menu inside a chat)
 - Participant tiles + add-people for groups
@@ -63,8 +75,9 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 - Pending friend requests with Accept/Reject
 - Group Chats listing
 - Blocked Users management
-- Tags row (placeholder)
+- **Tags** — create custom tags, group contacts (local-only, MMKV-backed)
 - Friend request policy (Anyone / Friends of friends / Nobody)
+- **Friend remarks** — rename a contact for yourself (local-only) — overrides display name in chats + contacts list + sorting
 
 ### Discover
 - Channels (text-based posts + comments)
@@ -73,51 +86,59 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 ### Me
 - Profile (avatar + display name + about + username)
 - Profile editing (display name, about, avatar upload with center-crop)
-- Settings — Display (language + theme), Notifications, Privacy, Chats, Calls, Storage
+- **My QR Code** — generates `https://kb-chat.com/u/<userId>` QR + copy-link action
+- Settings — Display (language + theme + **font size**), Notifications, Privacy, Chats (incl. **Hidden chats**), Calls, Storage
 - Starred Messages (empty state)
 - Account Security (change password, delete account, blocked users)
 - About (app info, version, support / privacy / terms links)
 - Sign out
 
+### Global features
+- **Global search** — search-icon in chat list header → unified screen searching contacts + chats + channels + moments
+- **QR scanner** — quick action `+ → Scan` → camera viewfinder with reticle → friend QR auto-opens their profile
+
 ### App polish
 - Default language: Chinese · toggle to English
 - Theme: Auto / Light / Dark (full migration of every screen)
+- **Font size: Small / Medium / Large / Extra large** (currently affects message bubble text)
 - KB Chat brand icons (white speech bubble on red)
 - Notifications use white silhouette icon
 
-## What's left (see also the TaskList)
+## Multi-device sync
 
-🔴 **High priority for WeChat parity**
-- QR code (mine + scanner)
-- Multi-select messages
-- Friend remarks
-- Global search
-- Stickers
-- Location sharing
-- Contact card sharing
+Web app + RN app hit the same backend. Both connect to the same Socket.IO server, join the same chat rooms, and receive the same broadcast events. Read receipts, typing, message events, profile changes — all propagate to both devices in real time. No client-side work needed.
 
-🟡 **Medium**
-- Message info modal
-- Link previews
-- Voice-to-text
-- GIF picker
-- Multi-device sync
+## Backend touchpoints expected (graceful degradation if missing)
 
-🟢 **Smaller**
-- Emoji picker for reactions (replace hardcoded 👍)
-- Font size scaling
-- Contact tags
-- Hidden chats manager
-- Message translation
+The RN client now expects (and falls back gracefully from) these endpoints:
+
+| Endpoint | Used by | Fallback |
+|---|---|---|
+| `POST /api/chats/messages/:id/translate` | Translate action | Toast "translation failed" |
+| `POST /api/chats/messages/:id/transcribe` | Voice-to-text action | Toast "transcription failed" |
+| `GET /api/chats/messages/:id/info` | Message info modal | Empty receipt lists |
+| `GET /api/og?url=...` | Link previews | No card, just plain text URL |
+| `GET /api/gifs?q=&trending=&limit=` | GIF picker | Toast "load error" |
+| `GET /api/chats/hidden` | Hidden chats screen | Empty state |
+| `POST /api/chats/:id/unhide` | Hidden chats unhide btn | Toast error |
+
+## What's left
 
 🚀 **Release**
-- Production-signed APK (currently building only the dev profile, 200MB)
+- Production-signed APK with new native deps (build in progress — Build #15)
 - Play Store listing
 
+🟡 Optional polish
+- Apply font scaling globally (currently only message bubble text)
+- Backend endpoints listed above (translate / transcribe / og / gifs / hidden)
+- Embedded map view in location messages (would need react-native-maps + Google Maps API key)
+- Multi-pack sticker library (only one pack today)
+- Cross-device sync of remarks + tags (currently local-only)
+
 ## Latest builds
-- **Production APK #14** (preview profile, standalone, no Metro): https://expo.dev/artifacts/eas/daBWRrttTJrAEeF8hLaVRS.apk · 145 MB — **use this for distribution**
+- **Build #14 (preview profile, standalone APK)** — https://expo.dev/artifacts/eas/daBWRrttTJrAEeF8hLaVRS.apk · 145 MB
+- **Build #15** — IN PROGRESS — adds expo-camera, expo-location, react-native-svg (needed for QR, location, sticker pack)
 - Dev APK #13 (development profile, needs Metro tunnel): https://expo.dev/artifacts/eas/aiyqhusQYgWsVwLsSVU3EM.apk · 197 MB
-- Tunnel URL when developing: `http://hpl2q0e-limjesson-8081.exp.direct`
 
 ## Build profiles in eas.json
 - `development` — dev-client + Metro tunnel, source maps, ~200 MB (for active development)
@@ -134,3 +155,5 @@ Native React Native + Expo client. Replaces the Capacitor wrapper. Same backend 
 6. **/api/contacts/requests** (plural) is the pending-requests endpoint, not `/pending`
 7. **The Pending friend request endpoint matters** — if you call `Promise.all` with the contacts list and one fails, the whole list blanks. Use `Promise.allSettled`
 8. **ObjectId casting in backend** — when writing to subdocument arrays (`readBy.user`, etc.), explicitly cast to `new mongoose.Types.ObjectId(userId)` or the aggregation later won't match it
+9. **Remarks + Tags are local-only** (MMKV) — if user reinstalls or switches device they're gone. Migrate to backend if cross-device parity matters.
+10. **Translation / transcription / OG previews / GIF / hidden-chats** all hit backend endpoints that may not yet exist — clients degrade gracefully (silent or toast error) but features won't be useful until backend implements them.

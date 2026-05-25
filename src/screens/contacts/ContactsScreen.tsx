@@ -16,6 +16,7 @@ import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { remarksStore, displayNameOf } from '../../stores/remarksStore';
 import type { User } from '../../types';
 
 interface Props {
@@ -35,6 +36,12 @@ const ContactsScreen = ({ navigation }: Props) => {
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Bumped every time the local remarks map changes — triggers re-sort
+  const [remarksTick, setRemarksTick] = useState(0);
+  useEffect(() => {
+    const unsubscribe = remarksStore.subscribe(() => setRemarksTick((t) => t + 1));
+    return () => { unsubscribe(); };
+  }, []);
 
   const loadContacts = useCallback(async () => {
     // Use allSettled so one failure doesn't blank the other section.
@@ -108,17 +115,19 @@ const ContactsScreen = ({ navigation }: Props) => {
     };
   }, [loadContacts]);
 
-  // Build alphabetical sections from contacts
+  // Build alphabetical sections from contacts. Remarks override displayName
+  // for both the sort key + the section bucket so renamed contacts file
+  // under the letter the user expects (e.g. "Mom" under M, not 李 under #).
   const sections: Section[] = useMemo(() => {
     const sorted = [...contacts].sort((a, b) => {
-      const nameA = (a.displayName || a.username).toLowerCase();
-      const nameB = (b.displayName || b.username).toLowerCase();
+      const nameA = displayNameOf(a).toLowerCase();
+      const nameB = displayNameOf(b).toLowerCase();
       return nameA.localeCompare(nameB);
     });
 
     const map: Record<string, User[]> = {};
     for (const contact of sorted) {
-      const firstChar = (contact.displayName || contact.username)[0]?.toUpperCase() || '#';
+      const firstChar = displayNameOf(contact)[0]?.toUpperCase() || '#';
       const letter = /[A-Z]/.test(firstChar) ? firstChar : '#';
       if (!map[letter]) map[letter] = [];
       map[letter].push(contact);
@@ -127,7 +136,10 @@ const ContactsScreen = ({ navigation }: Props) => {
     return Object.keys(map)
       .sort()
       .map((letter) => ({ title: letter, data: map[letter] }));
-  }, [contacts]);
+    // Re-sort whenever the local remarks store changes — accomplished by
+    // including a tick from the store in deps below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, remarksTick]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -141,14 +153,14 @@ const ContactsScreen = ({ navigation }: Props) => {
       onPress={() => navigation.navigate('UserProfile', { userId: item.id })}
     >
       <Avatar
-        name={item.displayName || item.username}
+        name={displayNameOf(item)}
         src={item.avatar}
         size={48}
         online={item.isOnline}
       />
       <View style={styles.contactInfo}>
         <Text style={styles.contactName} numberOfLines={1}>
-          {item.displayName || item.username}
+          {displayNameOf(item)}
         </Text>
         <Text style={styles.contactAbout} numberOfLines={1}>
           {item.about || `@${item.username}`}
@@ -203,9 +215,7 @@ const ContactsScreen = ({ navigation }: Props) => {
       <TouchableOpacity
         style={[styles.specialRow, styles.specialRowBorder]}
         activeOpacity={0.7}
-        onPress={() => {
-          Toast.show({ type: 'info', text1: t('contacts.tags'), text2: t('common.soon') });
-        }}
+        onPress={() => navigation.navigate('Tags')}
       >
         <View style={[styles.specialIcon, { backgroundColor: colors.info }]}>
           <Ionicons name="pricetag" size={20} color="#fff" />

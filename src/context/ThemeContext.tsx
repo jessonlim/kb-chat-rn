@@ -30,14 +30,31 @@ import {
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 export type ThemeMode = 'light' | 'dark';
+export type FontScale = 'small' | 'medium' | 'large' | 'xlarge';
 
 const STORAGE_KEY = 'pref.theme';
+const FONT_KEY = 'pref.fontScale';
 const DEFAULT_PREF: ThemePreference = 'auto';
+const DEFAULT_FONT: FontScale = 'medium';
+
+// Multiplier applied to the base fontSize.* values in utils/theme.ts.
+export const FONT_SCALE_MULTIPLIER: Record<FontScale, number> = {
+  small: 0.875,
+  medium: 1,
+  large: 1.125,
+  xlarge: 1.25,
+};
 
 const loadPref = (): ThemePreference => {
   const stored = storage.getString(STORAGE_KEY);
   if (stored === 'auto' || stored === 'light' || stored === 'dark') return stored;
   return DEFAULT_PREF;
+};
+
+const loadFont = (): FontScale => {
+  const stored = storage.getString(FONT_KEY);
+  if (stored === 'small' || stored === 'medium' || stored === 'large' || stored === 'xlarge') return stored;
+  return DEFAULT_FONT;
 };
 
 interface ThemeContextType {
@@ -49,12 +66,18 @@ interface ThemeContextType {
   colors: ColorPalette;
   /** Update user preference (persists to MMKV) */
   setTheme: (next: ThemePreference) => void;
+  /** Font size preference (s/m/l/xl) */
+  fontScale: FontScale;
+  /** Multiplier for font sizes — used as { fontSize: 16 * fontScaleMultiplier } */
+  fontScaleMultiplier: number;
+  setFontScale: (next: FontScale) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<ThemePreference>(() => loadPref());
+  const [fontScale, setFontScaleState] = useState<FontScale>(() => loadFont());
   const osScheme = useColorScheme(); // 'light' | 'dark' | null
 
   // Resolve 'auto' against the OS. Default to dark when OS hint is missing.
@@ -65,10 +88,16 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   }, [theme, osScheme]);
 
   const colors = mode === 'light' ? lightColors : darkColors;
+  const fontScaleMultiplier = FONT_SCALE_MULTIPLIER[fontScale];
 
   const setTheme = useCallback((next: ThemePreference) => {
     storage.set(STORAGE_KEY, next);
     setThemeState(next);
+  }, []);
+
+  const setFontScale = useCallback((next: FontScale) => {
+    storage.set(FONT_KEY, next);
+    setFontScaleState(next);
   }, []);
 
   // Persist whenever it changes (covers programmatic updates too)
@@ -76,8 +105,14 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     storage.set(STORAGE_KEY, theme);
   }, [theme]);
 
+  useEffect(() => {
+    storage.set(FONT_KEY, fontScale);
+  }, [fontScale]);
+
   return (
-    <ThemeContext.Provider value={{ theme, mode, colors, setTheme }}>
+    <ThemeContext.Provider
+      value={{ theme, mode, colors, setTheme, fontScale, fontScaleMultiplier, setFontScale }}
+    >
       {children}
     </ThemeContext.Provider>
   );

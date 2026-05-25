@@ -24,6 +24,13 @@ import MessageActions, { type MessageAction } from '../../components/chat/Messag
 import AttachmentMenu from '../../components/chat/AttachmentMenu';
 import VoiceRecorder from '../../components/chat/VoiceRecorder';
 import ImageViewer from '../../components/chat/ImageViewer';
+import SelectionToolbar from '../../components/chat/SelectionToolbar';
+import MessageInfoModal from '../../components/chat/MessageInfoModal';
+import StickerPicker from '../../components/chat/StickerPicker';
+import LocationPicker from '../../components/chat/LocationPicker';
+import ContactPicker from '../../components/chat/ContactPicker';
+import GifPicker from '../../components/chat/GifPicker';
+import Toast from 'react-native-toast-message';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize } from '../../utils/theme';
@@ -83,10 +90,29 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editMessage, setEditMessage] = useState<Message | null>(null);
 
+  // Multi-select state. selectMode = false means single-tap on a bubble is
+  // a no-op; selectMode = true means single-tap toggles selection.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Message info modal target (null = closed)
+  const [infoMessage, setInfoMessage] = useState<Message | null>(null);
+
+  // Translation in-bubble state: messageId → translated text
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+
+  // Ref to the latest isOwnMessage function so selection-mode useMemos can
+  // access it without re-running on every user.id change.
+  const isOwnMessageRef = useRef<(msg: Message) => boolean>(() => false);
+
   // Phase 4: media state
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [showStickers, setShowStickers] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
 
   // In-chat search state
   const [searchVisible, setSearchVisible] = useState(!!openSearchOnMount);
@@ -556,6 +582,83 @@ const ChatScreen = ({ route, navigation }: Props) => {
     [handleSendAttachment]
   );
 
+  // Generic "send a non-attachment-shaped message" helper. Used by sticker,
+  // location, and contact card flows — they all live in `content` rather
+  // than `attachments[]` because they're small JSON payloads.
+  const handleSendStructured = useCallback(
+    (type: 'sticker' | 'location' | 'contact', content: string, attachments: Attachment[] = []) => {
+      const socket = socketService.getSocket();
+      if (!socket) return;
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const optimistic: Message = {
+        _id: tempId,
+        chat: chatId,
+        sender: user as User,
+        content,
+        type,
+        attachments,
+        readBy: [],
+        status: 'sending',
+        edited: false,
+        deleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      socket.emit(
+        'send_message',
+        { chatId, content, type, attachments },
+        (ack: SendMessageAck) => {
+          if (ack.ok && ack.message) {
+            setMessages((prev) => prev.map((m) => (m._id === tempId ? ack.message! : m)));
+          } else {
+            setMessages((prev) =>
+              prev.map((m) => (m._id === tempId ? { ...m, status: 'failed' as const } : m))
+            );
+          }
+        }
+      );
+    },
+    [chatId, user]
+  );
+
+  const handleSendSticker = useCallback(
+    (url: string) => {
+      // The sticker URL goes in the first attachment so the bubble can
+      // resolve it through useMediaUrl just like an image.
+      handleSendStructured('sticker', '', [
+        { url, type: 'image/png', name: 'sticker', size: 0 },
+      ]);
+    },
+    [handleSendStructured]
+  );
+
+  const handleSendLocation = useCallback(
+    (lat: number, lng: number, name?: string) => {
+      handleSendStructured('location', JSON.stringify({ lat, lng, name: name || '' }));
+    },
+    [handleSendStructured]
+  );
+
+  const handleSendContact = useCallback(
+    (card: { userId: string; username: string; displayName?: string; avatar?: string }) => {
+      handleSendStructured('contact', JSON.stringify(card));
+    },
+    [handleSendStructured]
+  );
+
+  const handleSendGif = useCallback(
+    (gif: { url: string; width: number; height: number }) => {
+      // GIFs go through the regular image pipeline so they animate via the
+      // platform Image renderer. We mark them as type='image' so existing
+      // image bubble code handles display.
+      handleSendAttachment('image', [
+        { url: gif.url, type: 'image/gif', name: 'gif', size: 0 },
+      ]);
+    },
+    [handleSendAttachment]
+  );
+
   // Edit message via socket
   const handleSendEdit = useCallback(
     (messageId: string, newContent: string) => {
@@ -662,6 +765,148 @@ const ChatScreen = ({ route, navigation }: Props) => {
     setViewerImage(uri);
   }, []);
 
+  // Bubble tap handler — currently only used for contact cards (open the
+  // referenced user's profile). Other types ignore the tap.
+  const handleBubblePress = useCallback(
+    (message: Message) => {
+      if (message.type !== 'contact') return;
+      try {
+        const card = JSON.parse(message.content || '{}');
+        if (card.userId) {
+          navigation.getParent()?.navigate('ContactsTab', {
+            screen: 'UserProfile',
+            params: { userId: card.userId },
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [navigation]
+  );
+
+  // Translate a single message's text. Stores the result in `translations`
+  // keyed by message id; MessageBubble checks this map and renders the
+  // translated text below the original.
+  const handleTranslateMessage = useCallback(
+    async (msg: Message) => {
+      if (translations[msg._id]) {
+        // Toggle off — second tap removes the translation
+        setTranslations((prev) => {
+          const next = { ...prev };
+          delete next[msg._id];
+          return next;
+        });
+        return;
+      }
+      // Optimistic: show a "translating…" placeholder
+      setTranslations((prev) => ({ ...prev, [msg._id]: '…' }));
+      try {
+        // Auto-pick target lang: if message looks Chinese → English, else → Chinese
+        const hasChinese = /[一-鿿]/.test(msg.content || '');
+        const target = hasChinese ? 'en' : 'zh';
+        const { translation } = await chatService.translateMessage(msg._id, target);
+        setTranslations((prev) => ({ ...prev, [msg._id]: translation }));
+      } catch (err) {
+        Toast.show({ type: 'error', text1: t('translate.failed') });
+        setTranslations((prev) => {
+          const next = { ...prev };
+          delete next[msg._id];
+          return next;
+        });
+      }
+    },
+    [translations, t]
+  );
+
+  // Selection helpers ─────────────────────────────────────────────────
+  const enterSelectMode = useCallback((seedMessage?: Message) => {
+    setSelectMode(true);
+    setSelectedIds(seedMessage ? new Set([seedMessage._id]) : new Set());
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleSelected = useCallback((message: Message) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(message._id)) next.delete(message._id);
+      else next.add(message._id);
+      return next;
+    });
+  }, []);
+
+  // Snapshot of currently selected message objects (in chronological order)
+  const selectedMessages = useMemo(
+    () => messages.filter((m) => selectedIds.has(m._id) && !m.deleted),
+    [messages, selectedIds]
+  );
+
+  const canDeleteSelection = useMemo(
+    () => selectedMessages.length > 0 && selectedMessages.every((m) => isOwnMessageRef.current(m)),
+    [selectedMessages]
+  );
+
+  // Bulk forward — opens ForwardMessage with the selected messages array
+  const handleBulkForward = useCallback(() => {
+    if (selectedMessages.length === 0) return;
+    navigation.navigate('ForwardMessage', { messages: selectedMessages });
+    exitSelectMode();
+  }, [selectedMessages, navigation, exitSelectMode]);
+
+  // Bulk delete — loops the existing single-message delete socket emit
+  const handleBulkDelete = useCallback(() => {
+    if (selectedMessages.length === 0) return;
+    Alert.alert(
+      t('msg.deleted'),
+      t('select.deleteConfirm', { n: selectedMessages.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            const socket = socketService.getSocket();
+            if (!socket) return;
+            for (const m of selectedMessages) {
+              socket.emit('delete_message', { messageId: m._id });
+            }
+            // Optimistic — flip all to deleted locally
+            setMessages((prev) =>
+              prev.map((m) =>
+                selectedIds.has(m._id) ? { ...m, deleted: true, content: '' } : m
+              )
+            );
+            exitSelectMode();
+          },
+        },
+      ]
+    );
+  }, [selectedMessages, selectedIds, t, exitSelectMode]);
+
+  // Bulk star — loops the existing single-message star toggle
+  const handleBulkStar = useCallback(async () => {
+    if (selectedMessages.length === 0) return;
+    for (const m of selectedMessages) {
+      await handleToggleStar(m._id);
+    }
+    exitSelectMode();
+  }, [selectedMessages, handleToggleStar, exitSelectMode]);
+
+  // Bulk copy — concatenates the text content of selected messages
+  const handleBulkCopy = useCallback(async () => {
+    if (selectedMessages.length === 0) return;
+    const text = selectedMessages
+      .map((m) => m.content || `[${m.type}]`)
+      .join('\n');
+    await ExpoClipboard.setStringAsync(text);
+    Toast.show({ type: 'success', text1: t('select.copied') });
+    exitSelectMode();
+  }, [selectedMessages, t, exitSelectMode]);
+
   // Handle action selection
   const handleAction = useCallback(
     (action: MessageAction) => {
@@ -676,6 +921,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
         case 'copy':
           ExpoClipboard.setStringAsync(actionMessage.content);
+          Toast.show({ type: 'success', text1: t('select.copied') });
           break;
 
         case 'edit':
@@ -695,6 +941,33 @@ const ChatScreen = ({ route, navigation }: Props) => {
           navigation.navigate('ForwardMessage', { message: actionMessage });
           break;
 
+        case 'select':
+          // Enter multi-select with the just-acted-on message seeded
+          enterSelectMode(actionMessage);
+          break;
+
+        case 'info':
+          setInfoMessage(actionMessage);
+          break;
+
+        case 'translate':
+          handleTranslateMessage(actionMessage);
+          break;
+
+        case 'transcribe':
+          (async () => {
+            Toast.show({ type: 'info', text1: t('voiceToText.transcribing') });
+            try {
+              const { text } = await chatService.transcribeMessage(actionMessage._id);
+              // Stuff the transcription in translations[] so it renders
+              // below the audio player using the same machinery.
+              setTranslations((prev) => ({ ...prev, [actionMessage._id]: text }));
+            } catch (err) {
+              Toast.show({ type: 'error', text1: t('voiceToText.failed') });
+            }
+          })();
+          break;
+
         case 'react':
           // Quick reaction — for now emit a default reaction
           const socket = socketService.getSocket();
@@ -709,14 +982,21 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
       setActionMessage(null);
     },
-    [actionMessage, handleDeleteMessage, handleToggleStar]
+    [actionMessage, handleDeleteMessage, handleToggleStar, enterSelectMode, navigation, t]
   );
 
   const isGroup = chat?.type === 'group';
 
-  const isOwnMessage = (msg: Message): boolean => {
-    return (typeof msg.sender === 'object' ? msg.sender.id : msg.sender) === user?.id;
-  };
+  const isOwnMessage = useCallback(
+    (msg: Message): boolean => {
+      return (typeof msg.sender === 'object' ? msg.sender.id : msg.sender) === user?.id;
+    },
+    [user?.id]
+  );
+
+  // Ref-tracked isOwnMessage so callbacks that fire from useMemo dependencies
+  // don't need to re-create on every user change.
+  isOwnMessageRef.current = isOwnMessage;
 
   // Tapping a search result scrolls to that message in the chat.
   // Find its index in the reversed list, then scroll. If the message isn't
@@ -834,6 +1114,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
             showSenderName={isGroup}
             onLongPress={handleLongPress}
             onImagePress={handleImagePress}
+            onPress={handleBubblePress}
+            selectMode={selectMode}
+            selected={selectedIds.has(item._id)}
+            onSelectToggle={toggleSelected}
+            translation={translations[item._id]}
           />
         )}
         contentContainerStyle={styles.messageList}
@@ -861,8 +1146,19 @@ const ChatScreen = ({ route, navigation }: Props) => {
         </View>
       )}
 
-      {/* Voice recorder replaces the normal input bar */}
-      {showVoiceRecorder ? (
+      {/* In multi-select mode the input bar is replaced by the
+          selection toolbar. Voice recorder takes priority otherwise. */}
+      {selectMode ? (
+        <SelectionToolbar
+          count={selectedIds.size}
+          canDelete={canDeleteSelection}
+          onForward={handleBulkForward}
+          onDelete={handleBulkDelete}
+          onStar={handleBulkStar}
+          onCopy={handleBulkCopy}
+          onCancel={exitSelectMode}
+        />
+      ) : showVoiceRecorder ? (
         <VoiceRecorder
           onSend={handleVoiceSend}
           onCancel={() => setShowVoiceRecorder(false)}
@@ -888,6 +1184,17 @@ const ChatScreen = ({ route, navigation }: Props) => {
         message={actionMessage}
         isOwn={actionMessage ? isOwnMessage(actionMessage) : false}
         onAction={handleAction}
+        onReact={(emoji) => {
+          if (!actionMessage) return;
+          const socket = socketService.getSocket();
+          if (socket) {
+            socket.emit('react_message', {
+              messageId: actionMessage._id,
+              emoji,
+            });
+          }
+          setActionMessage(null);
+        }}
         onClose={() => {
           setShowActions(false);
           setActionMessage(null);
@@ -899,6 +1206,32 @@ const ChatScreen = ({ route, navigation }: Props) => {
         visible={showAttachMenu}
         onClose={() => setShowAttachMenu(false)}
         onAttachmentReady={handleSendAttachment}
+        onPickLocation={() => setShowLocationPicker(true)}
+        onPickContact={() => setShowContactPicker(true)}
+        onPickSticker={() => setShowStickers(true)}
+        onPickGif={() => setShowGifPicker(true)}
+      />
+
+      {/* Sticker / Location / Contact / GIF pickers */}
+      <StickerPicker
+        visible={showStickers}
+        onClose={() => setShowStickers(false)}
+        onPick={handleSendSticker}
+      />
+      <LocationPicker
+        visible={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onPick={handleSendLocation}
+      />
+      <ContactPicker
+        visible={showContactPicker}
+        onClose={() => setShowContactPicker(false)}
+        onPick={handleSendContact}
+      />
+      <GifPicker
+        visible={showGifPicker}
+        onClose={() => setShowGifPicker(false)}
+        onPick={handleSendGif}
       />
 
       {/* Fullscreen image viewer */}
@@ -906,6 +1239,13 @@ const ChatScreen = ({ route, navigation }: Props) => {
         visible={!!viewerImage}
         uri={viewerImage}
         onClose={() => setViewerImage(null)}
+      />
+
+      {/* Message info modal — read receipts + delivery list */}
+      <MessageInfoModal
+        message={infoMessage}
+        chatType={chat?.type || 'private'}
+        onClose={() => setInfoMessage(null)}
       />
     </KeyboardAvoidingView>
   );

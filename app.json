@@ -16,14 +16,17 @@
       "@livekit/react-native-expo-plugin",
       "expo-dev-client",
       "expo-font",
+      ["expo-camera", { "cameraPermission": "KB Chat needs camera access to scan QR codes and make video calls" }],
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "KB Chat needs location access to share your location in chats" }],
       ["react-native-full-screen-notification-incoming-call", { "statusBarColor": "#000000" }]
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "KB Chat needs camera access for video calls",
-        "NSMicrophoneUsageDescription": "KB Chat needs microphone access for voice and video calls"
+        "NSCameraUsageDescription": "KB Chat needs camera access to scan QR codes and make video calls",
+        "NSMicrophoneUsageDescription": "KB Chat needs microphone access for voice and video calls",
+        "NSLocationWhenInUseUsageDescription": "KB Chat needs location access to share your location in chats"
       },
       "bitcode": false
     },
@@ -46,7 +49,9 @@
         "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
         "android.permission.VIBRATE",
         "android.permission.DISABLE_KEYGUARD",
-        "android.permission.MANAGE_OWN_CALLS"
+        "android.permission.MANAGE_OWN_CALLS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

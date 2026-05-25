@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useT } from '../../i18n/I18nContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { compressImage } from '../../utils/imageCompression';
 import { uploadFile, type UploadResult } from '../../services/uploadService';
@@ -28,6 +29,12 @@ interface Props {
     type: 'image' | 'video' | 'audio' | 'file',
     attachments: Attachment[]
   ) => void;
+  // New: requests that the parent open the location picker (because this
+  // sheet doesn't know which chat it's sending to)
+  onPickLocation?: () => void;
+  onPickContact?: () => void;
+  onPickSticker?: () => void;
+  onPickGif?: () => void;
 }
 
 interface MenuOption {
@@ -37,16 +44,29 @@ interface MenuOption {
   color: string;
 }
 
-const OPTIONS: MenuOption[] = [
-  { key: 'gallery', label: 'Photo Library', icon: 'images-outline', color: '#a78bfa' },
-  { key: 'camera', label: 'Camera', icon: 'camera-outline', color: '#22c55e' },
-  { key: 'video', label: 'Video', icon: 'videocam-outline', color: '#f59e0b' },
-  { key: 'document', label: 'Document', icon: 'document-outline', color: '#3b82f6' },
-];
-
-const AttachmentMenu = ({ visible, onClose, onAttachmentReady }: Props) => {
+const AttachmentMenu = ({
+  visible,
+  onClose,
+  onAttachmentReady,
+  onPickLocation,
+  onPickContact,
+  onPickSticker,
+  onPickGif,
+}: Props) => {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const OPTIONS: MenuOption[] = [
+    { key: 'gallery', label: t('attach.photosVideos'), icon: 'images-outline', color: '#a78bfa' },
+    { key: 'camera', label: t('attach.camera'), icon: 'camera-outline', color: '#22c55e' },
+    { key: 'video', label: t('camera.video'), icon: 'videocam-outline', color: '#f59e0b' },
+    { key: 'document', label: t('attach.document'), icon: 'document-outline', color: '#3b82f6' },
+    { key: 'location', label: t('location.title'), icon: 'location-outline', color: '#ef4444' },
+    { key: 'contact', label: t('contactCard.preview'), icon: 'person-outline', color: '#06b6d4' },
+    { key: 'sticker', label: t('sticker.title'), icon: 'happy-outline', color: '#ec4899' },
+    { key: 'gif', label: t('gif.title'), icon: 'film-outline', color: '#10b981' },
+  ];
   const requestPermission = async (
     type: 'camera' | 'library'
   ): Promise<boolean> => {
@@ -175,6 +195,22 @@ const AttachmentMenu = ({ visible, onClose, onAttachmentReady }: Props) => {
       case 'document':
         handleDocument();
         break;
+      case 'location':
+        onClose();
+        onPickLocation?.();
+        break;
+      case 'contact':
+        onClose();
+        onPickContact?.();
+        break;
+      case 'sticker':
+        onClose();
+        onPickSticker?.();
+        break;
+      case 'gif':
+        onClose();
+        onPickGif?.();
+        break;
     }
   };
 
@@ -211,7 +247,7 @@ const AttachmentMenu = ({ visible, onClose, onAttachmentReady }: Props) => {
             onPress={onClose}
             activeOpacity={0.7}
           >
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -242,13 +278,16 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
   grid: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
+    rowGap: spacing.lg,
   },
   option: {
     alignItems: 'center',
     gap: spacing.sm,
+    width: '25%', // 4 per row
   },
   iconCircle: {
     width: 56,

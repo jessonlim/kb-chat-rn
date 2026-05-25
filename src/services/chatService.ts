@@ -84,6 +84,18 @@ const chatService = {
     return data;
   },
 
+  /** GET /api/chats/hidden — list chats the current user has hidden */
+  listHiddenChats: async (): Promise<ChatsResponse> => {
+    const { data } = await api.get<ChatsResponse>('/api/chats/hidden');
+    return data;
+  },
+
+  /** POST /api/chats/:id/unhide — restore a previously hidden chat */
+  unhideChat: async (chatId: string): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/unhide`);
+    return data;
+  },
+
   markChatRead: async (chatId: string): Promise<{ ok: boolean }> => {
     const { data } = await api.post(`/api/chats/${chatId}/mark-read`);
     return data;
@@ -118,6 +130,42 @@ const chatService = {
     const { data } = await api.get(`/api/chats/${chatId}/media`, {
       params: opts,
     });
+    return data;
+  },
+
+  /** POST /api/chats/messages/:id/translate — get translated text + detected source lang.
+   * Falls back to a free public endpoint if the backend route isn't ready. */
+  translateMessage: async (
+    messageId: string,
+    targetLang: string,
+  ): Promise<{ translation: string; detectedLang?: string }> => {
+    try {
+      const { data } = await api.post(`/api/chats/messages/${messageId}/translate`, {
+        target: targetLang,
+      });
+      return data;
+    } catch (err: any) {
+      // Backend not yet wired? Re-throw so the caller can show an error toast.
+      throw err;
+    }
+  },
+
+  /** POST /api/chats/messages/:id/transcribe — Whisper-style voice-to-text. */
+  transcribeMessage: async (
+    messageId: string,
+  ): Promise<{ text: string }> => {
+    const { data } = await api.post(`/api/chats/messages/${messageId}/transcribe`);
+    return data;
+  },
+
+  /** GET /api/chats/messages/:id/info — full delivery + read receipt list. */
+  getMessageInfo: async (
+    messageId: string,
+  ): Promise<{
+    readBy: Array<{ user: import('../types').User; readAt: string }>;
+    deliveredTo: Array<{ user: import('../types').User; deliveredAt: string }>;
+  }> => {
+    const { data } = await api.get(`/api/chats/messages/${messageId}/info`);
     return data;
   },
 };

@@ -31,6 +31,12 @@ import StarredMessagesScreen from '../screens/me/StarredMessagesScreen';
 import AccountSecurityScreen from '../screens/me/AccountSecurityScreen';
 import AboutScreen from '../screens/me/AboutScreen';
 import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
+import MyQRScreen from '../screens/me/MyQRScreen';
+import HiddenChatsScreen from '../screens/me/HiddenChatsScreen';
+import ScanQRScreen from '../screens/common/ScanQRScreen';
+import SetRemarkScreen from '../screens/contacts/SetRemarkScreen';
+import TagsScreen from '../screens/contacts/TagsScreen';
+import GlobalSearchScreen from '../screens/common/GlobalSearchScreen';
 import { useT } from '../i18n/I18nContext';
 import { useTheme } from '../context/ThemeContext';
 import { fontSize } from '../utils/theme';
@@ -79,8 +85,7 @@ const ChatsStackScreen = () => {
         key: 'scan',
         icon: 'scan-outline' as const,
         label: t('quick.scan'),
-        onPress: () =>
-          Toast.show({ type: 'info', text1: t('quick.scan'), text2: t('common.soon') }),
+        onPress: () => nav.navigate('ScanQR'),
       },
       {
         key: 'money',
@@ -102,11 +107,18 @@ const ChatsStackScreen = () => {
           return {
             title: t('chats.title'),
             headerRight: () => (
-              <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 12 }}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('GlobalSearch')}
+                  activeOpacity={0.7}
+                  style={{ paddingHorizontal: 8 }}
+                >
+                  <Ionicons name="search" size={22} color={colors.primary} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setMenuVisible(true)}
                   activeOpacity={0.7}
-                  style={{ paddingRight: 16 }}
+                  style={{ paddingHorizontal: 8 }}
                 >
                   <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
                 </TouchableOpacity>
@@ -115,7 +127,7 @@ const ChatsStackScreen = () => {
                   onClose={() => setMenuVisible(false)}
                   actions={buildActions()}
                 />
-              </>
+              </View>
             ),
           };
         }}
@@ -154,6 +166,23 @@ const ChatsStackScreen = () => {
         name="CreateGroup"
         component={CreateGroupScreen as any}
         options={{ title: t('group.newGroup') }}
+      />
+      <ChatsStack.Screen
+        name="ScanQR"
+        component={ScanQRScreen as any}
+        options={{ title: t('qr.scanQR') }}
+      />
+      <ChatsStack.Screen
+        name="GlobalSearch"
+        component={GlobalSearchScreen as any}
+        options={{ title: t('globalSearch.title') }}
+      />
+      {/* UserProfile is also reachable from the scanner — same component as
+          Contacts tab uses, just registered here so navigation.replace works. */}
+      <ChatsStack.Screen
+        name="UserProfile"
+        component={UserProfileScreen as any}
+        options={{ title: t('profile.title') }}
       />
     </ChatsStack.Navigator>
   );
@@ -197,6 +226,16 @@ const ContactsStackScreen = () => {
         name="GroupChats"
         component={GroupChatsListScreen as any}
         options={{ title: t('contacts.groupChats') }}
+      />
+      <ContactsStack.Screen
+        name="SetRemark"
+        component={SetRemarkScreen as any}
+        options={{ title: t('remark.title') }}
+      />
+      <ContactsStack.Screen
+        name="Tags"
+        component={TagsScreen as any}
+        options={{ title: t('tag.title') }}
       />
     </ContactsStack.Navigator>
   );
@@ -312,6 +351,16 @@ const MeStackScreen = () => {
         name="BlockedUsers"
         component={BlockedUsersScreen as any}
         options={{ title: t('privacy.blocked.title') }}
+      />
+      <MeStack.Screen
+        name="MyQR"
+        component={MyQRScreen as any}
+        options={{ title: t('qr.myQR') }}
+      />
+      <MeStack.Screen
+        name="HiddenChats"
+        component={HiddenChatsScreen as any}
+        options={{ title: t('hidden.title') }}
       />
     </MeStack.Navigator>
   );

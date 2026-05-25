@@ -14,7 +14,7 @@ import Toast from 'react-native-toast-message';
 import { storage } from '../../services/api';
 import userService from '../../services/userService';
 import { useT } from '../../i18n/I18nContext';
-import { useTheme, type ThemePreference } from '../../context/ThemeContext';
+import { useTheme, type ThemePreference, type FontScale } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 
 interface Props {
@@ -36,7 +36,7 @@ type FriendPolicy = 'anyone' | 'friends_of_friends' | 'nobody';
 
 const SettingsScreen = ({ navigation }: Props) => {
   const { lang, setLang, t } = useT();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, fontScale, setFontScale, fontScaleMultiplier } = useTheme();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -220,14 +220,47 @@ const SettingsScreen = ({ navigation }: Props) => {
           })}
         </View>
 
-        {/* Font size — placeholder (out of scope for this pass) */}
+        {/* Font size — actual picker */}
         <View style={[styles.policyHeader, styles.bordered]}>
           <Ionicons name="text-outline" size={22} color={colors.textSecondary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.policyTitle}>{t('display.fontSize')}</Text>
-            <Text style={styles.policyDesc}>{t('common.soon')}</Text>
+            <Text style={styles.policyTitle}>{t('font.title')}</Text>
+            <Text style={styles.policyDesc}>{t('font.preview')}</Text>
           </View>
         </View>
+        <View style={styles.segmentRow}>
+          {(['small', 'medium', 'large', 'xlarge'] as FontScale[]).map((opt) => {
+            const labelKey =
+              opt === 'small' ? 'font.small' :
+              opt === 'medium' ? 'font.medium' :
+              opt === 'large' ? 'font.large' :
+              'font.xlarge';
+            return (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.segment, fontScale === opt && styles.segmentActive]}
+                activeOpacity={0.7}
+                onPress={() => setFontScale(opt)}
+              >
+                <Text style={[styles.segmentText, fontScale === opt && styles.segmentTextActive]}>
+                  {t(labelKey as any)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {/* Sample text that scales with the choice */}
+        <Text
+          style={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.md,
+            color: colors.textPrimary,
+            fontSize: fontSize.md * fontScaleMultiplier,
+          }}
+        >
+          {t('font.preview')}
+        </Text>
       </View>
 
       {/* ─── Notifications ─── */}
@@ -313,6 +346,16 @@ const SettingsScreen = ({ navigation }: Props) => {
           onChange={(v) => toggle(KEYS.messagePreview, v, setMessagePreview)}
           bordered
         />
+        {/* Hidden chats manager */}
+        <TouchableOpacity
+          style={[styles.linkRow, styles.bordered]}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('HiddenChats')}
+        >
+          <Ionicons name="eye-off-outline" size={22} color={colors.textSecondary} />
+          <Text style={styles.rowLabel}>{t('hidden.title')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {/* ─── Calls ─── */}

@@ -20,6 +20,7 @@ import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { displayNameOf } from '../../stores/remarksStore';
 import type { Chat, Message, User } from '../../types';
 
 interface Props {
@@ -156,7 +157,8 @@ const ChatListScreen = ({ navigation }: Props) => {
   const getChatName = (chat: Chat): string => {
     if (chat.type === 'group') return chat.groupName || t('group.info');
     const other = getOtherUser(chat);
-    return other?.displayName || other?.username || t('tab.chats');
+    if (!other) return t('tab.chats');
+    return displayNameOf(other);
   };
 
   const getChatAvatar = (chat: Chat) => {
@@ -164,7 +166,7 @@ const ChatListScreen = ({ navigation }: Props) => {
       return { name: chat.groupName || 'G', src: chat.groupImage };
     }
     const other = getOtherUser(chat);
-    return { name: other?.displayName || other?.username || '?', src: other?.avatar };
+    return { name: other ? displayNameOf(other) : '?', src: other?.avatar };
   };
 
   const getLastMessagePreview = (chat: Chat): string => {

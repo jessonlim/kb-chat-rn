@@ -18,6 +18,7 @@ import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { useRemark } from '../../stores/remarksStore';
 import type { User, ContactStatus } from '../../types';
 
 interface Props {
@@ -38,6 +39,9 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   const [requestId, setRequestId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  // Subscribes to the remarks store so this screen re-renders when the
+  // user returns from the SetRemark screen with a saved change.
+  const remark = useRemark(userId);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -212,10 +216,15 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
         />
       </View>
 
-      {/* Name & info */}
+      {/* Name & info — remark overrides the displayName if set */}
       <Text style={styles.displayName}>
-        {profile.displayName || profile.username}
+        {remark || profile.displayName || profile.username}
       </Text>
+      {remark ? (
+        <Text style={styles.remarkOriginal}>
+          ({profile.displayName || profile.username})
+        </Text>
+      ) : null}
       <Text style={styles.username}>@{profile.username}</Text>
 
       {profile.about ? (
@@ -268,6 +277,20 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
               >
                 <Ionicons name="videocam" size={20} color={callState === 'idle' ? colors.primary : colors.textMuted} />
                 <Text style={styles.actionButtonText}>{t('chat.videoCall')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('SetRemark', {
+                    userId: profile.id,
+                    currentName: profile.displayName || profile.username,
+                  })
+                }
+              >
+                <Ionicons name="create-outline" size={20} color={colors.primary} />
+                <Text style={styles.actionButtonText}>{t('remark.title')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -372,6 +395,11 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     fontSize: fontSize.md,
     color: colors.textMuted,
     marginTop: spacing.xs,
+  },
+  remarkOriginal: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   about: {
     fontSize: fontSize.md,

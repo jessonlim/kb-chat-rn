@@ -39,6 +39,11 @@ const MeScreen = ({ navigation }: Props) => {
 
   const menuItems: MenuItem[] = [
     {
+      icon: 'qr-code-outline',
+      label: t('qr.myQR'),
+      onPress: () => navigation.navigate('MyQR'),
+    },
+    {
       icon: 'settings-outline',
       label: t('settings.title'),
       onPress: () => navigation.navigate('Settings'),
