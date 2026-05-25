@@ -1105,8 +1105,16 @@ const ChatScreen = ({ route, navigation }: Props) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      // iOS uses 'padding' (adds padding-bottom = keyboard height).
+      // Android needs 'height' (shrinks the View) when the app is
+      // edge-to-edge enabled (app.json has edgeToEdgeEnabled: true).
+      // Without this, the keyboard slides over the input bar and the
+      // user can't see what they're typing.
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // Offset accounts for the stack-navigator header. 90 was fine on
+      // iOS; on Android with edge-to-edge we want a smaller value or
+      // 0 — the header is already excluded from the KAV measurement.
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {searchVisible && (
         <View style={styles.searchBar}>
