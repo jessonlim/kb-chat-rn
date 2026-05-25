@@ -72,6 +72,15 @@ const ChatListScreen = ({ navigation }: Props) => {
 
     const onChatUpdated = (data: { chatId: string; lastMessage: Message }) => {
       let needsReload = false;
+      // The backend broadcasts chat_updated to the entire chat's participant
+      // list — INCLUDING the sender. We should only bump the unread badge
+      // for messages from OTHER people, not our own sends.
+      const senderId =
+        typeof data.lastMessage?.sender === 'object'
+          ? data.lastMessage.sender.id
+          : data.lastMessage?.sender;
+      const isOwnMessage = senderId === user?.id;
+
       setChats((prev) => {
         const idx = prev.findIndex((c) => c._id === data.chatId);
         if (idx === -1) {
@@ -84,7 +93,10 @@ const ChatListScreen = ({ navigation }: Props) => {
           ...updated[idx],
           lastMessage: data.lastMessage,
           updatedAt: new Date().toISOString(),
-          unreadCount: (updated[idx].unreadCount || 0) + 1,
+          // Only increment unread for messages from someone else.
+          unreadCount: isOwnMessage
+            ? updated[idx].unreadCount || 0
+            : (updated[idx].unreadCount || 0) + 1,
         };
         // Sort: pinned first, then by updatedAt
         updated.sort((a, b) => {
