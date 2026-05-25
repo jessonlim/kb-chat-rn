@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import userService from '../../services/userService';
+import contactService from '../../services/contactService';
 import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
@@ -28,46 +28,40 @@ const NewChatScreen = ({ navigation }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<User[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [contacts, setContacts] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [startingChat, setStartingChat] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const doSearch = useCallback(
-    async (q: string) => {
-      const trimmed = q.trim();
-      if (trimmed.length < 2) {
-        setResults([]);
-        setHasSearched(false);
-        return;
-      }
+  // Load all contacts once on mount. Then filter locally as the user types —
+  // way faster than hitting the API on every keystroke, and partial-matching
+  // becomes trivial: just substring on username/displayName.
+  // (For finding NEW people who aren't your friend, use the search in
+  // Contacts → New Friends, which requires the full username for privacy.)
+  useEffect(() => {
+    let alive = true;
+    contactService.getContacts()
+      .then((res) => {
+        if (!alive) return;
+        // Filter out self defensively (backend already excludes us)
+        setContacts(res.contacts.filter((u) => u.id !== user?.id));
+      })
+      .catch((err) => console.warn('Failed to load contacts:', err))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [user?.id]);
 
-      setSearching(true);
-      setHasSearched(true);
-      try {
-        const { users } = await userService.searchUsers(trimmed);
-        // Filter out self
-        setResults(users.filter((u) => u.id !== user?.id));
-      } catch (err) {
-        console.warn('Search failed:', err);
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    },
-    [user?.id]
-  );
+  // Local substring filter — empty query returns the full list.
+  const results = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return contacts;
+    return contacts.filter((u) => {
+      const username = (u.username || '').toLowerCase();
+      const displayName = (u.displayName || '').toLowerCase();
+      return username.includes(trimmed) || displayName.includes(trimmed);
+    });
+  }, [query, contacts]);
 
-  const handleChangeText = useCallback(
-    (text: string) => {
-      setQuery(text);
-      // Debounce the search
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => doSearch(text), 400);
-    },
-    [doSearch]
-  );
+  const handleChangeText = (text: string) => setQuery(text);
 
   const handleSelectUser = useCallback(
     async (selectedUser: User) => {
@@ -133,14 +127,7 @@ const NewChatScreen = ({ navigation }: Props) => {
           autoCorrect={false}
         />
         {query.length > 0 && (
-          <TouchableOpacity
-            onPress={() => {
-              setQuery('');
-              setResults([]);
-              setHasSearched(false);
-            }}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity onPress={() => setQuery('')} activeOpacity={0.7}>
             <Ionicons name="close-circle" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         )}
@@ -161,42 +148,34 @@ const NewChatScreen = ({ navigation }: Props) => {
 
       <View style={styles.divider} />
 
-      {/* Results */}
-      {searching && (
+      {loading ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.loadingText}>{t('chats.searching')}</Text>
         </View>
-      )}
-
-      <FlatList
-        data={results}
-        keyExtractor={(u) => u.id}
-        renderItem={renderUser}
-        ListEmptyComponent={
-          hasSearched && !searching ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>{t('chats.noUsersFound')}</Text>
-              <Text style={styles.emptySubtext}>
-                {t('contact.noMatch')}
-              </Text>
-            </View>
-          ) : !hasSearched ? (
+      ) : (
+        <FlatList
+          data={results}
+          keyExtractor={(u) => u.id}
+          renderItem={renderUser}
+          ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>{t('contacts.findUsers')}</Text>
+              <Text style={styles.emptyText}>
+                {query
+                  ? t('contact.noMatch')
+                  : t('contacts.empty')}
+              </Text>
               <Text style={styles.emptySubtext}>
-                {t('chat.searchHint')}
+                {query ? '' : t('contacts.emptyHint')}
               </Text>
             </View>
-          ) : null
-        }
-        contentContainerStyle={
-          results.length === 0 ? { flex: 1, justifyContent: 'center' } : undefined
-        }
-        keyboardShouldPersistTaps="handled"
-      />
+          }
+          contentContainerStyle={
+            results.length === 0 ? { flex: 1, justifyContent: 'center' } : undefined
+          }
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
     </View>
   );
 };
