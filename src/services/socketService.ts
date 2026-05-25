@@ -33,14 +33,16 @@ class SocketService {
     this.connecting = true;
     debugToast('Socket: connecting…', `to ${API_URL}`);
 
-    // Build #15 regression: some testers report send_message ack never
-    // returns. The previous build used `transports: ['websocket']` which
-    // is faster but fails silently on networks that block WebSocket (some
-    // ISPs, captive portals, corporate VPNs). Allow polling fallback so
-    // socket.io can negotiate whichever transport actually works.
+    // Use socket.io's default transport negotiation: start with HTTP
+    // long-polling (works on essentially every network) and then upgrade
+    // to WebSocket if the network allows it. Our previous config of
+    // ['websocket', 'polling'] was misleading — that order tries WS
+    // first and does NOT actually fall back to polling on failure, which
+    // is why testers on certain networks saw the connection hang forever
+    // with a "websocket error". Polling-first is the textbook fix.
     this.socket = io(API_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
