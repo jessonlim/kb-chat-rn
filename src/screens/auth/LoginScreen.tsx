@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../stores/authStore';
@@ -52,7 +53,11 @@ const LoginScreen = ({ navigation }: Props) => {
       <View style={styles.inner}>
         {/* Logo / Title */}
         <View style={styles.header}>
-          <Text style={styles.logo}>💬</Text>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>{t('about.appName')}</Text>
           <Text style={styles.subtitle}>{t('auth.signInToContinue')}</Text>
         </View>
@@ -123,7 +128,9 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     marginBottom: 40,
   },
   logo: {
-    fontSize: 56,
+    width: 96,
+    height: 96,
+    borderRadius: 20,
     marginBottom: spacing.md,
   },
   title: {

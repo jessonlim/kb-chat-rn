@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../stores/authStore';
@@ -69,6 +70,11 @@ const RegisterScreen = ({ navigation }: Props) => {
     >
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>{t('auth.createAccount')}</Text>
           <Text style={styles.subtitle}>{t('auth.createYourAccount')}</Text>
         </View>
@@ -160,6 +166,12 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 18,
+    marginBottom: spacing.md,
   },
   title: {
     fontSize: fontSize.title,
