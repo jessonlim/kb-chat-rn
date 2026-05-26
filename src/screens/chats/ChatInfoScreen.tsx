@@ -149,10 +149,20 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
       navigation.navigate('AddGroupMembers', {
         chatId,
         existingMemberIds: chat.participants.map((p) => p.id),
+        mode: 'add',
       });
     } else {
-      // For 1-on-1 chats, "+" would upgrade to a group — not built yet
-      showSoon(t('chatInfo.addPeople'));
+      // 1-on-1 chat → tapping "+" upgrades it to a group. Pre-include
+      // the existing friend so the picker only shows additional contacts;
+      // on confirm AddGroupMembersScreen creates a fresh group chat with
+      // the original friend + new picks and navigates to it.
+      const otherUser = chat.participants.find((p) => p.id !== user?.id);
+      if (!otherUser) return;
+      navigation.navigate('AddGroupMembers', {
+        chatId,
+        existingMemberIds: [otherUser.id],
+        mode: 'create',
+      });
     }
   };
 

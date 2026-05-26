@@ -1,7 +1,16 @@
-// AddGroupMembersScreen — pick contacts to add to an existing group.
-// Reached from ChatInfo's "+" tile when the chat is a group.
-// Only shows contacts who aren't already members. On confirm, calls
-// chatService.addMembers and returns to ChatInfo.
+// AddGroupMembersScreen — two modes:
+//
+//  mode='add' (default): add NEW members to an EXISTING group.
+//    chatId = the group chat. existingMemberIds are filtered out.
+//    On confirm → chatService.addMembers → back to ChatInfo.
+//
+//  mode='create': UPGRADE a 1-on-1 chat to a new group.
+//    chatId = the original 1-on-1 chat (not used in the create call,
+//      but kept for back-nav context).
+//    existingMemberIds = [otherUserId] — the friend from the 1-on-1
+//      is implicitly part of the new group, not selectable here.
+//    On confirm → chatService.createGroup with all members → navigate
+//      to the new group chat.
 
 import React, { useMemo, useEffect, useState } from 'react';
 import {
@@ -17,18 +26,27 @@ import Toast from 'react-native-toast-message';
 import contactService from '../../services/contactService';
 import chatService from '../../services/chatService';
 import Avatar from '../../components/common/Avatar';
+import { useAuth } from '../../stores/authStore';
+import { displayNameOf } from '../../stores/remarksStore';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { User } from '../../types';
 
 interface Props {
-  route: { params: { chatId: string; existingMemberIds: string[] } };
+  route: {
+    params: {
+      chatId: string;
+      existingMemberIds: string[];
+      mode?: 'add' | 'create';
+    };
+  };
   navigation: any;
 }
 
 const AddGroupMembersScreen = ({ route, navigation }: Props) => {
-  const { chatId, existingMemberIds } = route.params;
+  const { chatId, existingMemberIds, mode = 'add' } = route.params;
+  const { user } = useAuth();
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -38,6 +56,9 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
 
+  // For 'add' mode the existing group members are filtered out of the picker.
+  // For 'create' mode the friend from the original 1-on-1 is implicit so we
+  // also hide them from the list (they're always included on confirm).
   const existingSet = useMemo(() => new Set(existingMemberIds), [existingMemberIds]);
 
   useEffect(() => {
@@ -67,9 +88,40 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
     if (selected.size === 0 || submitting) return;
     setSubmitting(true);
     try {
-      await chatService.addMembers(chatId, Array.from(selected));
-      Toast.show({ type: 'success', text1: t('group.membersAdded') });
-      navigation.goBack();
+      if (mode === 'create') {
+        // Upgrading a 1-on-1 to a group: build memberIds from the implicit
+        // friend(s) (existingMemberIds) + the newly-picked contacts.
+        // The backend's createGroup auto-includes the caller as creator
+        // and admin, so we don't need to push user.id into memberIds.
+        const memberIds = [...new Set([...existingMemberIds, ...Array.from(selected)])];
+
+        // Auto-generate a sensible default name from member display names.
+        // User can rename via ChatInfo later. Mirrors WeChat's behaviour
+        // of showing comma-separated names for fresh groups.
+        const allPickedUsers = contacts.filter((c) => selected.has(c.id));
+        const names = [
+          displayNameOf(user as any),
+          ...allPickedUsers.map((u) => displayNameOf(u)),
+        ].slice(0, 3);
+        let groupName = names.join(', ');
+        const extra = memberIds.length + 1 - 3; // total minus what we displayed
+        if (extra > 0) groupName += ` +${extra}`;
+
+        const { chat } = await chatService.createGroup({
+          groupName,
+          memberIds,
+        });
+        Toast.show({ type: 'success', text1: t('group.created') || 'Group created' });
+        // Replace the navigation stack: from old 1-on-1 chat → new group chat.
+        navigation.getParent()?.navigate('ChatsTab', {
+          screen: 'ChatScreen',
+          params: { chatId: chat._id },
+        });
+      } else {
+        await chatService.addMembers(chatId, Array.from(selected));
+        Toast.show({ type: 'success', text1: t('group.membersAdded') });
+        navigation.goBack();
+      }
     } catch (err: any) {
       Toast.show({
         type: 'error',
@@ -143,7 +195,9 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
           {submitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.confirmButtonText}>{t('group.addMembers')}</Text>
+            <Text style={styles.confirmButtonText}>
+              {mode === 'create' ? t('group.newGroup') : t('group.addMembers')}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
