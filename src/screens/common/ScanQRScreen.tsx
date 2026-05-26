@@ -28,7 +28,10 @@ interface Props {
   navigation: any;
 }
 
-const QR_HOST_PATTERN = /https?:\/\/(?:www\.)?kb-chat\.com\/u\/([a-fA-F0-9]+)/;
+// Accept both forms of the friend QR:
+//   https://kb-chat.com/u/<userId>?u=<username>   (legacy / shareable URL)
+//   kbchat://user/<userId>?u=<username>           (custom-scheme deep link)
+const QR_HOST_PATTERN = /(?:https?:\/\/(?:www\.)?kb-chat\.com\/u\/|kbchat:\/\/user\/)([a-fA-F0-9]+)/i;
 
 const ScanQRScreen = ({ navigation }: Props) => {
   const { t } = useT();

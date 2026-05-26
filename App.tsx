@@ -9,6 +9,7 @@ import { GroupCallProvider } from './src/context/GroupCallContext';
 import { I18nProvider } from './src/i18n/I18nContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { navigationRef } from './src/navigation/navigationRef';
+import { linking } from './src/navigation/linking';
 import useNotifications from './src/hooks/useNotifications';
 import { useEasUpdateInfo } from './src/hooks/useEasUpdateInfo';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -33,7 +34,7 @@ export default function App() {
         <AuthContext.Provider value={auth}>
           <CallProvider>
             <GroupCallProvider>
-              <NavigationContainer ref={navigationRef}>
+              <NavigationContainer ref={navigationRef} linking={linking}>
                 <RootNavigator />
                 <StatusBar style="light" />
               </NavigationContainer>
