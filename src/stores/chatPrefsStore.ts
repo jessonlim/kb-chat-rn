@@ -29,6 +29,14 @@ type PrefsMap = Record<string, ChatPrefs>;
 let cache: PrefsMap | null = null;
 const listeners = new Set<() => void>();
 
+// Per-chat snapshot cache. useSyncExternalStore requires that getSnapshot
+// return the SAME reference (by Object.is) until the store actually
+// changes — otherwise React thinks the data changed on every render and
+// re-renders in an infinite loop. So we hand out stable references for
+// each chatId and only recompute when set() is called for that chat.
+const snapshotCache = new Map<string, ChatPrefs>();
+const EMPTY_PREFS: ChatPrefs = Object.freeze({});
+
 const load = (): PrefsMap => {
   if (cache) return cache;
   try {
@@ -55,10 +63,24 @@ const subscribe = (fn: () => void) => {
   return () => listeners.delete(fn);
 };
 
+/** Return a stable, cached snapshot for a given chatId. */
+const getSnapshot = (chatId: string): ChatPrefs => {
+  let snap = snapshotCache.get(chatId);
+  if (!snap) {
+    const raw = load()[chatId];
+    // Reuse the frozen empty object for chats with no overrides — avoids
+    // allocating one per chat on first read.
+    snap = raw ? { ...raw } : EMPTY_PREFS;
+    snapshotCache.set(chatId, snap);
+  }
+  return snap;
+};
+
 export const chatPrefsStore = {
-  /** Get all prefs for a chat (empty object if unset) */
+  /** Get all prefs for a chat (returns frozen empty object if unset).
+   *  The returned object is a stable reference — safe for useSyncExternalStore. */
   get(chatId: string): ChatPrefs {
-    return { ...(load()[chatId] || {}) };
+    return getSnapshot(chatId);
   },
 
   /** Merge-update a single field */
@@ -73,6 +95,9 @@ export const chatPrefsStore = {
     map[chatId] = next;
     cache = { ...map };
     persist(cache);
+    // Invalidate the cached snapshot so the next get() returns a new
+    // reference and useSyncExternalStore-subscribed components re-render.
+    snapshotCache.delete(chatId);
     notify();
   },
 
@@ -83,6 +108,7 @@ export const chatPrefsStore = {
     delete map[chatId];
     cache = { ...map };
     persist(cache);
+    snapshotCache.delete(chatId);
     notify();
   },
 
@@ -90,9 +116,14 @@ export const chatPrefsStore = {
 };
 
 /** React hook — re-renders when the chat's prefs change */
-export const useChatPrefs = (chatId: string | undefined): ChatPrefs =>
-  useSyncExternalStore(
-    subscribe,
-    () => (chatId ? chatPrefsStore.get(chatId) : {}),
-    () => (chatId ? chatPrefsStore.get(chatId) : {}),
-  );
+export const useChatPrefs = (chatId: string | undefined): ChatPrefs => {
+  // The same getSnapshot function reference is passed every call (no inline
+  // arrow function allocating). It returns a stable per-chatId reference,
+  // so React only re-renders when set/clear invalidates the snapshot.
+  const subscribeFn = chatId ? subscribe : noopSubscribe;
+  const snapshotFn = chatId ? () => getSnapshot(chatId) : emptySnapshot;
+  return useSyncExternalStore(subscribeFn, snapshotFn, snapshotFn);
+};
+
+const noopSubscribe = () => () => {};
+const emptySnapshot = () => EMPTY_PREFS;
