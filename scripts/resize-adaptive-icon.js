@@ -20,12 +20,19 @@ const sharp = require('sharp');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const SRC = path.join(ROOT, 'assets', 'adaptive-icon.png');
+// SOURCE is the original full-bleed bubble preserved under assets/source/.
+// Don't read from assets/adaptive-icon.png — each re-run would compound
+// the resize (smaller and smaller bubble in growing transparency).
+const SRC = path.join(ROOT, 'assets', 'source', 'adaptive-icon-original.png');
 const OUT = path.join(ROOT, 'assets', 'adaptive-icon.png');
 
 const CANVAS_SIZE = 1024;
-// 540 / 1024 = ~52% — well inside the 66% safe zone for any mask shape
-const FOREGROUND_SIZE = 540;
+// 700 / 1024 = ~68% — just inside the Android safe zone for the common
+// mask shapes (circle, squircle, rounded square). 52% was too small (the
+// bubble looked tiny vs neighbouring icons like WeChat / GitHub which
+// fill ~75% of their card). 68% matches typical visual weight without
+// clipping on Samsung One UI's rounded-square mask.
+const FOREGROUND_SIZE = 700;
 
 (async () => {
   // Read source, resize foreground to FOREGROUND_SIZE
