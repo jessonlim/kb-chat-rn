@@ -52,6 +52,11 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [contacts, setContacts] = useState<User[]>([]);
+  // The User objects of people implicitly included (e.g. the friend from
+  // the original 1-on-1 in 'create' mode). Kept separately so we can use
+  // their names in the auto-generated group name but still hide them from
+  // the picker list.
+  const [implicitMembers, setImplicitMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -65,8 +70,11 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
     (async () => {
       try {
         const { contacts: list } = await contactService.getContacts();
-        // Filter out contacts already in the group
+        // Filter out contacts already in the group → picker list
         setContacts(list.filter((c) => !existingSet.has(c.id)));
+        // Keep the full User objects for anyone implicitly included so we
+        // can show their names in the group-name preview / generation.
+        setImplicitMembers(list.filter((c) => existingSet.has(c.id)));
       } catch (err) {
         console.warn('Failed to load contacts:', err);
       } finally {
@@ -95,16 +103,20 @@ const AddGroupMembersScreen = ({ route, navigation }: Props) => {
         // and admin, so we don't need to push user.id into memberIds.
         const memberIds = [...new Set([...existingMemberIds, ...Array.from(selected)])];
 
-        // Auto-generate a sensible default name from member display names.
-        // User can rename via ChatInfo later. Mirrors WeChat's behaviour
-        // of showing comma-separated names for fresh groups.
-        const allPickedUsers = contacts.filter((c) => selected.has(c.id));
-        const names = [
+        // Auto-generate a sensible default name from ALL member display
+        // names: the current user + implicit members (original 1-on-1
+        // friend) + newly-picked contacts. Bug fixed: previously skipped
+        // the implicit member so a "test, ML, Dalpha" group showed up as
+        // "test, Dalpha".
+        const newlyPickedUsers = contacts.filter((c) => selected.has(c.id));
+        const allNames = [
           displayNameOf(user as any),
-          ...allPickedUsers.map((u) => displayNameOf(u)),
-        ].slice(0, 3);
-        let groupName = names.join(', ');
-        const extra = memberIds.length + 1 - 3; // total minus what we displayed
+          ...implicitMembers.map((u) => displayNameOf(u)),
+          ...newlyPickedUsers.map((u) => displayNameOf(u)),
+        ];
+        const shown = allNames.slice(0, 3);
+        let groupName = shown.join(', ');
+        const extra = allNames.length - shown.length;
         if (extra > 0) groupName += ` +${extra}`;
 
         const { chat } = await chatService.createGroup({
