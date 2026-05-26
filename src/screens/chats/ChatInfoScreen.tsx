@@ -17,6 +17,11 @@ import {
   Switch,
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -53,6 +58,10 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const [clearing, setClearing] = useState(false);
   // Local per-chat prefs (alias, remark, on-screen names, save-to-contacts)
   const prefs = useChatPrefs(chatId);
+  // Inline-edit modal state. Replaces Alert.prompt (iOS-only) so the
+  // edit flow works on Android too.
+  const [editingField, setEditingField] = useState<null | 'groupName' | 'alias' | 'remark'>(null);
+  const [editingValue, setEditingValue] = useState('');
 
   // ── Load chat metadata ──────────────────────────────────────────
   useEffect(() => {
@@ -122,94 +131,52 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     storage.set(alertKey(chatId), next);
   }, [chatId]);
 
-  // Tap "Group Name" row → inline edit via Alert prompt + save via REST.
-  // On Android, Alert.prompt isn't available, so we fall back to an
-  // inline TextInput modal would be nicer — for now we use a prompt that
-  // works on iOS, and an Alert with "OK / Cancel" plus a separate route
-  // would be cleaner long-term.
-  const handleEditGroupName = useCallback(async () => {
+  // Open the inline edit modal. Replaces Alert.prompt (iOS-only) so the
+  // edit flow works on Android too.
+  const handleEditGroupName = useCallback(() => {
     if (!chat || chat.type !== 'group') return;
-    // Simple cross-platform approach: ask once via Alert with the current
-    // name shown; user taps Edit → we present a TextInput in-screen.
-    // For brevity (and because Alert.prompt is iOS-only), navigate to a
-    // small dedicated screen would be ideal. v1: use Alert.prompt on iOS,
-    // skip on Android (we'll wire a screen if needed).
-    const currentName = chat.groupName || '';
-    const newName = await new Promise<string | null>((resolve) => {
-      const A: any = Alert;
-      if (typeof A.prompt === 'function') {
-        A.prompt(
-          t('chatInfo.editGroupName'),
-          '',
-          [
-            { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
-            { text: t('common.save'), onPress: (text: string) => resolve(text) },
-          ],
-          'plain-text',
-          currentName,
-        );
-      } else {
-        // Android: nudge the user to navigate to a future edit screen.
-        // For now we just show what it would do.
-        Toast.show({ type: 'info', text1: t('chatInfo.editGroupName'), text2: currentName });
-        resolve(null);
-      }
-    });
-    if (!newName || newName.trim() === currentName) return;
-    try {
-      const { chat: updated } = await chatService.updateGroup(chatId, { groupName: newName.trim() });
-      setChat(updated);
-      Toast.show({ type: 'success', text1: t('common.save') });
-    } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: err?.response?.data?.message || t('common.failed'),
-      });
-    }
-  }, [chat, chatId, t]);
+    setEditingValue(chat.groupName || '');
+    setEditingField('groupName');
+  }, [chat]);
 
-  // Per-chat local pref editors — all MMKV-only via chatPrefsStore
   const handleEditAlias = useCallback(() => {
-    const A: any = Alert;
-    if (typeof A.prompt === 'function') {
-      A.prompt(
-        t('chatInfo.editAlias'),
-        '',
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('common.save'),
-            onPress: (text: string) => chatPrefsStore.set(chatId, 'alias', (text || '').trim()),
-          },
-        ],
-        'plain-text',
-        prefs.alias || '',
-      );
-    } else {
-      Toast.show({ type: 'info', text1: t('chatInfo.editAlias'), text2: prefs.alias || '' });
-    }
-  }, [chatId, prefs.alias, t]);
+    setEditingValue(prefs.alias || '');
+    setEditingField('alias');
+  }, [prefs.alias]);
 
   const handleEditRemark = useCallback(() => {
-    const A: any = Alert;
-    if (typeof A.prompt === 'function') {
-      A.prompt(
-        t('chatInfo.editRemark'),
-        '',
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('common.save'),
-            onPress: (text: string) => chatPrefsStore.set(chatId, 'remark', (text || '').trim()),
-          },
-        ],
-        'plain-text',
-        prefs.remark || '',
-      );
-    } else {
-      Toast.show({ type: 'info', text1: t('chatInfo.editRemark'), text2: prefs.remark || '' });
+    setEditingValue(prefs.remark || '');
+    setEditingField('remark');
+  }, [prefs.remark]);
+
+  // Commit the edit modal — dispatch the right action based on which field.
+  const handleSaveEdit = useCallback(async () => {
+    const field = editingField;
+    const value = editingValue.trim();
+    if (!field) return;
+
+    if (field === 'groupName') {
+      if (!chat || value === (chat.groupName || '')) {
+        setEditingField(null);
+        return;
+      }
+      try {
+        const { chat: updated } = await chatService.updateGroup(chatId, { groupName: value });
+        setChat(updated);
+        Toast.show({ type: 'success', text1: t('common.save') });
+      } catch (err: any) {
+        Toast.show({
+          type: 'error',
+          text1: err?.response?.data?.message || t('common.failed'),
+        });
+      }
+    } else if (field === 'alias') {
+      chatPrefsStore.set(chatId, 'alias', value);
+    } else if (field === 'remark') {
+      chatPrefsStore.set(chatId, 'remark', value);
     }
-  }, [chatId, prefs.remark, t]);
+    setEditingField(null);
+  }, [editingField, editingValue, chat, chatId, t]);
 
   const handleToggleShowNames = useCallback((next: boolean) => {
     chatPrefsStore.set(chatId, 'showNames', next);
@@ -510,6 +477,60 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Inline edit modal — Android-compatible replacement for Alert.prompt.
+          Used for Group Name, My Alias in Group, and Remark. */}
+      <Modal
+        visible={editingField !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingField(null)}
+      >
+        <KeyboardAvoidingView
+          style={styles.editOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.editBackdrop} onPress={() => setEditingField(null)}>
+            <Pressable style={styles.editCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.editTitle}>
+                {editingField === 'groupName'
+                  ? t('chatInfo.editGroupName')
+                  : editingField === 'alias'
+                    ? t('chatInfo.editAlias')
+                    : editingField === 'remark'
+                      ? t('chatInfo.editRemark')
+                      : ''}
+              </Text>
+              <TextInput
+                style={styles.editInput}
+                value={editingValue}
+                onChangeText={setEditingValue}
+                autoFocus
+                placeholderTextColor={colors.textMuted}
+                returnKeyType="done"
+                onSubmitEditing={handleSaveEdit}
+                maxLength={40}
+              />
+              <View style={styles.editActions}>
+                <TouchableOpacity
+                  onPress={() => setEditingField(null)}
+                  activeOpacity={0.7}
+                  style={styles.editActionBtn}
+                >
+                  <Text style={styles.editCancel}>{t('common.cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveEdit}
+                  activeOpacity={0.7}
+                  style={styles.editActionBtn}
+                >
+                  <Text style={styles.editSave}>{t('common.save')}</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 };
@@ -667,6 +688,54 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     color: colors.textMuted,
     maxWidth: 160,
     marginRight: spacing.xs,
+  },
+  // Inline-edit modal (group name / alias / remark)
+  editOverlay: { flex: 1 },
+  editBackdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  editCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  editTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  editInput: {
+    backgroundColor: colors.bgInput,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+  },
+  editActionBtn: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  editCancel: {
+    fontSize: fontSize.md,
+    color: colors.textMuted,
+  },
+  editSave: {
+    fontSize: fontSize.md,
+    color: colors.primary,
+    fontWeight: '600',
   },
 });
 
