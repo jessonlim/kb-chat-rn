@@ -65,16 +65,6 @@ const ScanQRScreen = ({ navigation }: Props) => {
 
       const scannedUserId = match[1];
 
-      // DEBUG: surface raw scanned data + extracted ID so we can see
-      // exactly what's going wrong when "user not found" fires.
-      Toast.show({
-        type: 'info',
-        text1: '🔍 Scanned',
-        text2: `id="${scannedUserId.slice(0, 12)}…" len=${scannedUserId.length}`,
-        position: 'top',
-        visibilityTime: 4000,
-      });
-
       if (user && scannedUserId === user.id) {
         Toast.show({ type: 'info', text1: t('qr.cantScanSelf') });
         setHandling(false);

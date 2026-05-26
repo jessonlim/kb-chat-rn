@@ -17,6 +17,7 @@ import chatService from '../../services/chatService';
 import socketService from '../../services/socketService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
+import GroupAvatar from '../../components/common/GroupAvatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
@@ -232,12 +233,21 @@ const ChatListScreen = ({ navigation }: Props) => {
           navigation.navigate('ChatScreen', { chatId: chat._id });
         }}
       >
-        <Avatar
-          name={avatar.name}
-          src={avatar.src}
-          size={52}
-          online={chat.type === 'private' ? other?.isOnline : undefined}
-        />
+        {chat.type === 'group' ? (
+          <GroupAvatar
+            name={chat.groupName}
+            src={chat.groupImage}
+            members={chat.participants}
+            size={52}
+          />
+        ) : (
+          <Avatar
+            name={avatar.name}
+            src={avatar.src}
+            size={52}
+            online={other?.isOnline}
+          />
+        )}
 
         <View style={styles.chatInfo}>
           <View style={styles.topRow}>

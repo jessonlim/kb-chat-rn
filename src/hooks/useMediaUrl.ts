@@ -16,9 +16,9 @@ import { useState, useEffect, useRef } from 'react';
 import Toast from 'react-native-toast-message';
 import { API_URL, storage } from '../services/api';
 
-// DEBUG: surface signed-URL fetch failures. Avatars use the same hook so
-// if you see these toasts spamming, something's wrong with /api/uploads/signed-url.
-const SHOW_MEDIA_DEBUG = true;
+// DEBUG: surface signed-URL fetch failures. Default off — flip to true
+// if media stops loading and you need on-device visibility.
+const SHOW_MEDIA_DEBUG = false;
 let lastErrToastAt = 0;
 const dt = (text1: string, text2?: string) => {
   if (!SHOW_MEDIA_DEBUG) return;

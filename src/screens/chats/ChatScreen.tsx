@@ -181,13 +181,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
         setChat(chatRes.chat);
         setMessages(msgRes.messages);
         if (msgRes.messages.length < 50) setHasMore(false);
-        // Diagnostic — strip after confirming fix lands
-        if (msgRes.messages.length === 0) {
-          Toast.show({ type: 'info', text1: 'Loaded 0 messages', text2: 'Empty chat', visibilityTime: 2000 });
-        }
       } catch (err: any) {
         console.warn('Failed to load chat:', err);
-        Toast.show({ type: 'error', text1: 'Load chat failed', text2: err?.message || 'unknown', visibilityTime: 3000 });
       } finally {
         setLoading(false);
       }
@@ -205,15 +200,19 @@ const ChatScreen = ({ route, navigation }: Props) => {
       const groupTitle = chat.groupName || t('group.info');
       const canStartCall = groupCallState === 'idle';
       navigation.setOptions({
+        // WeChat-style header: group name with the member count inline
+        // in parentheses. Online count goes on the subtitle row if any
+        // member is online, otherwise we leave the subtitle blank.
         headerTitle: () => (
           <View style={styles.headerTitle}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {groupTitle}
+              {groupTitle} ({memberCount})
             </Text>
-            <Text style={styles.headerSub}>
-              {t('group.membersCount', { n: memberCount })}
-              {onlineCount > 0 ? ` · ${onlineCount} ${t('chat.online')}` : ''}
-            </Text>
+            {onlineCount > 0 ? (
+              <Text style={styles.headerSub}>
+                {onlineCount} {t('chat.online')}
+              </Text>
+            ) : null}
           </View>
         ),
         headerRight: () => (

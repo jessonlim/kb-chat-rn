@@ -4,9 +4,10 @@
 import Toast from 'react-native-toast-message';
 import { API_URL, storage } from './api';
 
-// DEBUG: surface upload progress + failure reasons. Once we confirm uploads
-// work in production, gate behind a flag like SHOW_SOCKET_DEBUG.
-const SHOW_UPLOAD_DEBUG = true;
+// DEBUG: surface upload progress + failure reasons. Flag stays in place
+// so we can flip back on quickly when investigating any future upload
+// regression. Default off in normal use.
+const SHOW_UPLOAD_DEBUG = false;
 const dt = (text1: string, text2?: string, type: 'info' | 'success' | 'error' = 'info') => {
   if (!SHOW_UPLOAD_DEBUG) return;
   Toast.show({ type, text1, text2, position: 'top', visibilityTime: 3000 });
