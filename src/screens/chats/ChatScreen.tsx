@@ -27,6 +27,7 @@ import VoiceRecorder from '../../components/chat/VoiceRecorder';
 import ImageViewer from '../../components/chat/ImageViewer';
 import VideoViewer from '../../components/chat/VideoViewer';
 import SelectionToolbar from '../../components/chat/SelectionToolbar';
+import { useChatPrefs } from '../../stores/chatPrefsStore';
 import MessageInfoModal from '../../components/chat/MessageInfoModal';
 import StickerPicker from '../../components/chat/StickerPicker';
 import LocationPicker from '../../components/chat/LocationPicker';
@@ -1066,6 +1067,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
   const isGroup = chat?.type === 'group';
 
+  // Per-chat prefs from ChatInfo (alias, on-screen-names toggle).
+  // Default for showNames: true in groups, false in 1-on-1 (matches WeChat).
+  const chatPrefs = useChatPrefs(chatId);
+  const showSenderName = isGroup && chatPrefs.showNames !== false;
+
   const isOwnMessage = useCallback(
     (msg: Message): boolean => {
       return (typeof msg.sender === 'object' ? msg.sender.id : msg.sender) === user?.id;
@@ -1199,7 +1205,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
           <MessageBubble
             message={item}
             isOwn={isOwnMessage(item)}
-            showSenderName={isGroup}
+            showSenderName={showSenderName}
             onLongPress={handleLongPress}
             onImagePress={handleImagePress}
             onVideoPress={handleVideoPress}

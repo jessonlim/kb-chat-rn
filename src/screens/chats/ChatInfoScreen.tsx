@@ -27,6 +27,8 @@ import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { chatPrefsStore, useChatPrefs } from '../../stores/chatPrefsStore';
+import { displayNameOf } from '../../stores/remarksStore';
 import type { Chat, User } from '../../types';
 
 interface Props {
@@ -49,6 +51,8 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const [isPinned, setIsPinned] = useState(false);
   const [isAlert, setIsAlert] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // Local per-chat prefs (alias, remark, on-screen names, save-to-contacts)
+  const prefs = useChatPrefs(chatId);
 
   // ── Load chat metadata ──────────────────────────────────────────
   useEffect(() => {
@@ -67,6 +71,28 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     };
     load();
   }, [chatId]);
+
+  // Set the header title to "Chat Info (N)" with a search icon on the right
+  // for groups. WeChat shows the member count in the title bar.
+  useEffect(() => {
+    if (!chat) return;
+    const memberCount = chat.participants.length;
+    navigation.setOptions({
+      title: chat.type === 'group'
+        ? t('chatInfo.title.withCount', { n: memberCount })
+        : t('chatInfo.title'),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ChatScreen', { chatId, openSearch: true })}
+          activeOpacity={0.7}
+          style={{ paddingRight: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="search" size={22} color={colors.primary} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [chat, navigation, t, colors.primary, chatId]);
 
   // ── Toggles ─────────────────────────────────────────────────────
   const handleToggleMute = useCallback(async () => {
@@ -94,6 +120,103 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const handleToggleAlert = useCallback((next: boolean) => {
     setIsAlert(next);
     storage.set(alertKey(chatId), next);
+  }, [chatId]);
+
+  // Tap "Group Name" row → inline edit via Alert prompt + save via REST.
+  // On Android, Alert.prompt isn't available, so we fall back to an
+  // inline TextInput modal would be nicer — for now we use a prompt that
+  // works on iOS, and an Alert with "OK / Cancel" plus a separate route
+  // would be cleaner long-term.
+  const handleEditGroupName = useCallback(async () => {
+    if (!chat || chat.type !== 'group') return;
+    // Simple cross-platform approach: ask once via Alert with the current
+    // name shown; user taps Edit → we present a TextInput in-screen.
+    // For brevity (and because Alert.prompt is iOS-only), navigate to a
+    // small dedicated screen would be ideal. v1: use Alert.prompt on iOS,
+    // skip on Android (we'll wire a screen if needed).
+    const currentName = chat.groupName || '';
+    const newName = await new Promise<string | null>((resolve) => {
+      const A: any = Alert;
+      if (typeof A.prompt === 'function') {
+        A.prompt(
+          t('chatInfo.editGroupName'),
+          '',
+          [
+            { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+            { text: t('common.save'), onPress: (text: string) => resolve(text) },
+          ],
+          'plain-text',
+          currentName,
+        );
+      } else {
+        // Android: nudge the user to navigate to a future edit screen.
+        // For now we just show what it would do.
+        Toast.show({ type: 'info', text1: t('chatInfo.editGroupName'), text2: currentName });
+        resolve(null);
+      }
+    });
+    if (!newName || newName.trim() === currentName) return;
+    try {
+      const { chat: updated } = await chatService.updateGroup(chatId, { groupName: newName.trim() });
+      setChat(updated);
+      Toast.show({ type: 'success', text1: t('common.save') });
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || t('common.failed'),
+      });
+    }
+  }, [chat, chatId, t]);
+
+  // Per-chat local pref editors — all MMKV-only via chatPrefsStore
+  const handleEditAlias = useCallback(() => {
+    const A: any = Alert;
+    if (typeof A.prompt === 'function') {
+      A.prompt(
+        t('chatInfo.editAlias'),
+        '',
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.save'),
+            onPress: (text: string) => chatPrefsStore.set(chatId, 'alias', (text || '').trim()),
+          },
+        ],
+        'plain-text',
+        prefs.alias || '',
+      );
+    } else {
+      Toast.show({ type: 'info', text1: t('chatInfo.editAlias'), text2: prefs.alias || '' });
+    }
+  }, [chatId, prefs.alias, t]);
+
+  const handleEditRemark = useCallback(() => {
+    const A: any = Alert;
+    if (typeof A.prompt === 'function') {
+      A.prompt(
+        t('chatInfo.editRemark'),
+        '',
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.save'),
+            onPress: (text: string) => chatPrefsStore.set(chatId, 'remark', (text || '').trim()),
+          },
+        ],
+        'plain-text',
+        prefs.remark || '',
+      );
+    } else {
+      Toast.show({ type: 'info', text1: t('chatInfo.editRemark'), text2: prefs.remark || '' });
+    }
+  }, [chatId, prefs.remark, t]);
+
+  const handleToggleShowNames = useCallback((next: boolean) => {
+    chatPrefsStore.set(chatId, 'showNames', next);
+  }, [chatId]);
+
+  const handleToggleSaveToContacts = useCallback((next: boolean) => {
+    chatPrefsStore.set(chatId, 'savedToContacts', next);
   }, [chatId]);
 
   // ── Clear chat history ──────────────────────────────────────────
@@ -226,10 +349,53 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
       </View>
 
+      {/* ── Group identity (group chats only) ─────────────── */}
+      {isGroup && (
+        <View style={styles.section}>
+          <Row
+            label={t('chatInfo.groupName')}
+            valueRight={chat.groupName || ''}
+            onPress={handleEditGroupName}
+            chevron
+            colors={colors}
+            styles={styles}
+          />
+          <Row
+            label={t('chatInfo.groupQR')}
+            iconRight="qr-code-outline"
+            onPress={() => navigation.navigate('GroupQR', {
+              chatId,
+              groupName: chat.groupName,
+              groupImage: chat.groupImage,
+              memberCount: chat.participants.length,
+            })}
+            bordered
+            colors={colors}
+            styles={styles}
+          />
+          <Row
+            label={t('chatInfo.groupNotice')}
+            onPress={() => showSoon(t('chatInfo.groupNotice'))}
+            chevron
+            bordered
+            colors={colors}
+            styles={styles}
+          />
+          <Row
+            label={t('chatInfo.chatRemark')}
+            valueRight={prefs.remark || ''}
+            onPress={handleEditRemark}
+            chevron
+            bordered
+            colors={colors}
+            styles={styles}
+          />
+        </View>
+      )}
+
       {/* ── Search + Shared Media ────────────────────────── */}
       <View style={styles.section}>
         <Row
-          icon="search-outline"
           label={t('chatInfo.searchHistory')}
           onPress={() => navigation.navigate('ChatScreen', { chatId, openSearch: true })}
           chevron
@@ -237,7 +403,6 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           styles={styles}
         />
         <Row
-          icon="images-outline"
           label={t('chatInfo.sharedMedia')}
           onPress={() => navigation.navigate('SharedMedia', { chatId })}
           chevron
@@ -247,10 +412,9 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
         />
       </View>
 
-      {/* ── Toggles ──────────────────────────────────────── */}
+      {/* ── Mute / Sticky / Save to Contacts (group only) ── */}
       <View style={styles.section}>
         <ToggleRow
-          icon="notifications-off-outline"
           label={t('chatInfo.muteNotifications')}
           value={isMuted}
           onChange={handleToggleMute}
@@ -258,7 +422,6 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           styles={styles}
         />
         <ToggleRow
-          icon="pin-outline"
           label={t('chatInfo.stickyOnTop')}
           value={isPinned}
           onChange={handleTogglePin}
@@ -266,21 +429,44 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           styles={styles}
           bordered
         />
-        <ToggleRow
-          icon="alert-circle-outline"
-          label={t('chatInfo.alert')}
-          value={isAlert}
-          onChange={handleToggleAlert}
-          colors={colors}
-          styles={styles}
-          bordered
-        />
+        {isGroup && (
+          <ToggleRow
+            label={t('chatInfo.savedToContacts')}
+            value={!!prefs.savedToContacts}
+            onChange={handleToggleSaveToContacts}
+            colors={colors}
+            styles={styles}
+            bordered
+          />
+        )}
       </View>
 
-      {/* ── Background / Clear / Report ──────────────────── */}
+      {/* ── Group-only display prefs ─────────────────────── */}
+      {isGroup && (
+        <View style={styles.section}>
+          <Row
+            label={t('chatInfo.myAlias')}
+            valueRight={prefs.alias || displayNameOf(user as any)}
+            onPress={handleEditAlias}
+            chevron
+            colors={colors}
+            styles={styles}
+          />
+          <ToggleRow
+            label={t('chatInfo.showNames')}
+            // Default ON — typical WeChat behaviour
+            value={prefs.showNames !== false}
+            onChange={handleToggleShowNames}
+            colors={colors}
+            styles={styles}
+            bordered
+          />
+        </View>
+      )}
+
+      {/* ── Background ─────────────────────────────────── */}
       <View style={styles.section}>
         <Row
-          icon="image-outline"
           label={t('chatInfo.background')}
           onPress={() => showSoon(t('chatInfo.background'))}
           chevron
@@ -289,9 +475,9 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
         />
       </View>
 
+      {/* ── Clear / Report ─────────────────────────────── */}
       <View style={styles.section}>
         <Row
-          icon="trash-outline"
           label={t('chatInfo.clearHistory')}
           onPress={handleClearHistory}
           chevron
@@ -299,14 +485,11 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           colors={colors}
           styles={styles}
         />
-      </View>
-
-      <View style={styles.section}>
         <Row
-          icon="flag-outline"
           label={t('chatInfo.report')}
           onPress={() => showSoon(t('chatInfo.report'))}
           chevron
+          bordered
           colors={colors}
           styles={styles}
         />
@@ -335,6 +518,8 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
 const Row = ({
   icon,
   label,
+  valueRight,
+  iconRight,
   onPress,
   chevron,
   loading,
@@ -342,8 +527,14 @@ const Row = ({
   styles,
   bordered,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  // Leading icon — optional (WeChat-style rows often have no icon).
+  icon?: keyof typeof Ionicons.glyphMap;
   label: string;
+  // Optional value text shown right-aligned before the chevron
+  // (e.g. "Group Name → PK")
+  valueRight?: string;
+  // Optional icon on the right instead of a chevron (e.g. QR icon)
+  iconRight?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   chevron?: boolean;
   loading?: boolean;
@@ -357,10 +548,19 @@ const Row = ({
     onPress={onPress}
     disabled={loading}
   >
-    <Ionicons name={icon} size={22} color={colors.textSecondary} />
+    {icon ? (
+      <Ionicons name={icon} size={22} color={colors.textSecondary} />
+    ) : null}
     <Text style={styles.rowLabel}>{label}</Text>
+    {valueRight ? (
+      <Text style={styles.rowValue} numberOfLines={1}>
+        {valueRight}
+      </Text>
+    ) : null}
     {loading ? (
       <ActivityIndicator size="small" color={colors.primary} />
+    ) : iconRight ? (
+      <Ionicons name={iconRight} size={20} color={colors.textMuted} />
     ) : chevron ? (
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
     ) : null}
@@ -376,7 +576,7 @@ const ToggleRow = ({
   styles,
   bordered,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
@@ -385,7 +585,9 @@ const ToggleRow = ({
   bordered?: boolean;
 }) => (
   <View style={[styles.row, bordered && styles.rowBorder]}>
-    <Ionicons name={icon} size={22} color={colors.textSecondary} />
+    {icon ? (
+      <Ionicons name={icon} size={22} color={colors.textSecondary} />
+    ) : null}
     <Text style={styles.rowLabel}>{label}</Text>
     <Switch
       value={value}
@@ -459,6 +661,12 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     flex: 1,
     fontSize: fontSize.md,
     color: colors.textPrimary,
+  },
+  rowValue: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    maxWidth: 160,
+    marginRight: spacing.xs,
   },
 });
 

@@ -529,6 +529,21 @@ export const STRINGS = {
   'camera.cantStart':         { en: 'Could not start camera', zh: '无法启动相机' },
   'camera.permissionDenied':  { en: 'Camera permission denied', zh: '相机权限被拒绝' },
 
+  // Group QR + extra ChatInfo strings
+  'group.qr.title':           { en: 'Group QR Code',        zh: '群二维码' },
+  'group.qr.scanToJoin':      { en: 'Scan this code to join the group', zh: '扫码加入群聊' },
+  'chatInfo.groupName':       { en: 'Group Name',           zh: '群聊名称' },
+  'chatInfo.groupQR':         { en: 'Group QR Code',        zh: '群二维码' },
+  'chatInfo.groupNotice':     { en: 'Group Notice',         zh: '群公告' },
+  'chatInfo.chatRemark':      { en: 'Remark',               zh: '备注' },
+  'chatInfo.savedToContacts': { en: 'Save to Contacts',     zh: '保存到通讯录' },
+  'chatInfo.myAlias':         { en: 'My Alias in Group',    zh: '我在本群的昵称' },
+  'chatInfo.showNames':       { en: 'On-screen Names',      zh: '显示群成员昵称' },
+  'chatInfo.title.withCount': { en: 'Chat Info ({n})',      zh: '聊天信息({n})' },
+  'chatInfo.editGroupName':   { en: 'Edit group name',      zh: '修改群名称' },
+  'chatInfo.editAlias':       { en: 'Set my alias',         zh: '设置我的昵称' },
+  'chatInfo.editRemark':      { en: 'Set remark',           zh: '设置备注' },
+
   // QR code
   'qr.myQR':                  { en: 'My QR Code',           zh: '我的二维码' },
   'qr.scanQR':                { en: 'Scan QR Code',         zh: '扫一扫' },

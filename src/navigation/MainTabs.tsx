@@ -11,6 +11,7 @@ import ChatInfoScreen from '../screens/chats/ChatInfoScreen';
 import SharedMediaScreen from '../screens/chats/SharedMediaScreen';
 import ForwardMessageScreen from '../screens/chats/ForwardMessageScreen';
 import AddGroupMembersScreen from '../screens/chats/AddGroupMembersScreen';
+import GroupQRScreen from '../screens/chats/GroupQRScreen';
 import NewChatScreen from '../screens/chats/NewChatScreen';
 import CreateGroupScreen from '../screens/chats/CreateGroupScreen';
 import ContactsScreen from '../screens/contacts/ContactsScreen';
@@ -156,6 +157,11 @@ const ChatsStackScreen = () => {
         name="AddGroupMembers"
         component={AddGroupMembersScreen as any}
         options={{ title: t('group.addMembers') }}
+      />
+      <ChatsStack.Screen
+        name="GroupQR"
+        component={GroupQRScreen as any}
+        options={{ title: t('group.qr.title') }}
       />
       <ChatsStack.Screen
         name="NewChat"
