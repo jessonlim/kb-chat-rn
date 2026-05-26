@@ -620,14 +620,15 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     // ── Call ended ──────────────────────────────────────────────
+    // We DON'T post a call-record system message here. The peer who
+    // initiated the hangup already posted one via their endCall()
+    // codepath, and the backend broadcasts that as a normal Message
+    // (received by both of us via receive_message). If we ALSO posted
+    // one here we'd get two identical "Voice call 0:28" entries — see
+    // bug report from 2026-05-26.
     const onCallEnded = (data: { byUserId: string }) => {
       if (callStateRef.current === 'idle') return;
       console.log('[call] Call ended by:', data.byUserId);
-
-      const durationSecs = callStartTimeRef.current > 0
-        ? Math.floor((Date.now() - callStartTimeRef.current) / 1000)
-        : 0;
-      postCallRecord(durationSecs, callTypeRef.current || 'voice');
       cleanup();
     };
 
