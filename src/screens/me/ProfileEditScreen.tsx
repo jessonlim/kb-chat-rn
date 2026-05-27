@@ -34,6 +34,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [about, setAbout] = useState(user?.about || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarFileName, setAvatarFileName] = useState('');
   const [avatarMimeType, setAvatarMimeType] = useState('');
@@ -104,18 +105,21 @@ const ProfileEditScreen = ({ navigation }: Props) => {
 
     setSaving(true);
     try {
+      // Trim phone but allow empty string (= clear phone)
+      const trimmedPhone = phone.trim();
       let result;
       if (avatarUri) {
         result = await userService.updateProfileWithAvatar(
           avatarUri,
           avatarFileName,
           avatarMimeType,
-          { displayName: trimmedName, about: about.trim() }
+          { displayName: trimmedName, about: about.trim(), phone: trimmedPhone }
         );
       } else {
         result = await userService.updateProfile({
           displayName: trimmedName,
           about: about.trim(),
+          phone: trimmedPhone,
         });
       }
 
@@ -133,6 +137,7 @@ const ProfileEditScreen = ({ navigation }: Props) => {
   const hasChanges =
     displayName.trim() !== (user?.displayName || '') ||
     about.trim() !== (user?.about || '') ||
+    phone.trim() !== (user?.phone || '') ||
     avatarUri !== null;
 
   return (
@@ -188,6 +193,22 @@ const ProfileEditScreen = ({ navigation }: Props) => {
             textAlignVertical="top"
           />
           <Text style={styles.charCount}>{about.length}/200</Text>
+        </View>
+
+        {/* Phone — optional. Used so friends who have your number in
+            their address book can find you via "Find from Contacts". */}
+        <View style={styles.field}>
+          <Text style={styles.label}>{t('profile.phoneLabel')}</Text>
+          <TextInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder={t('profile.phonePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            keyboardType="phone-pad"
+            maxLength={30}
+          />
+          <Text style={styles.charCount}>{t('profile.phoneHelp')}</Text>
         </View>
 
         {/* Save button */}

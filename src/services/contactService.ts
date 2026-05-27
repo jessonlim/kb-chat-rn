@@ -56,6 +56,24 @@ const contactService = {
     );
     return data;
   },
+
+  /**
+   * POST /api/contacts/match-phones
+   * Pass an array of raw phone-book numbers. Backend hashes them and
+   * returns any registered users whose stored phoneHash matches.
+   */
+  matchPhones: async (phones: string[]): Promise<{
+    matches: Array<{
+      id: string;
+      username: string;
+      displayName: string;
+      avatar: string;
+      phoneHashHex: string;
+    }>;
+  }> => {
+    const { data } = await api.post('/api/contacts/match-phones', { phones });
+    return data;
+  },
 };
 
 export default contactService;

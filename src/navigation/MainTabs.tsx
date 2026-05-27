@@ -36,6 +36,7 @@ import MyQRScreen from '../screens/me/MyQRScreen';
 import HiddenChatsScreen from '../screens/me/HiddenChatsScreen';
 import ScanQRScreen from '../screens/common/ScanQRScreen';
 import SetRemarkScreen from '../screens/contacts/SetRemarkScreen';
+import FindFromContactsScreen from '../screens/contacts/FindFromContactsScreen';
 import TagsScreen from '../screens/contacts/TagsScreen';
 import GlobalSearchScreen from '../screens/common/GlobalSearchScreen';
 import { useT } from '../i18n/I18nContext';
@@ -237,6 +238,11 @@ const ContactsStackScreen = () => {
         name="SetRemark"
         component={SetRemarkScreen as any}
         options={{ title: t('remark.title') }}
+      />
+      <ContactsStack.Screen
+        name="FindFromContacts"
+        component={FindFromContactsScreen as any}
+        options={{ title: t('findContacts.title') }}
       />
       <ContactsStack.Screen
         name="Tags"

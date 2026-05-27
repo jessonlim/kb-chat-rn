@@ -7,6 +7,8 @@ export interface User {
   about: string;
   isOnline: boolean;
   lastSeen: string;
+  /** Optional — only set if the user added their phone to enable contact discovery */
+  phone?: string;
 }
 
 export interface Chat {

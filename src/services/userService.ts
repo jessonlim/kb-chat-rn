@@ -8,6 +8,8 @@ interface UserProfileResponse {
 interface UpdateProfileBody {
   displayName?: string;
   about?: string;
+  /** Optional — phone number used for contact discovery. Pass "" to clear. */
+  phone?: string;
 }
 
 const userService = {

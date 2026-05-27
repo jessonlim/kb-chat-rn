@@ -28,7 +28,7 @@ import type { FriendRequest, User } from '../../types';
 // Cached relationship status per user, used to render the right action.
 type Status = 'none' | 'pending' | 'incoming' | 'friend' | 'self' | 'blocked' | 'loading';
 
-const NewFriendsScreen = () => {
+const NewFriendsScreen = ({ navigation }: { navigation: any }) => {
   const { user: me } = useAuth();
   const { t } = useT();
   const { colors } = useTheme();
@@ -277,6 +277,22 @@ const NewFriendsScreen = () => {
         )}
       </View>
 
+      {/* Find friends from your phone contacts */}
+      <TouchableOpacity
+        style={styles.findFromContactsRow}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('FindFromContacts')}
+      >
+        <View style={styles.findFromContactsIcon}>
+          <Ionicons name="people-circle-outline" size={24} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.findFromContactsTitle}>{t('findContacts.title')}</Text>
+          <Text style={styles.findFromContactsSubtitle}>{t('findContacts.subtitle')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </TouchableOpacity>
+
       <FlatList
         data={hasSearched ? results : []}
         keyExtractor={(u) => u.id}
@@ -413,6 +429,34 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     fontSize: fontSize.md,
     color: colors.textPrimary,
     paddingVertical: 4,
+  },
+  // "Find from phone contacts" entry point
+  findFromContactsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bgCard,
+    marginBottom: spacing.md,
+  },
+  findFromContactsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#22c55e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  findFromContactsTitle: {
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  findFromContactsSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   // Search results
   searchRow: {

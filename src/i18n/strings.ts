@@ -260,6 +260,9 @@ export const STRINGS = {
   'profile.displayNameRequired': { en: 'Display name is required', zh: '请输入昵称' },
   'profile.aboutLabel':       { en: 'About',          zh: '个性签名' },
   'profile.aboutPlaceholder': { en: 'A short bio',    zh: '简介一下自己' },
+  'profile.phoneLabel':       { en: 'Phone',          zh: '手机号' },
+  'profile.phonePlaceholder': { en: '+60 12 345 6789', zh: '+86 138 0000 0000' },
+  'profile.phoneHelp':        { en: 'Optional. Lets friends find you from their contacts.', zh: '选填。让朋友通过通讯录找到你。' },
   'profile.profileUpdated':   { en: 'Profile updated', zh: '资料已更新' },
   'profile.failedToSave':     { en: 'Failed to save', zh: '保存失败' },
 
@@ -528,6 +531,18 @@ export const STRINGS = {
   'camera.retake':            { en: 'Retake',               zh: '重拍' },
   'camera.cantStart':         { en: 'Could not start camera', zh: '无法启动相机' },
   'camera.permissionDenied':  { en: 'Camera permission denied', zh: '相机权限被拒绝' },
+
+  // Find friends from phone contacts
+  'findContacts.title':          { en: 'Find friends from contacts',     zh: '从手机通讯录找朋友' },
+  'findContacts.subtitle':       { en: 'See who already uses KB Chat',   zh: '看看通讯录里谁在用 KB Chat' },
+  'findContacts.scanning':       { en: 'Scanning your contacts…',        zh: '正在扫描通讯录...' },
+  'findContacts.permissionDenied': { en: 'Permission denied. Enable Contacts access in your phone settings to find friends.', zh: '未授权访问通讯录。请在系统设置中开启权限。' },
+  'findContacts.openSettings':   { en: 'Open Settings',                  zh: '打开设置' },
+  'findContacts.noContacts':     { en: 'No contacts found on your phone', zh: '通讯录中没有联系人' },
+  'findContacts.noMatches':      { en: 'None of your {n} contacts are on KB Chat yet', zh: '通讯录的 {n} 位联系人都还没注册 KB Chat' },
+  'findContacts.shareAppHint':   { en: 'Invite friends to join — once they sign up with their phone number they\'ll show up here.', zh: '邀请朋友加入 — 他们用手机号注册后会出现在这里。' },
+  'findContacts.foundMatches':   { en: '{n} of your {total} contacts on KB Chat', zh: '通讯录中 {total} 位联系人，{n} 位已在 KB Chat' },
+  'findContacts.savedAs':        { en: 'Saved as {name}',                zh: '通讯录中：{name}' },
 
   // Group QR + extra ChatInfo strings
   'group.qr.title':           { en: 'Group QR Code',        zh: '群二维码' },
