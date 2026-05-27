@@ -32,11 +32,7 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "// appleId": "Apple ID email — eas-cli will prompt + save on first run",
-        "// ascAppId": "App Store Connect App ID — from appstoreconnect.apple.com after creating the app",
-        "// appleTeamId": "Apple Developer Team ID — from developer.apple.com membership page"
-      }
+      "ios": {}
     }
   }
 }
