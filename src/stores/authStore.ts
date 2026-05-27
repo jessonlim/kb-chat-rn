@@ -6,6 +6,7 @@ import { storage } from '../services/api';
 import * as authService from '../services/authService';
 import socketService from '../services/socketService';
 import notificationService from '../services/notificationService';
+import { setSentryUser, clearSentryUser } from '../services/sentry';
 import type { User } from '../types';
 
 interface AuthState {
@@ -43,6 +44,7 @@ export const useAuthProvider = () => {
         }
         const { user: me } = await authService.getMe();
         setUser(me);
+        setSentryUser(me);
         socketService.connect();
       } catch {
         // Token expired or invalid — clear it
@@ -78,6 +80,7 @@ export const useAuthProvider = () => {
     storage.set('accessToken', res.accessToken);
     storage.set('refreshToken', res.refreshToken);
     setUser(res.user);
+    setSentryUser(res.user);
     socketService.connect();
   }, []);
 
@@ -91,6 +94,7 @@ export const useAuthProvider = () => {
     storage.set('accessToken', res.accessToken);
     storage.set('refreshToken', res.refreshToken);
     setUser(res.user);
+    setSentryUser(res.user);
     socketService.connect();
   }, []);
 
@@ -107,6 +111,7 @@ export const useAuthProvider = () => {
     storage.delete('refreshToken');
     socketService.disconnect();
     setUser(null);
+    clearSentryUser();
   }, []);
 
   const updateUser = useCallback((updates: Partial<User>) => {

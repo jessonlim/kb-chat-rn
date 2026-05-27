@@ -41,7 +41,8 @@
         {
           "statusBarColor": "#000000"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
@@ -98,7 +99,10 @@
               "pathPrefix": "/u/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },

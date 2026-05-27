@@ -16,8 +16,14 @@ import RootNavigator from './src/navigation/RootNavigator';
 import CallScreen from './src/components/call/CallScreen';
 import IncomingCallOverlay from './src/components/call/IncomingCallOverlay';
 import GroupCallScreen from './src/components/call/GroupCallScreen';
+import { Sentry, initSentry } from './src/services/sentry';
 
-export default function App() {
+// Initialise Sentry as early as possible — before any React code runs —
+// so we catch crashes during initial render too. The init is a no-op if
+// no DSN is configured (e.g. in development without env vars).
+initSentry();
+
+function App() {
   const auth = useAuthProvider();
 
   // Initialize push notifications when logged in
@@ -51,3 +57,10 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+// Sentry.wrap(App) auto-installs an ErrorBoundary that captures and
+// reports any uncaught render errors to Sentry, then shows a fallback
+// UI. Without this wrap, render-time crashes would still report (via
+// the unhandled exception integration) but the user would see a blank
+// white screen instead of a "Something went wrong" message.
+export default Sentry.wrap(App);
