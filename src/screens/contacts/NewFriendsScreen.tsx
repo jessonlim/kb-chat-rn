@@ -277,11 +277,41 @@ const NewFriendsScreen = ({ navigation }: { navigation: any }) => {
         )}
       </View>
 
-      {/* Find friends from your phone contacts */}
+      {/* Find friends from your phone contacts.
+          NOTE: requires expo-contacts native module which is queued for
+          Build #20. Until that build is installed, tapping crashes the
+          app (the JS shim resolves but calling its methods hits a missing
+          native binding). We probe react-native's NativeModules registry
+          to decide whether to navigate or show a friendly message. */}
       <TouchableOpacity
         style={styles.findFromContactsRow}
         activeOpacity={0.7}
-        onPress={() => navigation.navigate('FindFromContacts')}
+        onPress={() => {
+          // require lazily so the import never executes on builds that
+          // don't have the native side
+          let hasNative = false;
+          try {
+            const { NativeModules } = require('react-native');
+            // Expo's native module is registered under several possible
+            // names depending on SDK version — probe all the candidates.
+            hasNative =
+              !!NativeModules.ExpoContacts ||
+              !!NativeModules.ExponentContacts ||
+              !!NativeModules.RNCContacts;
+          } catch {
+            hasNative = false;
+          }
+          if (hasNative) {
+            navigation.navigate('FindFromContacts');
+          } else {
+            Toast.show({
+              type: 'info',
+              text1: 'Feature coming in the next app version',
+              text2: 'Reinstall the latest APK from your tester invite to enable contact discovery.',
+              visibilityTime: 5000,
+            });
+          }
+        }}
       >
         <View style={styles.findFromContactsIcon}>
           <Ionicons name="people-circle-outline" size={24} color="#fff" />
