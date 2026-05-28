@@ -2,7 +2,10 @@
 // Uses React Context (same pattern as the Capacitor app).
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import Toast from 'react-native-toast-message';
 import { storage } from '../services/api';
+import { authEvents } from '../services/authEvents';
+import { tStatic } from '../i18n/I18nContext';
 import * as authService from '../services/authService';
 import socketService from '../services/socketService';
 import notificationService from '../services/notificationService';
@@ -74,6 +77,32 @@ export const useAuthProvider = () => {
     socket.on('force_logout', onForceLogout);
     return () => { socket.off('force_logout', onForceLogout); };
   }, [user]);
+
+  // Listen for `session_expired` from the axios refresh interceptor.
+  // Triggered when the refresh-token flow gives up (M8 fix). Without
+  // this subscription, the interceptor would clear tokens silently and
+  // leave the auth state still believing the user was logged in,
+  // producing a permanently broken shell.
+  useEffect(() => {
+    const off = authEvents.on('session_expired', () => {
+      // Defensive — tokens are usually already cleared by the
+      // interceptor, but call delete again so a future refactor
+      // that fires this event from elsewhere can rely on a clean
+      // state.
+      storage.delete('accessToken');
+      storage.delete('refreshToken');
+      socketService.disconnect();
+      clearSentryUser();
+      setUser(null);
+      Toast.show({
+        type: 'error',
+        text1: tStatic('auth.sessionExpired'),
+        text2: tStatic('auth.signInAgain'),
+        visibilityTime: 5000,
+      });
+    });
+    return off;
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authService.login({ email, password });

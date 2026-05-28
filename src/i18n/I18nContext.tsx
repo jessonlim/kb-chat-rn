@@ -61,3 +61,25 @@ export const useT = () => {
   if (!ctx) throw new Error('useT must be used within I18nProvider');
   return ctx;
 };
+
+/**
+ * Non-React translation helper. Reads the current language directly
+ * from MMKV and picks the right string. Useful in non-component code
+ * (axios interceptors, event handlers, native module callbacks) that
+ * can't call the `useT` hook but still needs to surface a translated
+ * string to the user.
+ *
+ * NOTE: this snapshots the language at call time. If the user changes
+ * language mid-session the result reflects the new language on the
+ * NEXT call, not retroactively. That's fine for one-shot toasts.
+ */
+export const tStatic = (
+  key: StringKey,
+  vars?: Record<string, string | number>
+): string => {
+  const entry = STRINGS[key];
+  if (!entry) return key;
+  const lang = loadLang();
+  const template = entry[lang] ?? entry.en;
+  return interpolate(template, vars);
+};
