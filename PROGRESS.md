@@ -150,6 +150,7 @@ The RN client now expects (and falls back gracefully from) these endpoints:
 
 | Update ID | Date | What |
 |---|---|---|
+| `019e6feb` | 2026-05-29 | **M8 fix** — Refresh-token loop guard. 2 failures in 60s → emit `session_expired` → auth store force-logout + toast |
 | `019e6fc0` | 2026-05-29 | **Quick-wins audit batch** — Sentry PII scrub, ack timeouts, null-socket UX, push-tap guard, ChatScreen goBack on load fail |
 | `019e6ef2` | 2026-05-28 | Sentry crash reporting wired in (DSN + auth token via EAS env vars) |
 | `019e6013` | 2026-05-28 | Font size visual button refactor + misc UX |
@@ -164,19 +165,19 @@ See:
 - `AUDIT_BACKEND.md` (in `../MekaMessage/`) — Express/Mongo/Socket.IO findings
 
 **🔴 Blockers before public launch (still pending):**
-- M1 — JWT tokens stored unencrypted in MMKV (token migration needed)
 - M4 — Multiple eager native-module imports could brick existing APKs on future OTA updates (lazy-require pattern needed in CallContext, GroupCallContext, CallScreen, GroupCallScreen, callkeepService, notificationService, LocationPicker, ScanQRScreen)
-- M8 — Refresh-token loop on permanent failure (auth interceptor needs to give up gracefully)
 - **Legal docs missing** — Privacy Policy + Terms of Service URLs in About screen point to `kb-chat.com/privacy` and `/terms` which redirect to the blank app shell. Both stores will reject the app at review without these. Need to ship 2 static pages on the web app before submitting.
 - B1–B5 backend blockers — see AUDIT_BACKEND.md
 
-**🟢 Shipped this session (via Update `019e6fc0`):**
-- M2 — Sentry `sendDefaultPii: false` + `beforeBreadcrumb` drops auth-route XHR/fetch entirely + scrubs Authorization/Cookie headers and bodies elsewhere
-- M3 — Sentry `beforeSend` recursive scrub of `password|refreshToken|accessToken|token|phone` + drops `event.user.email` (GDPR/PDPA)
-- M5 — 15s ack timeouts on `handleSendAttachment` + `handleSendStructured` (text already had it)
-- M6 — All four send paths now drop a `status:'failed'` bubble + toast "no connection" when socket is null at send time
-- M7 — ChatScreen toasts + goBack on load failure (chat deleted on other device, kicked from group, etc.)
-- M9 — Push-tap navigation wrapped in try/catch, falls back to ChatsTab root
+**🟢 Shipped this session:**
+- M2 — Sentry `sendDefaultPii: false` + `beforeBreadcrumb` drops auth-route XHR/fetch entirely + scrubs Authorization/Cookie headers and bodies elsewhere (OTA `019e6fc0`)
+- M3 — Sentry `beforeSend` recursive scrub of `password|refreshToken|accessToken|token|phone` + drops `event.user.email` (GDPR/PDPA) (OTA `019e6fc0`)
+- M5 — 15s ack timeouts on `handleSendAttachment` + `handleSendStructured` (text already had it) (OTA `019e6fc0`)
+- M6 — All four send paths now drop a `status:'failed'` bubble + toast "no connection" when socket is null at send time (OTA `019e6fc0`)
+- M7 — ChatScreen toasts + goBack on load failure (chat deleted on other device, kicked from group, etc.) (OTA `019e6fc0`)
+- M9 — Push-tap navigation wrapped in try/catch, falls back to ChatsTab root (OTA `019e6fc0`)
+- M8 — Refresh-token failure counter (2 strikes in 60s) emits `session_expired` → auth store clears state + toast (OTA `019e6feb`)
+- M1 — JWT tokens now encrypted at rest in a separate MMKV instance, key stored in OS Keychain/Keystore via expo-secure-store. Plaintext-to-encrypted migration runs on first launch with this build (Build #21 — native build)
 
 ## EAS account
 - Plan: **Starter** (upgraded 2026-05-25 from Free tier when monthly quota hit)

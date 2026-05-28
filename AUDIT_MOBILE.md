@@ -24,23 +24,11 @@ Severity legend:
 
 ### 🔴 Blockers
 
-#### M1 — JWT tokens stored unencrypted in MMKV
-**File:** `src/services/api.ts`, `src/stores/authStore.ts`
-**Risk:** A rooted Android device or a backup-restore tool can read the MMKV file at `/data/data/com.kbchat.app/files/mmkv/` and exfiltrate the access + refresh token, gaining full account access for the token's lifetime (and refreshing forever).
-**Fix:** Wrap MMKV in `react-native-mmkv` v2's encryption mode (`new MMKV({ encryptionKey: ... })`) with a key fetched from `expo-secure-store` (Keychain / Keystore). Migration plan: on first launch after the update, copy the old plaintext entries into the new encrypted store, then delete the plaintext store.
-**Effort:** 3-4 hours (small surface, but auth migration needs careful testing — a bug here logs every existing user out).
-
 #### M4 — Eager native-module imports brick OTA updates
 **Files:** `src/services/callkeepService.ts`, `src/context/CallContext.tsx`, `src/context/GroupCallContext.tsx`, `src/screens/calls/CallScreen.tsx`, `src/screens/calls/GroupCallScreen.tsx`, `src/services/notificationService.ts`, `src/components/chat/LocationPicker.tsx`, `src/screens/contacts/ScanQRScreen.tsx`.
 **Risk:** When we ship an EAS Update that imports a *new* native module the user's APK doesn't have, the entry point crashes immediately on launch (red screen → app force-close). We've already lost an APK to this pattern once when `expo-contacts` was added. The lazy `require()` pattern used in `FindFromContactsScreen.tsx` is the safe pattern — every screen that uses a native module should follow it.
 **Fix:** Audit every screen + service for top-level imports of `livekit-client`, `@livekit/react-native`, `@livekit/react-native-webrtc`, `react-native-incall-manager`, `react-native-full-screen-notification-incoming-call`, `expo-location`, `expo-camera`, `expo-notifications`, `expo-contacts`, `react-native-svg`. Convert to lazy `require()` inside the function body. Guard component entry points with a `NativeModules` registry probe.
 **Effort:** 1 day. Touches ~8 files, needs careful testing of every native flow afterwards.
-
-#### M8 — Refresh-token loop on permanent failure
-**File:** `src/services/api.ts`
-**Risk:** When the refresh token genuinely expires (account deletion, server-side revocation), the axios interceptor retries the refresh forever, hammering the backend and leaving the user on a permanent loading spinner.
-**Fix:** Track refresh-attempt count in a closure variable. After 2 consecutive 401s on the refresh endpoint, clear tokens + force-logout the user. Toast "session expired, please sign in again."
-**Effort:** 1 hour.
 
 #### Legal docs missing — blocks app store submission
 **Confirmed missing:** Both `https://www.kb-chat.com/privacy` and `https://www.kb-chat.com/terms` redirect to the blank app shell (the React Router catch-all). The "Privacy" link in the About screen looks like it works but lands on the login screen.
@@ -94,22 +82,22 @@ Severity legend:
 
 ## Closed in this session
 
-| ID | What | How |
-|---|---|---|
-| M2 | Sentry breadcrumb leaks auth POST bodies | `beforeBreadcrumb` drops `/api/auth/*` XHR entirely + scrubs Authorization/Cookie from rest |
-| M3 | Sentry attaches user email to events | Removed email from `setSentryUser` signature + `beforeSend` strips it from `event.user` |
-| M5 | Attachment/sticker/location/contact sends have no ack timeout | Added 15s setTimeout → flips to `status:'failed'` |
-| M6 | Send paths bail silently when socket is null | All four send paths now drop a `status:'failed'` bubble + toast |
-| M7 | ChatScreen blank on load failure | Toast + `navigation.goBack()` in load `useEffect` catch |
-| M9 | Push tap navigates blindly to chat that may not exist | Wrapped navigate in try/catch, falls back to ChatsTab root |
-
-Shipped via EAS Update `019e6fc0` (commit `b69a68d`) on 2026-05-29.
+| ID | What | How | Ship |
+|---|---|---|---|
+| M2 | Sentry breadcrumb leaks auth POST bodies | `beforeBreadcrumb` drops `/api/auth/*` XHR entirely + scrubs Authorization/Cookie from rest | OTA `019e6fc0` |
+| M3 | Sentry attaches user email to events | Removed email from `setSentryUser` signature + `beforeSend` strips it from `event.user` | OTA `019e6fc0` |
+| M5 | Attachment/sticker/location/contact sends have no ack timeout | Added 15s setTimeout → flips to `status:'failed'` | OTA `019e6fc0` |
+| M6 | Send paths bail silently when socket is null | All four send paths now drop a `status:'failed'` bubble + toast | OTA `019e6fc0` |
+| M7 | ChatScreen blank on load failure | Toast + `navigation.goBack()` in load `useEffect` catch | OTA `019e6fc0` |
+| M9 | Push tap navigates blindly to chat that may not exist | Wrapped navigate in try/catch, falls back to ChatsTab root | OTA `019e6fc0` |
+| M8 | Refresh-token loop on permanent failure | Failure counter (2 strikes in 60s) → `session_expired` event → auth store force-logout + toast | OTA `019e6feb` |
+| M1 | JWT tokens stored unencrypted in MMKV | New `secureStorage` module wraps a second MMKV with AES-CBC, key in expo-secure-store (Keystore/Keychain). Plaintext tokens migrate on first launch + plain copies deleted | Build #21 (native build — expo-secure-store + expo-crypto added) |
 
 ---
 
 ## Recommended sequencing for blockers
 
-1. **Week 1** — M1 (encrypted MMKV) + M8 (refresh loop) — both auth security, can ship as one EAS Update.
-2. **Week 1** — Legal docs on the web app (no native code change, no EAS Update needed). Independent of #1.
+1. ~~**Week 1** — M1 (encrypted MMKV) + M8 (refresh loop)~~ ✅ **DONE 2026-05-29**. M8 shipped as OTA `019e6feb`. M1 in Build #21 (in-flight as of 2026-05-29).
+2. **Week 1** — Legal docs on the web app (no native code change, no EAS Update needed). Pure web work.
 3. **Week 2** — M4 (lazy native imports) — requires careful screen-by-screen testing. Ship as a single Update after a full QA pass.
 4. **Week 3+** — 🟡 items in priority order: M13 (GDPR — paired with backend B7) → M10 (push UX) → M14 (reporting) → M12 (storage) → M11 (upload retries) → M15 (cold-start perf).
