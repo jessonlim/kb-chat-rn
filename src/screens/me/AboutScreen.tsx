@@ -15,6 +15,8 @@ import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { useEasUpdateInfo } from '../../hooks/useEasUpdateInfo';
+import Toast from 'react-native-toast-message';
+import { Sentry } from '../../services/sentry';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
@@ -99,6 +101,48 @@ const AboutScreen = () => {
               <Text style={styles.applyBtnText}>Apply</Text>
             </TouchableOpacity>
           )}
+        </TouchableOpacity>
+
+        {/* Sentry test row — fires a controlled event so we can verify
+            crash reporting is wired up on a fresh install. Should disappear
+            from the dashboard within ~30s if everything is working. */}
+        <TouchableOpacity
+          style={[styles.row, styles.rowBorder]}
+          activeOpacity={0.7}
+          onPress={() => {
+            try {
+              Sentry.captureMessage('Sentry test — manually triggered from About screen', 'info');
+              Toast.show({
+                type: 'success',
+                text1: '✅ Sent to Sentry',
+                text2: 'Check the dashboard in 30s — issue title: "Sentry test — …"',
+                visibilityTime: 5000,
+              });
+            } catch (err) {
+              Toast.show({
+                type: 'error',
+                text1: 'Sentry not initialised',
+                text2: 'Build #19+ required — DSN was missing on older builds',
+                visibilityTime: 5000,
+              });
+            }
+          }}
+          onLongPress={() => {
+            // Long-press → throw a real exception so we can verify stack
+            // trace handling end-to-end. Wrapped in setTimeout so React's
+            // error boundary doesn't unmount the About screen.
+            setTimeout(() => {
+              throw new Error('Sentry test — uncaught exception from About screen');
+            }, 0);
+          }}
+        >
+          <Ionicons name="warning-outline" size={22} color={colors.danger} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowLabel}>Test Sentry</Text>
+            <Text style={styles.rowSubLabel}>
+              Tap = send test event · long-press = throw real exception
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
