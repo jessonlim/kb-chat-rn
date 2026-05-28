@@ -1,5 +1,16 @@
 // API client with token interceptor and auto-refresh.
 // Same pattern as the Capacitor app, adapted for React Native (MMKV storage).
+//
+// Token storage uses the encrypted `secureStorage` module (audit M1).
+// `storage` (the plain MMKV) is kept for everything else — theme,
+// language, caches, etc. — where encryption would be overhead without
+// benefit.
+//
+// NOTE on import ordering: secureStorage imports `storage` from this
+// file, so we can't import secureStorage at the top here without a
+// cycle. We use a lazy import inside the interceptor instead. The
+// auth store and other call sites use the eager import path which
+// resolves the cycle through module evaluation order.
 
 import axios from 'axios';
 import { MMKV } from 'react-native-mmkv';
@@ -17,7 +28,10 @@ const api = axios.create({
 
 // ── Request interceptor: attach access token ──────────────────────────
 api.interceptors.request.use((config) => {
-  const token = storage.getString('accessToken');
+  // Lazy require to break the circular import (secureStorage -> api.storage).
+  // After first call this is a cached module lookup, ~free.
+  const { secureStorage } = require('./secureStorage');
+  const token = secureStorage.getToken('accessToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -53,8 +67,8 @@ const declareSessionDead = () => {
   sessionExpiredEmitted = true;
   // Clear tokens defensively — the catch block below already does this
   // but the latch path may have come from somewhere else.
-  storage.delete('accessToken');
-  storage.delete('refreshToken');
+  const { secureStorage } = require('./secureStorage');
+  secureStorage.clearAll();
   authEvents.emit('session_expired');
 };
 
@@ -90,15 +104,16 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const refreshToken = storage.getString('refreshToken');
+      const { secureStorage } = require('./secureStorage');
+      const refreshToken = secureStorage.getToken('refreshToken');
       if (!refreshToken) throw new Error('No refresh token');
 
       const { data } = await axios.post(`${API_URL}/api/auth/refresh`, {
         refreshToken,
       });
 
-      storage.set('accessToken', data.accessToken);
-      storage.set('refreshToken', data.refreshToken);
+      secureStorage.setToken('accessToken', data.accessToken);
+      secureStorage.setToken('refreshToken', data.refreshToken);
 
       // Success — reset the failure tracker so we don't carry old
       // failures forward into a fresh, healthy session.
@@ -132,8 +147,8 @@ api.interceptors.response.use(
         // queued behind stale state, but don't force-logout yet. The
         // refresh might just be racing a transient network issue and
         // the next request will succeed.
-        storage.delete('accessToken');
-        storage.delete('refreshToken');
+        const { secureStorage } = require('./secureStorage');
+        secureStorage.clearAll();
       }
 
       return Promise.reject(refreshError);

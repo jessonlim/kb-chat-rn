@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import Toast from 'react-native-toast-message';
 import { storage } from '../services/api';
 import { authEvents } from '../services/authEvents';
+import { secureStorage, initSecureStorage } from '../services/secureStorage';
 import { tStatic } from '../i18n/I18nContext';
 import * as authService from '../services/authService';
 import socketService from '../services/socketService';
@@ -40,7 +41,15 @@ export const useAuthProvider = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const token = storage.getString('accessToken');
+        // Initialise encryption + run plaintext-token migration BEFORE
+        // we try to read any token. On first launch with this build,
+        // initSecureStorage moves the existing access/refresh tokens
+        // from plain MMKV into the encrypted instance and deletes the
+        // plaintext copies. Subsequent launches just open the
+        // encrypted instance.
+        await initSecureStorage();
+
+        const token = secureStorage.getToken('accessToken');
         if (!token) {
           setLoading(false);
           return;
@@ -51,8 +60,7 @@ export const useAuthProvider = () => {
         socketService.connect();
       } catch {
         // Token expired or invalid — clear it
-        storage.delete('accessToken');
-        storage.delete('refreshToken');
+        secureStorage.clearAll();
       } finally {
         setLoading(false);
       }
@@ -67,8 +75,7 @@ export const useAuthProvider = () => {
     if (!socket) return;
 
     const onForceLogout = () => {
-      storage.delete('accessToken');
-      storage.delete('refreshToken');
+      secureStorage.clearAll();
       socketService.disconnect();
       setUser(null);
       // Toast will be shown by the component that handles this
@@ -86,11 +93,9 @@ export const useAuthProvider = () => {
   useEffect(() => {
     const off = authEvents.on('session_expired', () => {
       // Defensive — tokens are usually already cleared by the
-      // interceptor, but call delete again so a future refactor
-      // that fires this event from elsewhere can rely on a clean
-      // state.
-      storage.delete('accessToken');
-      storage.delete('refreshToken');
+      // interceptor, but call again so a future refactor that
+      // fires this event from elsewhere can rely on a clean state.
+      secureStorage.clearAll();
       socketService.disconnect();
       clearSentryUser();
       setUser(null);
@@ -106,8 +111,8 @@ export const useAuthProvider = () => {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authService.login({ email, password });
-    storage.set('accessToken', res.accessToken);
-    storage.set('refreshToken', res.refreshToken);
+    secureStorage.setToken('accessToken', res.accessToken);
+    secureStorage.setToken('refreshToken', res.refreshToken);
     setUser(res.user);
     setSentryUser(res.user);
     socketService.connect();
@@ -120,8 +125,8 @@ export const useAuthProvider = () => {
     displayName?: string;
   }) => {
     const res = await authService.register(data);
-    storage.set('accessToken', res.accessToken);
-    storage.set('refreshToken', res.refreshToken);
+    secureStorage.setToken('accessToken', res.accessToken);
+    secureStorage.setToken('refreshToken', res.refreshToken);
     setUser(res.user);
     setSentryUser(res.user);
     socketService.connect();
@@ -136,8 +141,7 @@ export const useAuthProvider = () => {
     } catch {
       // Best-effort — even if the API call fails, still clear local state
     }
-    storage.delete('accessToken');
-    storage.delete('refreshToken');
+    secureStorage.clearAll();
     socketService.disconnect();
     setUser(null);
     clearSentryUser();

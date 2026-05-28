@@ -48,7 +48,8 @@
           "statusBarColor": "#000000"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-secure-store"
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
