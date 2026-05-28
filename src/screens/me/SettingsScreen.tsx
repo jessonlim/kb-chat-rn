@@ -242,7 +242,12 @@ const SettingsScreen = ({ navigation }: Props) => {
                 activeOpacity={0.7}
                 onPress={() => setFontScale(opt)}
               >
-                <Text style={[styles.segmentText, fontScale === opt && styles.segmentTextActive]}>
+                <Text
+                  style={[styles.segmentText, fontScale === opt && styles.segmentTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
                   {t(labelKey as any)}
                 </Text>
               </TouchableOpacity>
@@ -507,10 +512,18 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     gap: 4,
   },
   segment: {
+    // flex-basis 0 forces all segments to share the width equally
+    // regardless of how long their text is. Without this, longer-text
+    // segments grew and shorter ones (like "Small") shrank to a circle
+    // when the active background was applied.
     flex: 1,
+    flexBasis: 0,
     paddingVertical: 8,
-    borderRadius: borderRadius.full,
+    paddingHorizontal: 4,
+    // Pill shape but capped so a narrow segment doesn't become a circle
+    borderRadius: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   segmentActive: {
     backgroundColor: colors.primary,

@@ -774,7 +774,7 @@ export const STRINGS = {
   'font.small':               { en: 'Small',                       zh: '小' },
   'font.medium':              { en: 'Medium',                      zh: '中' },
   'font.large':               { en: 'Large',                       zh: '大' },
-  'font.xlarge':              { en: 'Extra large',                 zh: '特大' },
+  'font.xlarge':              { en: 'X-Large',                     zh: '特大' },
   'font.preview':             { en: 'The quick brown fox',         zh: '示例文字大小' },
 
   // Tags for contacts
