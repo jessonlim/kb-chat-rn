@@ -25,9 +25,32 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import * as Contacts from 'expo-contacts';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+// IMPORTANT: expo-contacts is a NATIVE module. If we eagerly
+// `import * as Contacts from 'expo-contacts'` at the top, EVERY build
+// that loads this JS bundle will try to resolve the native module at
+// startup. On builds that don't have the module installed (e.g. older
+// preview APKs predating the contacts feature), the require fails and
+// the entire app crashes on launch — there's no chance for the OTA
+// update system to recover because the JS that fetches updates is the
+// same JS that just crashed.
+//
+// Workaround: lazy-load via require() inside loadContactsModule, which
+// is only called AFTER this screen actually mounts. So users on older
+// builds get a clean error instead of an app-killing crash.
+type ContactsModule = typeof import('expo-contacts');
+let _contactsModule: ContactsModule | null = null;
+const loadContactsModule = (): ContactsModule | null => {
+  if (_contactsModule) return _contactsModule;
+  try {
+    _contactsModule = require('expo-contacts');
+    return _contactsModule;
+  } catch (err) {
+    console.warn('[FindFromContacts] expo-contacts not available:', err);
+    return null;
+  }
+};
 import contactService from '../../services/contactService';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
@@ -48,7 +71,7 @@ interface MatchedUser {
   contactName?: string;
 }
 
-type Status = 'idle' | 'loading' | 'denied' | 'noContacts' | 'noPhone' | 'matched';
+type Status = 'idle' | 'loading' | 'denied' | 'noContacts' | 'noPhone' | 'matched' | 'unsupported';
 
 const FindFromContactsScreen = ({ navigation }: Props) => {
   const { t } = useT();
@@ -63,6 +86,16 @@ const FindFromContactsScreen = ({ navigation }: Props) => {
 
   const runMatch = useCallback(async () => {
     setStatus('loading');
+
+    // Step 0: load the native module lazily. On builds that don't have
+    // expo-contacts installed (older APKs) this returns null and we
+    // surface a friendly "rebuild required" message instead of crashing.
+    const Contacts = loadContactsModule();
+    if (!Contacts) {
+      setStatus('unsupported');
+      return;
+    }
+
     try {
       // Step 1: ask permission
       const { status: permStatus } = await Contacts.requestPermissionsAsync();
@@ -213,6 +246,18 @@ const FindFromContactsScreen = ({ navigation }: Props) => {
         >
           <Text style={styles.retryText}>{t('findContacts.openSettings')}</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (status === 'unsupported') {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Ionicons name="construct-outline" size={48} color={colors.textMuted} />
+        <Text style={styles.centerText}>
+          This feature needs the next app update. Reinstall the latest APK from your
+          tester invite to enable contact discovery.
+        </Text>
       </View>
     );
   }
