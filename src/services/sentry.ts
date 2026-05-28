@@ -49,17 +49,83 @@ export const initSentry = (): boolean => {
     // Don't ship sourcemaps + spans to Sentry from Metro dev runs — only
     // standalone builds. Saves your free-tier event quota during dev.
     enabled: !__DEV__,
+    // PII / secret scrubbing — without these filters Sentry would auto-
+    // capture HTTP request/response bodies as breadcrumbs, which means
+    // any crash within 100 breadcrumbs of a login attempt would ship the
+    // user's password to our dashboard. Same for refresh tokens, change-
+    // password, delete-account. Filter the breadcrumbs at source AND
+    // double-check on send.
+    sendDefaultPii: false,
+    beforeBreadcrumb(breadcrumb) {
+      // Drop axios/fetch breadcrumbs for sensitive auth endpoints
+      // entirely — we don't need to know the URL was hit, the stack
+      // trace at the crash site is enough context.
+      const url = (breadcrumb.data as any)?.url || '';
+      if (
+        breadcrumb.category === 'xhr' ||
+        breadcrumb.category === 'fetch' ||
+        breadcrumb.category === 'http'
+      ) {
+        if (/\/api\/auth\/(login|register|change-password|delete-account|refresh)/.test(url)) {
+          return null;
+        }
+      }
+      // Sanitize the rest: strip request body / Authorization header
+      // from non-auth requests too — safer default than trusting field
+      // names. We keep the URL + status for debug context.
+      if (breadcrumb.data) {
+        const data = breadcrumb.data as any;
+        if (data.request_body_size != null) delete data.request_body_size;
+        if (data.body) delete data.body;
+        if (data.headers) {
+          if (typeof data.headers === 'object') {
+            delete data.headers.Authorization;
+            delete data.headers.authorization;
+            delete data.headers.Cookie;
+            delete data.headers.cookie;
+          }
+        }
+      }
+      return breadcrumb;
+    },
+    beforeSend(event) {
+      // Final scrub before the event leaves the device. Strip anything
+      // that looks like a token/password from extra fields. (The
+      // breadcrumb filter usually catches everything; this is defence
+      // in depth.)
+      const scrubFields = ['password', 'refreshToken', 'accessToken', 'token', 'phone'];
+      const scrub = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return;
+        for (const k of Object.keys(obj)) {
+          if (scrubFields.includes(k)) {
+            obj[k] = '[Filtered]';
+          } else if (typeof obj[k] === 'object') {
+            scrub(obj[k]);
+          }
+        }
+      };
+      scrub(event.extra);
+      scrub(event.contexts);
+      // Drop email from user — id + username is enough for triage and
+      // doesn't risk GDPR/PDPA exposure.
+      if (event.user) {
+        delete (event.user as any).email;
+      }
+      return event;
+    },
   });
 
   return true;
 };
 
-/** Attach user info to subsequent events so we know who hit each crash. */
-export const setSentryUser = (user: { id: string; username: string; email?: string }) => {
+/** Attach user info to subsequent events so we know who hit each crash.
+ *  Intentionally omits email — id + username is enough to triage, and
+ *  shipping email to Sentry without explicit user consent violates
+ *  GDPR/PDPA. */
+export const setSentryUser = (user: { id: string; username: string }) => {
   Sentry.setUser({
     id: user.id,
     username: user.username,
-    email: user.email,
   });
 };
 

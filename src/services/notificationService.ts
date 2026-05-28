@@ -140,6 +140,38 @@ const notificationService = {
   },
 
   /**
+   * Navigate from a notification tap. Defensive about chat existence —
+   * if the user got kicked from a group / blocked / chat was deleted
+   * between the push fanning out and the tap landing, we'd otherwise
+   * deep-link into a chat that fails to load. ChatScreen's load handler
+   * already toasts + goBacks on 403/404, so the fallback path here is
+   * to land on the chat LIST first so goBack has somewhere sane to go.
+   *
+   * Wrapped in try/catch because navigationRef.navigate can throw if
+   * the route name doesn't match the current navigator (rare, but
+   * happens during a navigator swap mid-cold-start).
+   */
+  _navigateToChat(chatId: string) {
+    try {
+      // Navigate into the tab first so the back stack is ChatList →
+      // ChatScreen. If ChatScreen's M7 goBack fires (chat unavailable),
+      // user lands on the chat list which is the safe fallback.
+      (navigationRef as any).navigate('ChatsTab', {
+        screen: 'ChatScreen',
+        params: { chatId },
+      });
+    } catch (err) {
+      console.warn('[notifications] navigate to chat failed:', err);
+      // Last-resort fallback: jump to the chat list root
+      try {
+        (navigationRef as any).navigate('ChatsTab');
+      } catch (err2) {
+        console.warn('[notifications] navigate to ChatsTab failed:', err2);
+      }
+    }
+  },
+
+  /**
    * Set up notification tap handler — navigates to the right screen.
    * Returns a cleanup function.
    */
@@ -150,17 +182,17 @@ const notificationService = {
 
         if (!navigationRef.isReady()) return;
 
-        // Navigate based on notification data
         if (data?.chatId) {
-          (navigationRef as any).navigate('ChatsTab', {
-            screen: 'ChatScreen',
-            params: { chatId: data.chatId },
-          });
+          this._navigateToChat(data.chatId as string);
         } else if (data?.channelId) {
-          (navigationRef as any).navigate('DiscoverTab', {
-            screen: 'ChannelDetail',
-            params: { channelId: data.channelId },
-          });
+          try {
+            (navigationRef as any).navigate('DiscoverTab', {
+              screen: 'ChannelDetail',
+              params: { channelId: data.channelId },
+            });
+          } catch (err) {
+            console.warn('[notifications] navigate to channel failed:', err);
+          }
         }
       }
     );
@@ -180,10 +212,7 @@ const notificationService = {
       // Small delay to let navigation mount
       setTimeout(() => {
         if (navigationRef.isReady()) {
-          (navigationRef as any).navigate('ChatsTab', {
-            screen: 'ChatScreen',
-            params: { chatId: data.chatId },
-          });
+          this._navigateToChat(data.chatId as string);
         }
       }, 1000);
     }

@@ -183,12 +183,25 @@ const ChatScreen = ({ route, navigation }: Props) => {
         if (msgRes.messages.length < 50) setHasMore(false);
       } catch (err: any) {
         console.warn('Failed to load chat:', err);
+        // Bounce back rather than leaving the user on a blank chat
+        // screen with no way out. Triggers for: chat deleted on
+        // another device, kicked from group, expired token mid-flight,
+        // malformed deep-link chatId.
+        Toast.show({
+          type: 'error',
+          text1: t('chat.loadFailed'),
+          text2: err?.response?.data?.message || err?.message || 'unknown',
+          visibilityTime: 4000,
+        });
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, [chatId]);
+  }, [chatId, navigation, t]);
 
   // Set header with online status / member count
   useEffect(() => {
@@ -513,9 +526,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const handleSend = useCallback(
     (text: string) => {
       const socket = socketService.getSocket();
-      if (!socket) return;
 
-      // Optimistic: add message immediately
+      // Optimistic: add message immediately. If the socket isn't
+      // connected we still drop the bubble in, but immediately flag it
+      // as failed so the user gets a tap-to-retry UI instead of a
+      // permanent spinner.
       const tempId = `temp-${Date.now()}`;
       const optimistic: Message = {
         _id: tempId,
@@ -525,7 +540,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         type: 'text',
         attachments: [],
         readBy: [],
-        status: 'sending',
+        status: socket ? 'sending' : 'failed',
         edited: false,
         deleted: false,
         replyTo: replyTo || undefined,
@@ -536,6 +551,15 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
       // Clear reply state
       if (replyTo) setReplyTo(null);
+
+      if (!socket) {
+        Toast.show({
+          type: 'error',
+          text1: t('chat.noConnection'),
+          text2: t('chat.messageWillRetry'),
+        });
+        return;
+      }
 
       // Failsafe timeout — if the server doesn't ack within 15s, flip the
       // optimistic message from 'sending' to 'failed' so the user sees
@@ -587,7 +611,6 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const handleSendAttachment = useCallback(
     (type: 'image' | 'video' | 'audio' | 'file', attachments: Attachment[]) => {
       const socket = socketService.getSocket();
-      if (!socket) return;
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const optimistic: Message = {
@@ -598,7 +621,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         type,
         attachments,
         readBy: [],
-        status: 'sending',
+        status: socket ? 'sending' : 'failed',
         edited: false,
         deleted: false,
         replyTo: replyTo || undefined,
@@ -608,6 +631,30 @@ const ChatScreen = ({ route, navigation }: Props) => {
       setMessages((prev) => [...prev, optimistic]);
 
       if (replyTo) setReplyTo(null);
+
+      if (!socket) {
+        Toast.show({
+          type: 'error',
+          text1: t('chat.noConnection'),
+          text2: t('chat.messageWillRetry'),
+        });
+        return;
+      }
+
+      // Same 15s ack timeout pattern as handleSend — without this an
+      // unack'd attachment would spin forever (e.g. server crashed
+      // between accepting the upload and persisting the message row).
+      let timeoutFired = false;
+      const ackTimeout = setTimeout(() => {
+        timeoutFired = true;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId && m.status === 'sending'
+              ? { ...m, status: 'failed' as const }
+              : m
+          )
+        );
+      }, 15_000);
 
       socket.emit(
         'send_message',
@@ -624,6 +671,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
           ...(replyTo ? { replyTo: replyTo._id } : {}),
         },
         (ack: SendMessageAck) => {
+          clearTimeout(ackTimeout);
+          if (timeoutFired) return;
           if (ack.ok && ack.message) {
             setMessages((prev) =>
               prev.map((m) => (m._id === tempId ? ack.message! : m))
@@ -638,7 +687,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         }
       );
     },
-    [chatId, user, replyTo]
+    [chatId, user, replyTo, t]
   );
 
   // Voice message send handler (from VoiceRecorder)
@@ -656,7 +705,6 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const handleSendStructured = useCallback(
     (type: 'sticker' | 'location' | 'contact', content: string, attachments: Attachment[] = []) => {
       const socket = socketService.getSocket();
-      if (!socket) return;
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const optimistic: Message = {
         _id: tempId,
@@ -666,17 +714,43 @@ const ChatScreen = ({ route, navigation }: Props) => {
         type,
         attachments,
         readBy: [],
-        status: 'sending',
+        status: socket ? 'sending' : 'failed',
         edited: false,
         deleted: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
+
+      if (!socket) {
+        Toast.show({
+          type: 'error',
+          text1: t('chat.noConnection'),
+          text2: t('chat.messageWillRetry'),
+        });
+        return;
+      }
+
+      // 15s ack timeout — protects sticker/location/contact sends from
+      // the same indefinite-spinner failure mode as text + attachments.
+      let timeoutFired = false;
+      const ackTimeout = setTimeout(() => {
+        timeoutFired = true;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === tempId && m.status === 'sending'
+              ? { ...m, status: 'failed' as const }
+              : m
+          )
+        );
+      }, 15_000);
+
       socket.emit(
         'send_message',
         { chatId, content, type, attachments },
         (ack: SendMessageAck) => {
+          clearTimeout(ackTimeout);
+          if (timeoutFired) return;
           if (ack.ok && ack.message) {
             setMessages((prev) => prev.map((m) => (m._id === tempId ? ack.message! : m)));
           } else {
@@ -687,7 +761,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         }
       );
     },
-    [chatId, user]
+    [chatId, user, t]
   );
 
   const handleSendSticker = useCallback(
@@ -735,7 +809,18 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const handleSendEdit = useCallback(
     (messageId: string, newContent: string) => {
       const socket = socketService.getSocket();
-      if (!socket) return;
+      if (!socket) {
+        // No optimistic update — edits modify existing bubbles, so the
+        // safer fallback is to toast and bail rather than show a half-
+        // applied edit that gets reverted when the next message_updated
+        // event lands.
+        Toast.show({
+          type: 'error',
+          text1: t('chat.noConnection'),
+          text2: t('chat.editFailed'),
+        });
+        return;
+      }
 
       socket.emit('edit_message', { messageId, content: newContent });
 
@@ -748,7 +833,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
       setEditMessage(null);
     },
-    []
+    [t]
   );
 
   // Delete message via socket
