@@ -15,6 +15,16 @@
 import { useState, useEffect, useRef } from 'react';
 import Toast from 'react-native-toast-message';
 import { API_URL, storage } from '../services/api';
+import { secureStorage } from '../services/secureStorage';
+
+// NOTE on token reads below:
+// The signed-URL fetches use raw `fetch` (not the axios `api` client)
+// so the request interceptor does NOT apply — we have to add the
+// Authorization header by hand. After the M1 migration on Build #21+,
+// the only place the real token lives is the encrypted MMKV exposed
+// via `secureStorage.getToken()`. Reading from the plain `storage`
+// instance returns undefined and produces a 401 "not authenticated"
+// on the backend.
 
 // DEBUG: surface signed-URL fetch failures. Default off — flip to true
 // if media stops loading and you need on-device visibility.
@@ -133,7 +143,7 @@ export const useMediaUrl = (rawUrl: string | undefined) => {
       setLoading(true);
       setError(null);
 
-      const token = storage.getString('accessToken');
+      const token = secureStorage.getToken('accessToken');
       fetch(`${API_URL}/api/uploads/signed-url?key=${encodeURIComponent(key)}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -194,7 +204,7 @@ export const resolveMediaUrl = async (rawUrl: string): Promise<string> => {
     const cached = signedUrlCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.url;
 
-    const token = storage.getString('accessToken');
+    const token = secureStorage.getToken('accessToken');
     const res = await fetch(
       `${API_URL}/api/uploads/signed-url?key=${encodeURIComponent(key)}`,
       { headers: { Authorization: `Bearer ${token}` } }

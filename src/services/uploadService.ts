@@ -2,7 +2,8 @@
 // Uses XMLHttpRequest (not axios) so we get real upload progress in React Native.
 
 import Toast from 'react-native-toast-message';
-import { API_URL, storage } from './api';
+import { API_URL } from './api';
+import { secureStorage } from './secureStorage';
 
 // DEBUG: surface upload progress + failure reasons. Flag stays in place
 // so we can flip back on quickly when investigating any future upload
@@ -42,7 +43,11 @@ export const uploadFile = (
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadResult> => {
   return new Promise((resolve, reject) => {
-    const token = storage.getString('accessToken');
+    // Token comes from secureStorage (encrypted MMKV after M1 migration on
+    // Build #21+; falls back to plain MMKV on older builds where the
+    // encryption native module isn't present). NEVER read directly from
+    // the plain `storage` instance — after migration that's empty.
+    const token = secureStorage.getToken('accessToken');
     if (!token) {
       dt('Upload: no token', 'Not authenticated', 'error');
       reject(new Error('Not authenticated'));

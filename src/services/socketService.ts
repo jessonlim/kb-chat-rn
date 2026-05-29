@@ -3,7 +3,14 @@
 
 import { io, Socket } from 'socket.io-client';
 import Toast from 'react-native-toast-message';
-import { API_URL, storage } from './api';
+import { API_URL } from './api';
+import { secureStorage } from './secureStorage';
+
+// Tokens come from secureStorage (encrypted MMKV after the M1
+// migration on Build #21+). The Socket.IO client does NOT use the
+// axios interceptor — it reads the token directly here. After
+// migration the plain MMKV instance has no tokens, so reading from
+// it returns undefined and the socket auth handshake fails silently.
 
 // Diagnostic toasts kept off by default. Flip to true if a tester
 // reports send_message stuck and you need to see socket lifecycle
@@ -25,7 +32,7 @@ class SocketService {
   connect() {
     if (this.socket?.connected || this.connecting) return;
 
-    const token = storage.getString('accessToken');
+    const token = secureStorage.getToken('accessToken');
     if (!token) {
       debugToast('Socket: no token', 'Skip connect', 'error');
       return;
@@ -71,7 +78,7 @@ class SocketService {
       // If the token is expired, try refreshing
       if (err.message === 'Invalid token' || err.message === 'Authentication required') {
         try {
-          const refreshToken = storage.getString('refreshToken');
+          const refreshToken = secureStorage.getToken('refreshToken');
           if (!refreshToken) return;
           const res = await fetch(`${API_URL}/api/auth/refresh`, {
             method: 'POST',
@@ -80,8 +87,8 @@ class SocketService {
           });
           if (res.ok) {
             const data = await res.json();
-            storage.set('accessToken', data.accessToken);
-            storage.set('refreshToken', data.refreshToken);
+            secureStorage.setToken('accessToken', data.accessToken);
+            secureStorage.setToken('refreshToken', data.refreshToken);
             // Reconnect with fresh token
             if (this.socket) {
               this.socket.auth = { token: data.accessToken };
