@@ -166,10 +166,11 @@ See:
 
 **🔴 Blockers before public launch (still pending):**
 - M4 — Multiple eager native-module imports could brick existing APKs on future OTA updates (lazy-require pattern needed in CallContext, GroupCallContext, CallScreen, GroupCallScreen, callkeepService, notificationService, LocationPicker, ScanQRScreen)
-- **Legal docs missing** — Privacy Policy + Terms of Service URLs in About screen point to `kb-chat.com/privacy` and `/terms` which redirect to the blank app shell. Both stores will reject the app at review without these. Need to ship 2 static pages on the web app before submitting.
 - B1–B5 backend blockers — see AUDIT_BACKEND.md
+- 🟡 Privacy Policy text accuracy — lists GIPHY (app uses Tenor); omits AWS S3, MongoDB Atlas, Sentry from third-party processor list. Patch in Notion source + redeploy.
 
 **🟢 Shipped this session:**
+- Legal docs — Privacy Policy + Terms & Conditions now live at https://www.kb-chat.com/privacy and /terms (verbatim from your Notion source) — closes the app-store-review blocker.
 - M2 — Sentry `sendDefaultPii: false` + `beforeBreadcrumb` drops auth-route XHR/fetch entirely + scrubs Authorization/Cookie headers and bodies elsewhere (OTA `019e6fc0`)
 - M3 — Sentry `beforeSend` recursive scrub of `password|refreshToken|accessToken|token|phone` + drops `event.user.email` (GDPR/PDPA) (OTA `019e6fc0`)
 - M5 — 15s ack timeouts on `handleSendAttachment` + `handleSendStructured` (text already had it) (OTA `019e6fc0`)

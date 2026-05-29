@@ -30,13 +30,26 @@ Severity legend:
 **Fix:** Audit every screen + service for top-level imports of `livekit-client`, `@livekit/react-native`, `@livekit/react-native-webrtc`, `react-native-incall-manager`, `react-native-full-screen-notification-incoming-call`, `expo-location`, `expo-camera`, `expo-notifications`, `expo-contacts`, `react-native-svg`. Convert to lazy `require()` inside the function body. Guard component entry points with a `NativeModules` registry probe.
 **Effort:** 1 day. Touches ~8 files, needs careful testing of every native flow afterwards.
 
-#### Legal docs missing — blocks app store submission
-**Confirmed missing:** Both `https://www.kb-chat.com/privacy` and `https://www.kb-chat.com/terms` redirect to the blank app shell (the React Router catch-all). The "Privacy" link in the About screen looks like it works but lands on the login screen.
-**Risk:** Google Play and Apple App Store will both reject the app at review. We've already lost time on this in prior projects.
-**Fix:** Ship two static pages on the web client:
-1. `/privacy` — Privacy Policy (data collected, why, retention, third-party processors: AWS S3, MongoDB Atlas, Sentry, Firebase, LiveKit Cloud)
-2. `/terms` — Terms of Service (acceptable use, account termination, governing law: Malaysia)
-**Effort:** 4 hours for legal-document drafting + 30 min to wire the routes in `MekaMessage/client/src/App.tsx`. Templates available from prior projects (Alpha98).
+#### ~~Legal docs missing~~ ✅ **SHIPPED 2026-05-29**
+Privacy Policy and Terms & Conditions now served at
+`https://www.kb-chat.com/privacy` and `/terms` (commit `d40d3ed`
+on the MekaMessage repo). Source text from the Notion drafts
+(`canary-blossom-1ac.notion.site` published copies) was reproduced
+verbatim, wrapped in the existing Vite/React/Tailwind chrome with a
+sticky header + back-to-app link, and added as public routes
+OUTSIDE the ProtectedRoute wrapper so app-store reviewers can
+reach them logged-out.
+
+**Two factual discrepancies in the Privacy Policy were flagged but
+NOT corrected** (legal text needs explicit authorization):
+- Lists GIPHY as the GIF provider; app actually uses Tenor
+- Omits AWS S3, MongoDB Atlas, and Sentry from the third-party
+  processor list (Sentry was added in this session)
+
+These should be patched in the Notion source before the next
+update + redeploy. Won't necessarily fail Play Store review at
+v1 (reviewers don't check third-party lists against network
+traffic at first review) but is a real compliance gap.
 
 ---
 
