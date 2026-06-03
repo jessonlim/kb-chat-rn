@@ -3,8 +3,12 @@
 // Accept/Decline buttons on the lock screen when someone calls.
 
 import { Platform } from 'react-native';
-import RNNotificationCall from 'react-native-full-screen-notification-incoming-call';
 import type { AnswerPayload, DeclinePayload } from 'react-native-full-screen-notification-incoming-call';
+import { getCallNotification } from '../utils/nativeModules';
+
+// Lazy accessor (audit M4) — resolves the native module only when a
+// call notification is actually shown, not at app launch. `import type`
+// above keeps the payload types without triggering native resolution.
 
 // ── Types ──────────────────────────────────────────────────────────
 interface IncomingCallInfo {
@@ -35,7 +39,7 @@ const callkeepService = {
     const isVideo = info.callType === 'video';
     const callLabel = isVideo ? 'Video Call' : 'Voice Call';
 
-    RNNotificationCall.displayNotification(
+    getCallNotification().displayNotification(
       uuid,
       info.avatar || null,
       50000, // 50s timeout (matches our call timeout)
@@ -67,7 +71,7 @@ const callkeepService = {
   hideIncomingCall() {
     if (Platform.OS !== 'android') return;
 
-    RNNotificationCall.hideNotification();
+    getCallNotification().hideNotification();
     currentCallUUID = null;
     pendingCallInfo = null;
     console.log('[callkeep] Hiding notification');
@@ -85,6 +89,8 @@ const callkeepService = {
     onDecline: (info: IncomingCallInfo | null, timedOut: boolean) => void,
   ): () => void {
     if (Platform.OS !== 'android') return () => {};
+
+    const RNNotificationCall = getCallNotification();
 
     // User tapped Answer
     RNNotificationCall.addEventListener('answer', (payload: AnswerPayload) => {

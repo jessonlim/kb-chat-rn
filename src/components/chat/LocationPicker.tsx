@@ -18,8 +18,8 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import Toast from 'react-native-toast-message';
+import { getLocation } from '../../utils/nativeModules';
 import { useTheme } from '../../context/ThemeContext';
 import { useT } from '../../i18n/I18nContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
@@ -54,6 +54,8 @@ const LocationPicker = ({ visible, onClose, onPick }: Props) => {
     (async () => {
       setLoading(true);
       setError(null);
+      // Lazy-load expo-location only when the picker actually opens (M4).
+      const Location = getLocation();
       const perm = await Location.requestForegroundPermissionsAsync();
       if (perm.status !== 'granted') {
         if (!alive) return;

@@ -9,19 +9,23 @@ import React, {
   useCallback,
   useEffect,
 } from 'react';
-import {
+import type {
   RTCPeerConnection,
   RTCIceCandidate,
-  mediaDevices,
   MediaStream,
 } from '@livekit/react-native-webrtc';
-import InCallManager from 'react-native-incall-manager';
 import { AppState } from 'react-native';
 import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
 import callkeepService from '../services/callkeepService';
 import { useAuth } from '../stores/authStore';
+import { getWebRTC, getInCallManager } from '../utils/nativeModules';
+
+// Native modules (WebRTC + InCallManager) are accessed lazily via the
+// getters above (audit M4). Types are `import type` so they're erased at
+// compile time and never trigger native resolution at app launch — only
+// the actual call actions (getMedia, createPeer, ringtone) pull them in.
 
 // ── Types ──────────────────────────────────────────────────────────
 export type CallState = 'idle' | 'calling' | 'ringing' | 'connecting' | 'in_call';
@@ -165,7 +169,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Stop InCallManager
     try {
-      InCallManager.stop();
+      getInCallManager().stop();
     } catch {}
 
     // Hide native call notification (if showing)
@@ -196,7 +200,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       audio: true,
       video: type === 'video' ? { facingMode: 'user', width: 640, height: 480 } : false,
     };
-    const stream = await mediaDevices.getUserMedia(constraints);
+    const stream = await getWebRTC().mediaDevices.getUserMedia(constraints);
     return stream as MediaStream;
   }, []);
 
@@ -205,7 +209,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     const iceServers = await callService.getIceServers();
     const config: any = { iceServers };
 
-    const pc = new RTCPeerConnection(config);
+    const pc = new (getWebRTC().RTCPeerConnection)(config);
 
     // When we get a remote track, save the remote stream
     (pc as any).ontrack = (event: any) => {
@@ -318,10 +322,10 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       // Start InCallManager
-      InCallManager.start({ media: type === 'video' ? 'video' : 'audio' });
-      InCallManager.setKeepScreenOn(true);
+      getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
+      getInCallManager().setKeepScreenOn(true);
       if (type === 'video') {
-        InCallManager.setSpeakerphoneOn(true);
+        getInCallManager().setSpeakerphoneOn(true);
       }
 
       // Get media
@@ -379,11 +383,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       const type = callTypeRef.current || 'voice';
 
       // Start InCallManager
-      InCallManager.start({ media: type === 'video' ? 'video' : 'audio' });
-      InCallManager.setKeepScreenOn(true);
-      InCallManager.stopRingtone();
+      getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
+      getInCallManager().setKeepScreenOn(true);
+      getInCallManager().stopRingtone();
       if (type === 'video') {
-        InCallManager.setSpeakerphoneOn(true);
+        getInCallManager().setSpeakerphoneOn(true);
       }
 
       // Get media
@@ -432,7 +436,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       socketService.emit('reject_call', { callerId, reason });
     }
     try {
-      InCallManager.stopRingtone();
+      getInCallManager().stopRingtone();
     } catch {}
     cleanup();
   }, [cleanup]);
@@ -472,7 +476,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     setIsSpeaker((prev) => {
       const next = !prev;
       try {
-        InCallManager.setSpeakerphoneOn(next);
+        getInCallManager().setSpeakerphoneOn(next);
       } catch {}
       return next;
     });
@@ -580,7 +584,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Play ringtone
       try {
-        InCallManager.startRingtone('_DEFAULT_', 1000, 'default', 30);
+        getInCallManager().startRingtone('_DEFAULT_', 1000, 'default', 30);
       } catch {}
 
       // 50s timeout for ringing
@@ -639,7 +643,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     }) => {
       if (!data.candidate) return;
 
-      const candidate = new RTCIceCandidate(data.candidate);
+      const candidate = new (getWebRTC().RTCIceCandidate)(data.candidate);
 
       if (!remoteDescSetRef.current) {
         // Queue until remote description is set

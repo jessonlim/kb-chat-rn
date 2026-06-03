@@ -1,51 +1,61 @@
 // Push notification service — FCM via expo-notifications.
 // Backend already uses firebase-admin, so we register native FCM tokens directly.
+//
+// Native modules (expo-notifications, expo-device) are loaded lazily via
+// getNotifications()/getDevice() (audit M4) so they don't resolve at app
+// launch. The foreground-display handler that used to run as a top-level
+// side-effect now lives in configureHandler(), called once from init().
 
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
 import callkeepService from './callkeepService';
+import { getNotifications, getDevice } from '../utils/nativeModules';
 
 // ── Foreground notification display ─────────────────────────────────
-// Show notifications even when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const data = notification.request.content.data;
+// Registers the handler that decides how a notification renders while the
+// app is foregrounded. Previously a top-level side-effect (ran at import,
+// i.e. app launch, eagerly pulling in expo-notifications). Now called from
+// init() so the native module only resolves when push is set up. Guarded +
+// idempotent.
+let handlerConfigured = false;
+const configureHandler = () => {
+  if (handlerConfigured) return;
+  handlerConfigured = true;
+  getNotifications().setNotificationHandler({
+    handleNotification: async (notification) => {
+      const data = notification.request.content.data;
 
-    // If this is an incoming call notification, suppress the regular notification
-    // because the native full-screen call UI handles it via callkeepService
-    if (data?.type === 'incoming_call') {
-      // Show native call screen instead
-      callkeepService.showIncomingCall({
-        callerId: data.callerId as string,
-        callerName: (data.callerName as string) || 'Unknown',
-        avatar: data.callerAvatar as string | undefined,
-        callType: (data.callType as 'voice' | 'video') || 'voice',
-        chatId: data.chatId as string,
-      });
+      // If this is an incoming call notification, suppress the regular
+      // notification because the native full-screen call UI handles it.
+      if (data?.type === 'incoming_call') {
+        callkeepService.showIncomingCall({
+          callerId: data.callerId as string,
+          callerName: (data.callerName as string) || 'Unknown',
+          avatar: data.callerAvatar as string | undefined,
+          callType: (data.callType as 'voice' | 'video') || 'voice',
+          chatId: data.chatId as string,
+        });
+        return {
+          shouldShowAlert: false,
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      }
 
-      // Don't show the regular notification — the native call UI is enough
+      // For all other notifications, show normally
       return {
-        shouldShowAlert: false,
-        shouldShowBanner: false,
-        shouldShowList: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
       };
-    }
-
-    // For all other notifications, show normally
-    return {
-      shouldShowAlert: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    };
-  },
-});
+    },
+  });
+};
 
 // ── Stored token for cleanup on logout ──────────────────────────────
 let currentToken: string | null = null;
@@ -59,6 +69,13 @@ const notificationService = {
    * 4. Register token with backend
    */
   async init(): Promise<string | null> {
+    // Register the foreground-display handler now that push is being set
+    // up (was previously a top-level side-effect — see configureHandler).
+    configureHandler();
+
+    const Notifications = getNotifications();
+    const Device = getDevice();
+
     if (!Device.isDevice) {
       console.log('[notifications] Must use a physical device');
       return null;
@@ -176,7 +193,7 @@ const notificationService = {
    * Returns a cleanup function.
    */
   setupTapHandler(): () => void {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
+    const subscription = getNotifications().addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data;
 
@@ -204,7 +221,7 @@ const notificationService = {
    * Handle the notification that launched the app (cold start from tap).
    */
   async handleInitialNotification() {
-    const response = await Notifications.getLastNotificationResponseAsync();
+    const response = await getNotifications().getLastNotificationResponseAsync();
     if (!response) return;
 
     const data = response.notification.request.content.data;

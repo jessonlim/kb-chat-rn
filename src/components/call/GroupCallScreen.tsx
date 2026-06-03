@@ -16,13 +16,18 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Track, type Participant } from 'livekit-client';
-import { VideoTrack } from '@livekit/react-native';
-import { useGroupCall, getCameraTrack } from '../../context/GroupCallContext';
+import type { Participant } from 'livekit-client';
+import { useGroupCall } from '../../context/GroupCallContext';
 import { useAuth } from '../../stores/authStore';
 import { useT } from '../../i18n/I18nContext';
 import Avatar from '../common/Avatar';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
+import { getLiveKitClient, getLiveKitRN } from '../../utils/nativeModules';
+
+// LiveKit's Track enum + the VideoTrack component are resolved lazily
+// inside ParticipantTile (which only mounts during an active call), so
+// this root-rendered overlay doesn't pull LiveKit into the launch path
+// (audit M4).
 
 const formatDuration = (s: number): string => {
   const mins = Math.floor(s / 60);
@@ -247,6 +252,11 @@ const ParticipantTile = ({
 }) => {
   const { user } = useAuth();
   const isLocal = user?.id === participant.identity;
+
+  // Lazy-resolve LiveKit here — ParticipantTile only mounts once a call
+  // has participants, so this never runs at app launch (audit M4).
+  const { Track } = getLiveKitClient();
+  const { VideoTrack } = getLiveKitRN();
 
   // Find the camera publication for this participant (if any, and not muted)
   const cameraPublication = useMemo(() => {

@@ -19,20 +19,23 @@ import React, {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import {
+import type {
   Room,
-  RoomEvent,
-  Track,
-  type RemoteParticipant,
-  type Participant,
+  RemoteParticipant,
+  Participant,
 } from 'livekit-client';
-import InCallManager from 'react-native-incall-manager';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../stores/authStore';
 import { useT } from '../i18n/I18nContext';
 import socketService from '../services/socketService';
 import groupCallService from '../services/groupCallService';
 import { storage } from '../services/api';
+import { getLiveKitClient, getInCallManager } from '../utils/nativeModules';
+
+// LiveKit + InCallManager loaded lazily (audit M4). Types are erased at
+// compile time via `import type`; the runtime classes (Room, RoomEvent,
+// Track) and InCallManager only resolve when a group call actually
+// starts — not at app launch where this provider is mounted.
 
 export type GroupCallState = 'idle' | 'incoming' | 'joining' | 'in_call';
 export type GroupCallType = 'voice' | 'video';
@@ -106,8 +109,8 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   // ── Cleanup: tear down everything ─────────────────────────────────
   const cleanup = useCallback(async () => {
     stopDurationTimer();
-    try { InCallManager.stopRingtone(); } catch { /* noop */ }
-    try { InCallManager.stop(); } catch { /* noop */ }
+    try { getInCallManager().stopRingtone(); } catch { /* noop */ }
+    try { getInCallManager().stop(); } catch { /* noop */ }
     if (room) {
       try { await room.disconnect(); } catch { /* noop */ }
     }
@@ -127,6 +130,8 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   // ── Connect to the LiveKit room ───────────────────────────────────
   const connectToRoom = useCallback(
     async (targetChatId: string, callType: GroupCallType): Promise<Room> => {
+      // Resolve LiveKit lazily here, the first time a call connects (M4).
+      const { Room, RoomEvent } = getLiveKitClient();
       const { token, url } = await groupCallService.getToken(targetChatId);
       const r = new Room({
         adaptiveStream: true,
@@ -185,10 +190,10 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   // ── Audio routing helper (reads user pref for default speaker) ───
   const applyAudioRouting = (callType: GroupCallType) => {
     const useSpeaker = callType === 'video' || (storage.getBoolean('pref.defaultSpeakerOn') ?? false);
-    // InCallManager.start sets the right Android audio mode for a call
+    // getInCallManager().start sets the right Android audio mode for a call
     try {
-      InCallManager.start({ media: callType === 'video' ? 'video' : 'audio' });
-      InCallManager.setForceSpeakerphoneOn(useSpeaker);
+      getInCallManager().start({ media: callType === 'video' ? 'video' : 'audio' });
+      getInCallManager().setForceSpeakerphoneOn(useSpeaker);
       setIsSpeakerOn(useSpeaker);
     } catch (err) {
       console.warn('audio routing failed', err);
@@ -277,7 +282,7 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   const toggleSpeaker = useCallback(() => {
     setIsSpeakerOn((prev) => {
       const next = !prev;
-      try { InCallManager.setForceSpeakerphoneOn(next); } catch { /* noop */ }
+      try { getInCallManager().setForceSpeakerphoneOn(next); } catch { /* noop */ }
       return next;
     });
   }, []);
@@ -323,18 +328,18 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (state === 'incoming') {
         // 30s ringtone, default vibrate pattern, no iOS category override
-        InCallManager.startRingtone('_BUNDLE_', [500, 1000], '', 30);
+        getInCallManager().startRingtone('_BUNDLE_', [500, 1000], '', 30);
       } else if (state === 'joining') {
-        InCallManager.startRingback('_BUNDLE_');
+        getInCallManager().startRingback('_BUNDLE_');
       } else {
-        InCallManager.stopRingtone();
-        InCallManager.stopRingback();
+        getInCallManager().stopRingtone();
+        getInCallManager().stopRingback();
       }
     } catch { /* noop */ }
     return () => {
       try {
-        InCallManager.stopRingtone();
-        InCallManager.stopRingback();
+        getInCallManager().stopRingtone();
+        getInCallManager().stopRingback();
       } catch { /* noop */ }
     };
   }, [state]);
@@ -375,8 +380,9 @@ export const useGroupCall = () => {
 
 // Helper: return the camera VideoTrack for a participant, or null if none
 export const getCameraTrack = (p: Participant) => {
+  const cameraSource = getLiveKitClient().Track.Source.Camera;
   for (const pub of p.videoTrackPublications.values()) {
-    if (pub.source === Track.Source.Camera && pub.track && !pub.isMuted) {
+    if (pub.source === cameraSource && pub.track && !pub.isMuted) {
       return pub.track;
     }
   }

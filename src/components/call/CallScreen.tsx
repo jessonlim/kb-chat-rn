@@ -11,12 +11,16 @@ import {
   SafeAreaView,
   Dimensions,
 } from 'react-native';
-import { RTCView } from '@livekit/react-native-webrtc';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../common/Avatar';
 import { useTheme } from '../../context/ThemeContext';
 import { fontSize, spacing } from '../../utils/theme';
+import { getWebRTC } from '../../utils/nativeModules';
+
+// RTCView (the native video surface) is resolved lazily — see the video
+// branch below. This overlay renders at the app root, so a top-level
+// import would pull WebRTC into the launch path (audit M4).
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PIP_W = 120;
@@ -93,6 +97,9 @@ const CallScreen = () => {
 
   // ── Video call layout ──────────────────────────────────────────
   if (isVideo) {
+    // Lazy-resolve the native video view — only reached during an active
+    // video call, never at launch (we've already returned null for idle).
+    const RTCView = getWebRTC().RTCView;
     return (
       <View style={styles.container}>
         {/* Remote video — fullscreen */}
