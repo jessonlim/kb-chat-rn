@@ -58,7 +58,8 @@
         "NSCameraUsageDescription": "KB Chat needs camera access to scan QR codes and make video calls",
         "NSMicrophoneUsageDescription": "KB Chat needs microphone access for voice and video calls",
         "NSLocationWhenInUseUsageDescription": "KB Chat needs location access to share your location in chats",
-        "NSContactsUsageDescription": "KB Chat needs access to your contacts to help you find friends who already use the app."
+        "NSContactsUsageDescription": "KB Chat needs access to your contacts to help you find friends who already use the app.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bitcode": false
     },
