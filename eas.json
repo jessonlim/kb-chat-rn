@@ -25,6 +25,14 @@
       },
       "channel": "preview"
     },
+    "ios-testflight": {
+      "distribution": "store",
+      "channel": "preview",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production"
@@ -32,6 +40,9 @@
   },
   "submit": {
     "production": {
+      "ios": {}
+    },
+    "ios-testflight": {
       "ios": {}
     }
   }
