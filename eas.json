@@ -43,7 +43,12 @@
       "ios": {}
     },
     "ios-testflight": {
-      "ios": {}
+      "ios": {
+        "ascAppId": "6776333956",
+        "ascApiKeyPath": "./credentials/AuthKey_78MRNDT3W2.p8",
+        "ascApiKeyId": "78MRNDT3W2",
+        "ascApiKeyIssuerId": "d4142cf1-2e0e-4189-9e8d-872ec2c287fc"
+      }
     }
   }
 }
