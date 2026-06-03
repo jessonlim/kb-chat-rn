@@ -137,9 +137,19 @@ The RN client now expects (and falls back gracefully from) these endpoints:
 
 ## Latest builds + OTA updates
 
-**Native builds** (require new APK install — bumps native deps or app shell)
-- **🆕 Build #20 (preview profile, in progress)** — adds `expo-contacts` for FindFromContactsScreen
-  - Triggered 2026-05-28 after the find-friends-from-contacts crash on Build #15
+**iOS / TestFlight (NEW 2026-06-04)** 🍎
+- **First iOS build (build #5) is LIVE on TestFlight** — app had never been built for iOS before, compiled first try.
+  - IPA: https://expo.dev/artifacts/eas/sCcz9NUiB7TcsQdKuoaSDg.ipa
+  - App Store Connect app "KB Chat", ascAppId `6776333956`, primary language Simplified Chinese
+  - Build profile `ios-testflight` in eas.json (store distribution, preview channel, autoIncrement)
+  - Apple cert + provisioning profile + APNs push key all created (interactive Apple-ID login once; future builds non-interactive)
+  - Submit config wired in eas.json → future TestFlight submits are non-interactive
+  - **Status:** internal testing first (verify on iPhone + iOS↔Android), external testing (public link, needs ~1-day Apple review) next
+  - **iOS pending:** push (APNs→Firebase + FCM-token fix) + CallKit lock-screen calls
+
+**Android native builds** (require new APK install — bumps native deps or app shell)
+- **🆕 Build #22 (preview, current)** — fresh-install fix (bakes in M1 hotfix + M4 + all OTA fixes so first launch works without a restart). APK: https://expo.dev/artifacts/eas/im7W5hxj9Grftgugc11u4e.apk
+- Build #20/#21 — superseded by #22
 - **Build #15 (preview profile)** — https://expo.dev/artifacts/eas/caswxnjbK9SDYYPScedCwY.apk
   - All 17 WeChat parity features + native deps: expo-camera, expo-location, react-native-svg
   - Built 2026-05-25, ~8m30s, ~$1.50 build credits
