@@ -41,7 +41,14 @@ import TagsScreen from '../screens/contacts/TagsScreen';
 import GlobalSearchScreen from '../screens/common/GlobalSearchScreen';
 import { useT } from '../i18n/I18nContext';
 import { useTheme } from '../context/ThemeContext';
+import { useBadges } from '../context/BadgeContext';
 import { fontSize } from '../utils/theme';
+
+// Format a count for a tab badge: undefined hides it, 99+ caps it.
+const badgeValue = (n: number): number | string | undefined => {
+  if (!n || n <= 0) return undefined;
+  return n > 99 ? '99+' : n;
+};
 
 const useStackScreenOptions = () => {
   const { colors } = useTheme();
@@ -384,6 +391,7 @@ const Tab = createBottomTabNavigator();
 const MainTabs = () => {
   const { t } = useT();
   const { colors } = useTheme();
+  const { totalUnread, pendingRequests } = useBadges();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -396,6 +404,12 @@ const MainTabs = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontSize: fontSize.xs },
+        // Brand-red badge dot/count (default is a system red; pin it to ours).
+        tabBarBadgeStyle: {
+          backgroundColor: colors.danger,
+          color: '#fff',
+          fontSize: 10,
+        },
         tabBarIcon: ({ color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'chatbubbles';
           if (route.name === 'ChatsTab') iconName = 'chatbubbles';
@@ -409,12 +423,22 @@ const MainTabs = () => {
       <Tab.Screen
         name="ChatsTab"
         component={ChatsStackScreen}
-        options={{ headerShown: false, tabBarLabel: t('tab.chats') }}
+        options={{
+          headerShown: false,
+          tabBarLabel: t('tab.chats'),
+          // Unread messages across all chats.
+          tabBarBadge: badgeValue(totalUnread),
+        }}
       />
       <Tab.Screen
         name="ContactsTab"
         component={ContactsStackScreen}
-        options={{ headerShown: false, tabBarLabel: t('tab.contacts') }}
+        options={{
+          headerShown: false,
+          tabBarLabel: t('tab.contacts'),
+          // Pending incoming friend requests.
+          tabBarBadge: badgeValue(pendingRequests),
+        }}
       />
       <Tab.Screen
         name="DiscoverTab"

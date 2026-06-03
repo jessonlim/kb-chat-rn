@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { AuthContext, useAuthProvider } from './src/stores/authStore';
+import { BadgeProvider } from './src/context/BadgeContext';
 import { CallProvider } from './src/context/CallContext';
 import { GroupCallProvider } from './src/context/GroupCallContext';
 import { I18nProvider } from './src/i18n/I18nContext';
@@ -38,6 +39,7 @@ function App() {
       <ThemeProvider>
         <I18nProvider>
         <AuthContext.Provider value={auth}>
+          <BadgeProvider>
           <CallProvider>
             <GroupCallProvider>
               <NavigationContainer ref={navigationRef} linking={linking}>
@@ -51,6 +53,7 @@ function App() {
             </GroupCallProvider>
           </CallProvider>
           <Toast />
+          </BadgeProvider>
         </AuthContext.Provider>
       </I18nProvider>
       </ThemeProvider>
