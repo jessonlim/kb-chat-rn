@@ -166,8 +166,12 @@ See:
 
 **🔴 Blockers before public launch (still pending):**
 - M4 — Multiple eager native-module imports could brick existing APKs on future OTA updates (lazy-require pattern needed in CallContext, GroupCallContext, CallScreen, GroupCallScreen, callkeepService, notificationService, LocationPicker, ScanQRScreen)
-- B1–B5 backend blockers — see AUDIT_BACKEND.md
 - 🟡 Privacy Policy text accuracy — lists GIPHY (app uses Tenor); omits AWS S3, MongoDB Atlas, Sentry from third-party processor list. Patch in Notion source + redeploy.
+
+**🟢 Backend blockers B1–B5 — ALL CLEARED (2026-05-29):**
+- B1 socket rate limiting + B5 full account deletion (S3 cleanup) shipped in mekamessage `f2154e6`
+- B2 (message cap), B3 (refresh rotation), B4 (upload size/MIME) were already implemented — audit was a stale snapshot
+- See `../MekaMessage/AUDIT_BACKEND.md` for details
 
 **🟢 Shipped this session:**
 - Legal docs — Privacy Policy + Terms & Conditions now live at https://www.kb-chat.com/privacy and /terms (verbatim from your Notion source) — closes the app-store-review blocker.
