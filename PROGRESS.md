@@ -150,6 +150,8 @@ The RN client now expects (and falls back gracefully from) these endpoints:
 
 | Update ID | Date | What |
 |---|---|---|
+| `019e8d69` | 2026-05-29 | **M4 fix** — Lazy-load all native modules out of the launch path (calls/QR/location/notifications). Last mobile blocker. |
+| `019e73cb` | 2026-05-29 | **M1 hotfix** — route upload/media/socket token reads through secureStorage (fixed "upload failed: not authenticated" + media not loading after the M1 migration) |
 | `019e6feb` | 2026-05-29 | **M8 fix** — Refresh-token loop guard. 2 failures in 60s → emit `session_expired` → auth store force-logout + toast |
 | `019e6fc0` | 2026-05-29 | **Quick-wins audit batch** — Sentry PII scrub, ack timeouts, null-socket UX, push-tap guard, ChatScreen goBack on load fail |
 | `019e6ef2` | 2026-05-28 | Sentry crash reporting wired in (DSN + auth token via EAS env vars) |
@@ -164,9 +166,15 @@ See:
 - `AUDIT_MOBILE.md` (this folder) — RN client findings
 - `AUDIT_BACKEND.md` (in `../MekaMessage/`) — Express/Mongo/Socket.IO findings
 
-**🔴 Blockers before public launch (still pending):**
-- M4 — Multiple eager native-module imports could brick existing APKs on future OTA updates (lazy-require pattern needed in CallContext, GroupCallContext, CallScreen, GroupCallScreen, callkeepService, notificationService, LocationPicker, ScanQRScreen)
-- 🟡 Privacy Policy text accuracy — lists GIPHY (app uses Tenor); omits AWS S3, MongoDB Atlas, Sentry from third-party processor list. Patch in Notion source + redeploy.
+**🔴 Blockers before public launch — ALL CLEARED 🎉**
+- ~~M1, M4, M8, legal docs~~ (mobile) + ~~B1-B5~~ (backend) all done.
+- Remaining is 🟡 polish only (see below).
+
+**🟡 Should-fix (not launch blockers):**
+- Privacy Policy text accuracy — lists GIPHY (app uses Tenor); omits AWS S3, MongoDB Atlas, Sentry from third-party processor list. Patch in Notion source + redeploy.
+- The 🟡 items in `AUDIT_MOBILE.md` (push-permission UX, storage screen, in-app reporting, cold-start perf, etc.)
+
+**Native-module convention (M4):** never top-level-`import` a native module into a launch-path file. Add a lazy getter to `src/utils/nativeModules.ts` and `require()` on first use; keep types as `import type`. Hook-using components → wrapper-split (see ScanQRScreen + ScanQRScreenInner).
 
 **🟢 Backend blockers B1–B5 — ALL CLEARED (2026-05-29):**
 - B1 socket rate limiting + B5 full account deletion (S3 cleanup) shipped in mekamessage `f2154e6`

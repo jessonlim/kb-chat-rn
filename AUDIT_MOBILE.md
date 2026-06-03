@@ -22,13 +22,20 @@ Severity legend:
 - 🟡 **Should fix** — fix in the next 2 weeks of operation
 - 🟢 **Nice to have** — can wait until next sprint
 
-### 🔴 Blockers
+### 🔴 Blockers — ALL CLEARED
 
-#### M4 — Eager native-module imports brick OTA updates
-**Files:** `src/services/callkeepService.ts`, `src/context/CallContext.tsx`, `src/context/GroupCallContext.tsx`, `src/screens/calls/CallScreen.tsx`, `src/screens/calls/GroupCallScreen.tsx`, `src/services/notificationService.ts`, `src/components/chat/LocationPicker.tsx`, `src/screens/contacts/ScanQRScreen.tsx`.
-**Risk:** When we ship an EAS Update that imports a *new* native module the user's APK doesn't have, the entry point crashes immediately on launch (red screen → app force-close). We've already lost an APK to this pattern once when `expo-contacts` was added. The lazy `require()` pattern used in `FindFromContactsScreen.tsx` is the safe pattern — every screen that uses a native module should follow it.
-**Fix:** Audit every screen + service for top-level imports of `livekit-client`, `@livekit/react-native`, `@livekit/react-native-webrtc`, `react-native-incall-manager`, `react-native-full-screen-notification-incoming-call`, `expo-location`, `expo-camera`, `expo-notifications`, `expo-contacts`, `react-native-svg`. Convert to lazy `require()` inside the function body. Guard component entry points with a `NativeModules` registry probe.
-**Effort:** 1 day. Touches ~8 files, needs careful testing of every native flow afterwards.
+#### ~~M4 — Eager native-module imports brick OTA updates~~ ✅ **SHIPPED 2026-05-29 (OTA `019e8d69`)**
+**Was:** Eager top-level imports of native modules resolved at module-evaluation time — which for the call contexts (wrap the app), the call overlays (render at root), and every screen (MainTabs eager-imports all) is effectively app launch. A missing/throwing native module white-screened the whole app at startup. We lost an APK to exactly this once (expo-contacts).
+**Fixed:** New `src/utils/nativeModules.ts` provides typed lazy getters (`getWebRTC`, `getInCallManager`, `getLiveKitClient`, `getLiveKitRN`, `getCallNotification`, `getNotifications`, `getDevice`, `getLocation`) that `require()` on first use; types are `import type` (erased at compile). All 8 files converted:
+- CallContext, GroupCallContext — WebRTC/LiveKit/InCallManager resolve on first call action
+- CallScreen (RTCView), GroupCallScreen (Track + VideoTrack in ParticipantTile) — resolve during an active call only
+- callkeepService, notificationService — lazy; notification foreground handler moved from a top-level side-effect into `configureHandler()` called from `init()`
+- LocationPicker — expo-location required inside the open effect
+- ScanQRScreen — split into a thin wrapper (launch-path safe) + `ScanQRScreenInner` (holds expo-camera + the un-lazyable `useCameraPermissions` hook), lazy-`require()`d on first render
+
+**Verified:** zero eager native-module imports remain in the launch path (all are `import type` or behind a lazy require). A broken native module now degrades only its own feature instead of bricking startup.
+
+**CONVENTION going forward:** never top-level-`import` a native module into a launch-path file. Add a getter to `src/utils/nativeModules.ts` and `require()` it on first use; keep types as `import type`. For components that use a native *hook* (can't be lazy-required), use the wrapper-split pattern (see ScanQRScreen + ScanQRScreenInner).
 
 #### ~~Legal docs missing~~ ✅ **SHIPPED 2026-05-29**
 Privacy Policy and Terms & Conditions now served at
