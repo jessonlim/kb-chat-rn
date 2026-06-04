@@ -21,6 +21,7 @@
     "axios": "^1.16.1",
     "expo": "~54.0.33",
     "expo-av": "~16.0.8",
+    "expo-callkit-telecom": "^0.3.9",
     "expo-camera": "~17.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-contacts": "~15.0.11",
