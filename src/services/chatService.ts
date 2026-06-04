@@ -111,6 +111,14 @@ const chatService = {
     return data;
   },
 
+  /** GET /api/starred-messages — every message the user has starred across
+   *  all chats. Each message is populated with its sender and a slim chat
+   *  object ({ type, groupName, participants }). */
+  getStarredMessages: async (): Promise<{ messages: import('../types').Message[] }> => {
+    const { data } = await api.get('/api/starred-messages');
+    return data;
+  },
+
   /** GET /api/chats/:chatId/messages/search?q=... — case-insensitive search */
   searchChatMessages: async (
     chatId: string,

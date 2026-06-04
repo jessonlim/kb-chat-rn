@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../stores/authStore';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { Video, ResizeMode } from 'expo-av';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -426,8 +427,15 @@ const MessageBubble = ({
   translation,
 }: Props) => {
   const { colors, fontScaleMultiplier } = useTheme();
+  const { user } = useAuth();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const sender = typeof message.sender === 'object' ? message.sender : null;
+  // Starred BY ME — starredBy is per-user, so a message shows a star only
+  // if the current user starred it. IDs may arrive as ObjectId strings, so
+  // compare stringified.
+  const isStarred = !!message.starredBy?.some(
+    (id) => String(id) === user?.id
+  );
 
   const handleLongPress = () => {
     // While in select mode we suppress long-press so we don't open the
@@ -600,6 +608,14 @@ const MessageBubble = ({
 
         {/* Timestamp + status */}
         <View style={styles.meta}>
+          {isStarred && (
+            <Ionicons
+              name="star"
+              size={11}
+              color="#FFC107"
+              style={{ marginRight: 3 }}
+            />
+          )}
           {message.edited && <Text style={styles.edited}>edited</Text>}
           <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
           {isOwn && (
