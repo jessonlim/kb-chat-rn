@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import notificationService from '../services/notificationService';
+import callkitService from '../services/callkitService';
 
 const useNotifications = (isLoggedIn: boolean) => {
   const initialized = useRef(false);
@@ -12,6 +13,7 @@ const useNotifications = (isLoggedIn: boolean) => {
       // User logged out — unregister token
       if (initialized.current) {
         notificationService.unregisterToken();
+        callkitService.cleanup();
         initialized.current = false;
       }
       return;
@@ -22,6 +24,8 @@ const useNotifications = (isLoggedIn: boolean) => {
       initialized.current = true;
       notificationService.init();
       notificationService.handleInitialNotification();
+      // iOS VoIP push registration for CallKit (no-op on Android).
+      callkitService.init();
     }
 
     // Set up tap handler

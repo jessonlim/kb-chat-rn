@@ -41,6 +41,7 @@ import type * as CallNotificationType from 'react-native-full-screen-notificatio
 import type * as NotificationsType from 'expo-notifications';
 import type * as DeviceType from 'expo-device';
 import type * as LocationType from 'expo-location';
+import type * as CallKitType from 'expo-callkit-telecom';
 
 // ── @livekit/react-native-webrtc (1:1 calls — RTCPeerConnection etc.) ──
 let _webrtc: typeof WebRTCType | undefined;
@@ -98,4 +99,12 @@ let _location: typeof LocationType | undefined;
 export const getLocation = (): typeof LocationType => {
   if (!_location) _location = require('expo-location');
   return _location!;
+};
+
+// ── expo-callkit-telecom (iOS CallKit + VoIP push) ────────────────────
+// iOS-only in practice — callers must guard with Platform.OS === 'ios'.
+let _callkit: typeof CallKitType | undefined;
+export const getCallKit = (): typeof CallKitType => {
+  if (!_callkit) _callkit = require('expo-callkit-telecom');
+  return _callkit!;
 };
