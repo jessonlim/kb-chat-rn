@@ -36,6 +36,7 @@ import GifPicker from '../../components/chat/GifPicker';
 import Toast from 'react-native-toast-message';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useBadges } from '../../context/BadgeContext';
 import { spacing, fontSize } from '../../utils/theme';
 import type { Chat, Message, User, Attachment, SendMessageAck } from '../../types';
 
@@ -53,6 +54,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const { startGroupCall, state: groupCallState } = useGroupCall();
   const { t } = useT();
   const { colors } = useTheme();
+  const { refresh: refreshBadges } = useBadges();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   // True height of the stack-navigator header. With edge-to-edge enabled,
   // KeyboardAvoidingView measures from the top of the screen (not from
@@ -374,14 +376,22 @@ const ChatScreen = ({ route, navigation }: Props) => {
       socket.emit('join_chat', chatId);
       socket.emit('mark_chat_read', { chatId });
     }
-    // Always hit the REST endpoint as a reliable backup. Fire-and-forget.
-    chatService.markChatRead(chatId).catch((err) => {
-      console.warn('[chat] markChatRead REST failed:', err?.response?.data || err?.message);
-    });
+    // Always hit the REST endpoint as a reliable backup. Once it persists,
+    // refresh the global tab badges. We can't rely on the socket
+    // `messages_read` broadcast to clear the Chats-tab badge: it's emitted
+    // to the chat room, but join_chat (which adds us to that room) may not
+    // have finished when mark_chat_read broadcasts — so we'd miss our own
+    // read event and the tab badge would linger until the next chat_updated
+    // (e.g. our own reply). Refreshing here clears it the moment we open.
+    chatService.markChatRead(chatId)
+      .then(() => { refreshBadges(); })
+      .catch((err) => {
+        console.warn('[chat] markChatRead REST failed:', err?.response?.data || err?.message);
+      });
     return () => {
       socket?.emit('leave_chat', chatId);
     };
-  }, [chatId]);
+  }, [chatId, refreshBadges]);
 
   // Socket listeners for real-time messages
   useEffect(() => {
