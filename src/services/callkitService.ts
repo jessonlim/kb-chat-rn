@@ -18,6 +18,15 @@ import Toast from 'react-native-toast-message';
 import api from './api';
 import { getCallKit } from '../utils/nativeModules';
 
+// TEMPORARILY DISABLED (2026-06-05): calling expo-callkit-telecom's
+// registerVoIPPush() crashed the app on our SDK 54 / Old Architecture build
+// (a native crash JS can't catch). The library compiles on Old Arch but its
+// runtime VoIP registration does not work here. Flip back on only once we've
+// confirmed a working path (likely Track A: react-native-callkeep +
+// react-native-voip-push-notification, or a New-Arch migration). Until then
+// init() is a no-op so the app launches cleanly.
+const CALLKIT_ENABLED = false;
+
 let registered = false;
 let tokenSub: { remove: () => void } | null = null;
 
@@ -33,6 +42,8 @@ const sendVoipToken = async (token: string) => {
 const callkitService = {
   /** Register for VoIP push (iOS only). Idempotent. */
   init() {
+    // Disabled — see CALLKIT_ENABLED note above (crashes on Old Arch).
+    if (!CALLKIT_ENABLED) return;
     if (Platform.OS !== 'ios' || registered) return;
     registered = true;
     try {
