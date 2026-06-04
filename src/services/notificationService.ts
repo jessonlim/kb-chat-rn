@@ -7,6 +7,7 @@
 // side-effect now lives in configureHandler(), called once from init().
 
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
 import callkeepService from './callkeepService';
@@ -118,11 +119,29 @@ const notificationService = {
       return null;
     }
 
-    // Get native FCM token (not Expo push token — backend uses firebase-admin)
+    // Acquire a push token, platform-split:
+    //   • Android → native FCM device token. Backend sends via firebase-admin.
+    //   • iOS     → Expo push token. The native iOS device token is a raw
+    //     APNs token our FCM backend can't address, so on iOS we register an
+    //     Expo push token instead; the backend delivers those through Expo's
+    //     push service (which talks to APNs using the key EAS manages).
+    // The backend tells the two apart by token format, so they coexist.
     try {
-      const tokenData = await Notifications.getDevicePushTokenAsync();
-      const token = tokenData.data as string;
-      console.log('[notifications] FCM token obtained');
+      let token: string;
+      if (Platform.OS === 'ios') {
+        const projectId =
+          (Constants.expoConfig?.extra as any)?.eas?.projectId ||
+          (Constants as any)?.easConfig?.projectId;
+        const tokenData = await Notifications.getExpoPushTokenAsync(
+          projectId ? { projectId } : undefined
+        );
+        token = tokenData.data;
+        console.log('[notifications] Expo push token obtained (iOS)');
+      } else {
+        const tokenData = await Notifications.getDevicePushTokenAsync();
+        token = tokenData.data as string;
+        console.log('[notifications] FCM device token obtained (Android)');
+      }
 
       // Register with backend
       await this.registerToken(token);
