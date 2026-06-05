@@ -98,6 +98,71 @@ const callkitService = {
     }
     registered = false;
   },
+
+  /**
+   * True if iOS currently has a live CallKit call session. Used to reconcile
+   * stale in-app call state when the app returns to the foreground (e.g. the
+   * phone was locked during the call and the JS missed the `call_ended`
+   * socket event, leaving the incoming-call overlay stuck on screen).
+   */
+  async hasActiveCallSession(): Promise<boolean> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return false;
+    try {
+      const session = await getCallKit().getActiveCallSession();
+      return !!session;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Dismiss the CallKit system UI for the current call (called when the call
+   * ends from inside the app — remote hang-up, in-app decline, timeout — so
+   * the lock-screen / system call UI doesn't linger).
+   */
+  async endActiveCallKitCall(): Promise<void> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return;
+    try {
+      const CallKit = getCallKit();
+      const session = await CallKit.getActiveCallSession();
+      if (session?.id) {
+        await CallKit.reportCallEnded(session.id, 'remoteEnded');
+      }
+    } catch (err) {
+      console.warn('[callkit] endActiveCallKitCall failed:', err);
+    }
+  },
+
+  /**
+   * Wire CallKit system-UI actions (Answer / End from the lock screen or
+   * the iOS in-call UI) back into the app. Returns a cleanup function.
+   * iOS only — no-op elsewhere.
+   *
+   * @param onAnswer fired when the user answers from the system call UI
+   * @param onEnd    fired when the user ends/declines from the system call UI
+   */
+  setupCallListeners(onAnswer: () => void, onEnd: () => void): () => void {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return () => {};
+    let answeredSub: { remove: () => void } | null = null;
+    let endedSub: { remove: () => void } | null = null;
+    try {
+      const CallKit = getCallKit();
+      answeredSub = CallKit.addCallAnsweredListener(() => {
+        console.log('[callkit] answered from system UI');
+        onAnswer();
+      });
+      endedSub = CallKit.addCallEndedListener(() => {
+        console.log('[callkit] ended from system UI');
+        onEnd();
+      });
+    } catch (err) {
+      console.warn('[callkit] setupCallListeners failed:', err);
+    }
+    return () => {
+      try { answeredSub?.remove(); } catch { /* noop */ }
+      try { endedSub?.remove(); } catch { /* noop */ }
+    };
+  },
 };
 
 export default callkitService;

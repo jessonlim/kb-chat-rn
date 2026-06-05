@@ -14,11 +14,12 @@ import type {
   RTCIceCandidate,
   MediaStream,
 } from '@livekit/react-native-webrtc';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
 import callkeepService from '../services/callkeepService';
+import callkitService from '../services/callkitService';
 import { useAuth } from '../stores/authStore';
 import { getWebRTC, getInCallManager } from '../utils/nativeModules';
 
@@ -174,6 +175,10 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Hide native call notification (if showing)
     callkeepService.hideIncomingCall();
+
+    // Dismiss the iOS CallKit system UI if a call session is lingering
+    // (fire-and-forget; no-op on Android / when no session exists).
+    callkitService.endActiveCallKitCall();
 
     // Reset refs
     remoteDescSetRef.current = false;
@@ -515,6 +520,59 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     return cleanup_ck;
   }, [user, acceptCall, rejectCall]);
+
+  // ── CallKit listeners (iOS system call UI: Answer / End) ───────
+  // Bridges the native iOS call UI (lock-screen slide-to-answer, the
+  // in-call End button, decline-via-side-button) back into our call state.
+  useEffect(() => {
+    if (!user || Platform.OS !== 'ios') return;
+
+    const cleanup_ckit = callkitService.setupCallListeners(
+      // User answered from the iOS system call UI
+      () => {
+        console.log('[callkit] Answer triggered, callState:', callStateRef.current);
+        if (callStateRef.current === 'ringing') {
+          acceptCall();
+        }
+      },
+      // User ended / declined from the iOS system call UI
+      () => {
+        console.log('[callkit] End triggered, callState:', callStateRef.current);
+        const st = callStateRef.current;
+        if (st === 'ringing') {
+          rejectCall(); // notify caller their call was declined + cleanup
+        } else if (st !== 'idle') {
+          endCall(); // hang up an active/connecting call + cleanup
+        }
+      },
+    );
+
+    return cleanup_ckit;
+  }, [user, acceptCall, rejectCall, endCall]);
+
+  // ── Foreground reconcile (iOS): clear a stale incoming-call overlay ──
+  // If the phone was locked during a call, the JS may have missed the
+  // `call_ended` socket event, leaving callState stuck on 'ringing' so the
+  // incoming-call overlay lingers when the user reopens the app. On return
+  // to the foreground, ask CallKit whether a call is still live; if not,
+  // clean up. Only 'ringing' (incoming) is reconciled — outgoing 'calling'
+  // and connected calls have no incoming CallKit session and must be left
+  // alone.
+  useEffect(() => {
+    if (!user || Platform.OS !== 'ios') return;
+
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (next !== 'active') return;
+      if (callStateRef.current !== 'ringing') return;
+      const alive = await callkitService.hasActiveCallSession();
+      if (!alive && callStateRef.current === 'ringing') {
+        console.log('[callkit] foreground reconcile — no live call session, clearing stale ring');
+        cleanup();
+      }
+    });
+
+    return () => sub.remove();
+  }, [user, cleanup]);
 
   // ── Socket event handlers ─────────────────────────────────────
   useEffect(() => {
