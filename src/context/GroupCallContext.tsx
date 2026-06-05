@@ -161,6 +161,12 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
             cleanup();
           }
         });
+        // A joiner sets their display-name metadata AFTER connecting, so
+        // participants already in the call must re-render on metadata/name
+        // change — otherwise the joiner shows with no name. (The joiner sees
+        // everyone fine because those names were set before they joined.)
+        r.on(RoomEvent.ParticipantMetadataChanged, refreshParticipants);
+        r.on(RoomEvent.ParticipantNameChanged, refreshParticipants);
         r.on(RoomEvent.TrackMuted, refreshParticipants);
         r.on(RoomEvent.TrackUnmuted, refreshParticipants);
         r.on(RoomEvent.TrackPublished, refreshParticipants);
