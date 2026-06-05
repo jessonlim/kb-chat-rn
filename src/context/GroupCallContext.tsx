@@ -166,13 +166,21 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
 
       await r.connect(url, token);
 
-      // Publish our identity so other participants see our name + avatar
+      // Publish our identity so other participants see our name + avatar.
+      // Non-fatal: if the token somehow lacks canUpdateOwnMetadata, joining
+      // without metadata is far better than failing the whole call (this is
+      // exactly what surfaced as "does not have permission to update own
+      // metadata" and killed group calls for whoever started one).
       if (user) {
-        await r.localParticipant.setMetadata(JSON.stringify({
-          displayName: user.displayName,
-          username: user.username,
-          avatar: user.avatar || '',
-        }));
+        try {
+          await r.localParticipant.setMetadata(JSON.stringify({
+            displayName: user.displayName,
+            username: user.username,
+            avatar: user.avatar || '',
+          }));
+        } catch (err) {
+          console.warn('[groupcall] setMetadata failed (non-fatal):', err);
+        }
       }
 
       // Turn on mic always, camera only for video calls
