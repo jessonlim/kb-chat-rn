@@ -36,7 +36,8 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "credentialsSource": "local"
     }
   },
   "submit": {
