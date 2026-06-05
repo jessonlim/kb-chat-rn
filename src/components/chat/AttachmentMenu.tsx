@@ -35,6 +35,10 @@ interface Props {
   onPickContact?: () => void;
   onPickSticker?: () => void;
   onPickGif?: () => void;
+  // Group voice/video call — shown only in group chats (moved here from the
+  // header so the call icons don't crowd the group name, WeChat-style).
+  isGroup?: boolean;
+  onGroupCall?: (type: 'voice' | 'video') => void;
 }
 
 interface MenuOption {
@@ -52,12 +56,22 @@ const AttachmentMenu = ({
   onPickContact,
   onPickSticker,
   onPickGif,
+  isGroup,
+  onGroupCall,
 }: Props) => {
   const { colors } = useTheme();
   const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const OPTIONS: MenuOption[] = [
+    ...(isGroup && onGroupCall
+      ? [{
+          key: 'groupcall',
+          label: t('groupCall.title'),
+          icon: 'call-outline' as keyof typeof Ionicons.glyphMap,
+          color: '#f43f5e',
+        }]
+      : []),
     { key: 'gallery', label: t('attach.photosVideos'), icon: 'images-outline', color: '#a78bfa' },
     { key: 'camera', label: t('attach.camera'), icon: 'camera-outline', color: '#22c55e' },
     { key: 'video', label: t('camera.video'), icon: 'videocam-outline', color: '#f59e0b' },
@@ -183,6 +197,14 @@ const AttachmentMenu = ({
 
   const handleOptionPress = (key: string) => {
     switch (key) {
+      case 'groupcall':
+        onClose();
+        Alert.alert(t('groupCall.title'), undefined, [
+          { text: t('chat.voiceCall'), onPress: () => onGroupCall?.('voice') },
+          { text: t('chat.videoCall'), onPress: () => onGroupCall?.('video') },
+          { text: t('common.cancel'), style: 'cancel' },
+        ]);
+        break;
       case 'gallery':
         handleGallery();
         break;

@@ -213,7 +213,6 @@ const ChatScreen = ({ route, navigation }: Props) => {
       const memberCount = chat.participants.length;
       const onlineCount = chat.participants.filter((p) => p.isOnline).length;
       const groupTitle = chat.groupName || t('group.info');
-      const canStartCall = groupCallState === 'idle';
       navigation.setOptions({
         // WeChat-style header: group name with the member count inline
         // in parentheses. Online count goes on the subtitle row if any
@@ -232,22 +231,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
         ),
         headerRight: () => (
           <View style={styles.headerCallButtons}>
-            <TouchableOpacity
-              onPress={() => canStartCall && startGroupCall(chatId, 'voice', groupTitle)}
-              activeOpacity={0.7}
-              style={styles.headerCallBtn}
-              disabled={!canStartCall}
-            >
-              <Ionicons name="call-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => canStartCall && startGroupCall(chatId, 'video', groupTitle)}
-              activeOpacity={0.7}
-              style={styles.headerCallBtn}
-              disabled={!canStartCall}
-            >
-              <Ionicons name="videocam-outline" size={22} color={canStartCall ? colors.primary : colors.textMuted} />
-            </TouchableOpacity>
+            {/* Group voice/video call lives in the "+" attachment menu
+                (WeChat-style) so the icons don't crowd the group name. */}
             <TouchableOpacity
               onPress={() => setSearchVisible((v) => !v)}
               activeOpacity={0.7}
@@ -1399,6 +1384,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
         onPickContact={() => setShowContactPicker(true)}
         onPickSticker={() => setShowStickers(true)}
         onPickGif={() => setShowGifPicker(true)}
+        isGroup={chat?.type === 'group'}
+        onGroupCall={(callType) => startGroupCall(chatId, callType, chat?.groupName || '')}
       />
 
       {/* Sticker / Location / Contact / GIF pickers */}
