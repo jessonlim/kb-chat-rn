@@ -18,14 +18,15 @@ import Toast from 'react-native-toast-message';
 import api from './api';
 import { getCallKit } from '../utils/nativeModules';
 
-// TEMPORARILY DISABLED (2026-06-05): calling expo-callkit-telecom's
-// registerVoIPPush() crashed the app on our SDK 54 / Old Architecture build
-// (a native crash JS can't catch). The library compiles on Old Arch but its
-// runtime VoIP registration does not work here. Flip back on only once we've
-// confirmed a working path (likely Track A: react-native-callkeep +
-// react-native-voip-push-notification, or a New-Arch migration). Until then
-// init() is a no-op so the app launches cleanly.
-const CALLKIT_ENABLED = false;
+// Re-enabled 2026-06-05 with the real fix. The earlier crash was NOT our
+// registerVoIPPush() call — it was a NATIVE BUILD mismatch: expo-callkit-telecom's
+// pod requires iOS 16 (its CallManager uses iOS-16-only Duration APIs), but our
+// app never raised the iOS deployment target (SDK 54 defaults to 15.1), so the
+// native module crashed the instant it loaded. Fixed by adding expo-build-
+// properties with ios.deploymentTarget "16.0" (app.json) + a fresh native build.
+// NOTE: this requires a NEW BUILD — do NOT ship as an OTA to builds that lack
+// the iOS-16 deployment target (e.g. build #6), or they crash again.
+const CALLKIT_ENABLED = true;
 
 let registered = false;
 let tokenSub: { remove: () => void } | null = null;
@@ -42,28 +43,15 @@ const sendVoipToken = async (token: string) => {
 const callkitService = {
   /** Register for VoIP push (iOS only). Idempotent. */
   init() {
-    // Disabled — see CALLKIT_ENABLED note above (crashes on Old Arch).
     if (!CALLKIT_ENABLED) return;
     if (Platform.OS !== 'ios' || registered) return;
     registered = true;
     try {
       const CallKit = getCallKit();
-      CallKit.registerVoIPPush();
 
-      // A token may already be available from a previous registration.
-      const existing = CallKit.getVoIPPushToken();
-      if (existing?.token) {
-        sendVoipToken(existing.token);
-        // Temporary on-device confirmation while we verify the integration.
-        Toast.show({
-          type: 'success',
-          text1: 'VoIP ready',
-          text2: existing.token.slice(0, 14) + '…',
-          visibilityTime: 2500,
-        });
-      }
-
-      // Subscribe to token updates (fires on first registration + rotation).
+      // 1) SUBSCRIBE FIRST. The APNs VoIP token is delivered ASYNCHRONOUSLY by
+      //    PushKit's delegate — it is never ready synchronously right after
+      //    registering. Listen before reading so we never miss the first token.
       tokenSub = CallKit.addVoIPPushTokenUpdatedListener(
         (event: { token?: string }) => {
           if (event.token) {
@@ -77,6 +65,25 @@ const callkitService = {
           }
         }
       );
+
+      // 2) One-shot read in case the native subscriber already got the token at
+      //    launch. May be null on a cold first run — that's expected; the
+      //    listener above will deliver it.
+      const existing = CallKit.getVoIPPushToken();
+      if (existing?.token) {
+        sendVoipToken(existing.token);
+        Toast.show({
+          type: 'success',
+          text1: 'VoIP ready',
+          text2: existing.token.slice(0, 14) + '…',
+          visibilityTime: 2500,
+        });
+      }
+
+      // 3) registerVoIPPush() is idempotent (the native side guards against a
+      //    double PKPushRegistry) and the AppDelegate subscriber already
+      //    registered at launch — this is just belt-and-suspenders.
+      CallKit.registerVoIPPush();
     } catch (err) {
       console.warn('[callkit] init failed:', err);
       registered = false;

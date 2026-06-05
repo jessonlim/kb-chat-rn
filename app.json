@@ -2,7 +2,7 @@
   "expo": {
     "name": "KB Chat",
     "slug": "kb-chat-rn",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -50,7 +50,15 @@
       ],
       "@sentry/react-native",
       "expo-secure-store",
-      "expo-callkit-telecom"
+      "expo-callkit-telecom",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
