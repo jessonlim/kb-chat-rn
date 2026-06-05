@@ -137,6 +137,12 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   const chatIdRef = useRef<string | null>(null);
   const callTypeRef = useRef<'voice' | 'video' | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  // Set when the user answers from the iOS CallKit system UI BEFORE the
+  // WebRTC offer has arrived (cold launch from a notification). The backend
+  // replays `incoming_call` on socket reconnect; the auto-accept effect then
+  // connects the call once callState becomes 'ringing'.
+  const pendingCallKitAnswerRef = useRef(false);
+  const pendingAnswerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => { callStateRef.current = callState; }, [callState]);
@@ -156,6 +162,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       clearInterval(durationRef.current);
       durationRef.current = null;
     }
+    if (pendingAnswerTimerRef.current) {
+      clearTimeout(pendingAnswerTimerRef.current);
+      pendingAnswerTimerRef.current = null;
+    }
+    pendingCallKitAnswerRef.current = false;
 
     // Close peer connection
     if (pcRef.current) {
@@ -533,6 +544,16 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('[callkit] Answer triggered, callState:', callStateRef.current);
         if (callStateRef.current === 'ringing') {
           acceptCall();
+        } else {
+          // Cold launch: answered from the notification before the WebRTC
+          // offer arrived. Queue it — the auto-accept effect connects the call
+          // once the backend replays incoming_call (callState -> 'ringing').
+          pendingCallKitAnswerRef.current = true;
+          if (pendingAnswerTimerRef.current) clearTimeout(pendingAnswerTimerRef.current);
+          pendingAnswerTimerRef.current = setTimeout(() => {
+            pendingCallKitAnswerRef.current = false;
+            pendingAnswerTimerRef.current = null;
+          }, 20000);
         }
       },
       // User ended / declined from the iOS system call UI
@@ -573,6 +594,23 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => sub.remove();
   }, [user, cleanup]);
+
+  // ── Auto-accept a queued CallKit answer once the offer arrives ──
+  // If the user answered from the iOS system UI on a cold launch (before the
+  // WebRTC offer), pendingCallKitAnswerRef is set. The backend replays
+  // incoming_call on socket reconnect → callState becomes 'ringing' → connect
+  // here. The ref-sync effect runs before this one, so acceptCall()'s
+  // `callStateRef.current === 'ringing'` guard passes.
+  useEffect(() => {
+    if (callState === 'ringing' && pendingCallKitAnswerRef.current) {
+      pendingCallKitAnswerRef.current = false;
+      if (pendingAnswerTimerRef.current) {
+        clearTimeout(pendingAnswerTimerRef.current);
+        pendingAnswerTimerRef.current = null;
+      }
+      acceptCall();
+    }
+  }, [callState, acceptCall]);
 
   // ── Socket event handlers ─────────────────────────────────────
   useEffect(() => {
