@@ -143,13 +143,31 @@ const ChatListScreen = ({ navigation }: Props) => {
       );
     };
 
+    // Group created, members added/removed, group renamed/avatar changed, etc.
+    // The backend broadcasts chat_changed (with the full chat) to every
+    // participant — including the creator and newly-added members. The list
+    // wasn't listening for it, so new groups + membership changes only showed
+    // after a manual pull-to-refresh. Re-fetch to reflect them immediately.
+    const onChatChanged = () => {
+      loadChats();
+    };
+
+    // Removed from a chat, or the chat was deleted.
+    const onChatRemoved = (data: { chatId: string }) => {
+      setChats((prev) => prev.filter((c) => c._id !== data.chatId));
+    };
+
     socket.on('chat_updated', onChatUpdated);
+    socket.on('chat_changed', onChatChanged);
+    socket.on('chat_removed', onChatRemoved);
     socket.on('user_online', onPresence);
     socket.on('user_offline', onOffline);
     socket.on('messages_read', onMessagesRead);
 
     return () => {
       socket.off('chat_updated', onChatUpdated);
+      socket.off('chat_changed', onChatChanged);
+      socket.off('chat_removed', onChatRemoved);
       socket.off('user_online', onPresence);
       socket.off('user_offline', onOffline);
       socket.off('messages_read', onMessagesRead);

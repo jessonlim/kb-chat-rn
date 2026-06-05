@@ -110,12 +110,14 @@ export const BadgeProvider = ({ children }: { children: ReactNode }) => {
     const onFriendAccepted = () => debouncedPending();
 
     socket.on('chat_updated', onChatUpdated);
+    socket.on('chat_changed', onChatUpdated); // new group / membership change
     socket.on('messages_read', onMessagesRead);
     socket.on('friend_request_received', onFriendRequest);
     socket.on('friend_request_accepted', onFriendAccepted);
 
     return () => {
       socket.off('chat_updated', onChatUpdated);
+      socket.off('chat_changed', onChatUpdated);
       socket.off('messages_read', onMessagesRead);
       socket.off('friend_request_received', onFriendRequest);
       socket.off('friend_request_accepted', onFriendAccepted);
