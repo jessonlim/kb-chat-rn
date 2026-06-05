@@ -258,6 +258,14 @@ const ParticipantTile = ({
   const { Track } = getLiveKitClient();
   const { VideoTrack } = getLiveKitRN();
 
+  // Signature that changes whenever a video publication is added, becomes
+  // SUBSCRIBED (pub.track null -> track), or mutes. Keying the memo on the
+  // track *count* alone missed the publish->subscribe transition, so a remote
+  // participant's camera never rendered. Recompute on any of those changes.
+  const videoSig = Array.from(participant.videoTrackPublications.values())
+    .map((p) => `${p.trackSid}:${p.track ? 1 : 0}:${p.isMuted ? 'm' : ''}`)
+    .join('|');
+
   // Find the camera publication for this participant (if any, and not muted)
   const cameraPublication = useMemo(() => {
     if (!isVideoCall) return null;
@@ -267,7 +275,8 @@ const ParticipantTile = ({
       }
     }
     return null;
-  }, [participant, isVideoCall, participant.videoTrackPublications.size]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participant, isVideoCall, videoSig]);
 
   // LiveKit VideoTrack wants a "TrackReference" object
   const trackRef = useMemo(() => {

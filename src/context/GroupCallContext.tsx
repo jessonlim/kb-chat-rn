@@ -160,6 +160,12 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
       r.on(RoomEvent.TrackUnmuted, refreshParticipants);
       r.on(RoomEvent.TrackPublished, refreshParticipants);
       r.on(RoomEvent.TrackUnpublished, refreshParticipants);
+      // CRITICAL: a remote participant's video only becomes renderable once
+      // its track is SUBSCRIBED (publication.track goes from null -> a track).
+      // Without re-rendering on subscribe, remote video never appears even
+      // though it's flowing — each person only ever sees their own camera.
+      r.on(RoomEvent.TrackSubscribed, refreshParticipants);
+      r.on(RoomEvent.TrackUnsubscribed, refreshParticipants);
       r.on(RoomEvent.LocalTrackPublished, refreshParticipants);
       r.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
       r.on(RoomEvent.Disconnected, () => { cleanup(); });
