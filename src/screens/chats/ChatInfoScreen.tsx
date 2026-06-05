@@ -26,6 +26,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import chatService from '../../services/chatService';
+import socketService from '../../services/socketService';
 import { storage } from '../../services/api';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
@@ -64,22 +65,39 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const [editingValue, setEditingValue] = useState('');
 
   // ── Load chat metadata ──────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await chatService.getChatById(chatId);
-        setChat(res.chat);
-        setIsMuted(!!res.chat.isMuted);
-        setIsPinned(!!res.chat.isPinned);
-        setIsAlert(storage.getBoolean(alertKey(chatId)) ?? false);
-      } catch (err) {
-        console.warn('Failed to load chat info:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const loadChat = useCallback(async () => {
+    try {
+      const res = await chatService.getChatById(chatId);
+      setChat(res.chat);
+      setIsMuted(!!res.chat.isMuted);
+      setIsPinned(!!res.chat.isPinned);
+      setIsAlert(storage.getBoolean(alertKey(chatId)) ?? false);
+    } catch (err) {
+      console.warn('Failed to load chat info:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [chatId]);
+
+  useEffect(() => {
+    loadChat();
+  }, [loadChat]);
+
+  // Live-refresh when the group changes (members added/removed, renamed,
+  // avatar/admin change). The backend broadcasts chat_changed to every
+  // participant; without this the member list stayed stale after adding
+  // someone until the screen was reopened.
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+    const onChatChanged = (data: { chat?: { _id?: string } }) => {
+      if (!data?.chat?._id || data.chat._id === chatId) loadChat();
+    };
+    socket.on('chat_changed', onChatChanged);
+    return () => {
+      socket.off('chat_changed', onChatChanged);
+    };
+  }, [chatId, loadChat]);
 
   // Set the header title to "Chat Info (N)" with a search icon on the right
   // for groups. WeChat shows the member count in the title bar.
