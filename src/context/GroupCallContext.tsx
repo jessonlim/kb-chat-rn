@@ -132,70 +132,75 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
     async (targetChatId: string, callType: GroupCallType): Promise<Room> => {
       // Resolve LiveKit lazily here, the first time a call connects (M4).
       const { Room, RoomEvent } = getLiveKitClient();
-      // Call setup is sensitive to transient network blips (mobile networks +
-      // the LiveKit websocket handshake), which surfaced as intermittent
-      // "Network Error" on group-call start. Retry the whole token-fetch +
-      // connect a few times with backoff before giving up.
-      const attemptConnect = async (): Promise<Room> => {
-        const { token, url } = await groupCallService.getToken(targetChatId);
-        const r = new Room({
-          adaptiveStream: true,
-          dynacast: true,
-        });
-
-        // Keep participant list in sync as people join / leave / mute
-        const refreshParticipants = () => {
-          const all: Participant[] = [
-            r.localParticipant,
-            ...Array.from(r.remoteParticipants.values()),
-          ];
-          setParticipants(all);
-        };
-
-        r.on(RoomEvent.ParticipantConnected, refreshParticipants);
-        r.on(RoomEvent.ParticipantDisconnected, (_p: RemoteParticipant) => {
-          refreshParticipants();
-          // If we're the last one, end the call
-          if (r.remoteParticipants.size === 0) {
-            Toast.show({ type: 'info', text1: t('groupCall.everyoneLeft') });
-            cleanup();
-          }
-        });
-        // A joiner sets their display-name metadata AFTER connecting, so
-        // participants already in the call must re-render on metadata/name
-        // change — otherwise the joiner shows with no name. (The joiner sees
-        // everyone fine because those names were set before they joined.)
-        r.on(RoomEvent.ParticipantMetadataChanged, refreshParticipants);
-        r.on(RoomEvent.ParticipantNameChanged, refreshParticipants);
-        r.on(RoomEvent.TrackMuted, refreshParticipants);
-        r.on(RoomEvent.TrackUnmuted, refreshParticipants);
-        r.on(RoomEvent.TrackPublished, refreshParticipants);
-        r.on(RoomEvent.TrackUnpublished, refreshParticipants);
-        // CRITICAL: a remote participant's video only becomes renderable once
-        // its track is SUBSCRIBED (publication.track goes from null -> a track).
-        // Without re-rendering on subscribe, remote video never appears even
-        // though it's flowing — each person only ever sees their own camera.
-        r.on(RoomEvent.TrackSubscribed, refreshParticipants);
-        r.on(RoomEvent.TrackUnsubscribed, refreshParticipants);
-        r.on(RoomEvent.LocalTrackPublished, refreshParticipants);
-        r.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
-        r.on(RoomEvent.Disconnected, () => { cleanup(); });
-
+      // 1) Get token + connect, with retry for transient network blips
+      //    (mobile networks + the LiveKit handshake → intermittent
+      //    "Network Error"). CRITICAL: attach NO room event handlers until
+      //    AFTER a successful connect — otherwise a failed attempt's
+      //    disconnect fires our Disconnected->cleanup and wipes the call state
+      //    mid-join, and a half-open room leaks (you'd hear audio before
+      //    accepting, and the answerer ends up seeing nobody).
+      let connected: Room | null = null;
+      let lastErr: any;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let candidate: Room | null = null;
         try {
-          await r.connect(url, token);
-        } catch (e) {
-          // Tear down the half-open room before retrying so its handlers and
-          // websocket don't leak.
-          try { await r.disconnect(); } catch { /* noop */ }
-          throw e;
+          const { token, url } = await groupCallService.getToken(targetChatId);
+          candidate = new Room({ adaptiveStream: true, dynacast: true });
+          await candidate.connect(url, token);
+          connected = candidate;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[groupcall] connect attempt ${attempt + 1}/3 failed:`, err);
+          // No handlers attached yet, so this disconnect can't trigger cleanup.
+          if (candidate) { try { await candidate.disconnect(); } catch { /* noop */ } }
+          if (attempt < 2) {
+            await new Promise((res) => setTimeout(res, 700 * (attempt + 1)));
+          }
         }
+      }
+      if (!connected) throw lastErr;
+      const room = connected;
 
-        // Publish our identity so other participants see our name + avatar.
-        // Non-fatal: if the token somehow lacks canUpdateOwnMetadata, joining
-        // without metadata is far better than failing the whole call.
+      // 2) NOW attach handlers (post-connect, so retries above never wipe state).
+      const refreshParticipants = () => {
+        setParticipants([
+          room.localParticipant,
+          ...Array.from(room.remoteParticipants.values()),
+        ]);
+      };
+
+      room.on(RoomEvent.ParticipantConnected, refreshParticipants);
+      room.on(RoomEvent.ParticipantDisconnected, (_p: RemoteParticipant) => {
+        refreshParticipants();
+        if (room.remoteParticipants.size === 0) {
+          Toast.show({ type: 'info', text1: t('groupCall.everyoneLeft') });
+          cleanup();
+        }
+      });
+      // A joiner sets display-name metadata AFTER connecting → re-render so
+      // their name + avatar appear for people already in the call.
+      room.on(RoomEvent.ParticipantMetadataChanged, refreshParticipants);
+      room.on(RoomEvent.ParticipantNameChanged, refreshParticipants);
+      room.on(RoomEvent.TrackMuted, refreshParticipants);
+      room.on(RoomEvent.TrackUnmuted, refreshParticipants);
+      room.on(RoomEvent.TrackPublished, refreshParticipants);
+      room.on(RoomEvent.TrackUnpublished, refreshParticipants);
+      // A remote participant's video only renders once its track is SUBSCRIBED
+      // (publication.track null -> track), so re-render on subscribe.
+      room.on(RoomEvent.TrackSubscribed, refreshParticipants);
+      room.on(RoomEvent.TrackUnsubscribed, refreshParticipants);
+      room.on(RoomEvent.LocalTrackPublished, refreshParticipants);
+      room.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
+      room.on(RoomEvent.Disconnected, () => { cleanup(); });
+
+      // 3) Publish local media. If MIC setup fails, tear the room down so we
+      //    don't leak a connected session. CAMERA is non-fatal — join without
+      //    it rather than fail the whole video call.
+      try {
         if (user) {
           try {
-            await r.localParticipant.setMetadata(JSON.stringify({
+            await room.localParticipant.setMetadata(JSON.stringify({
               displayName: user.displayName,
               username: user.username,
               avatar: user.avatar || '',
@@ -204,30 +209,21 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
             console.warn('[groupcall] setMetadata failed (non-fatal):', err);
           }
         }
-
-        // Turn on mic always, camera only for video calls
-        await r.localParticipant.setMicrophoneEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
         if (callType === 'video') {
-          await r.localParticipant.setCameraEnabled(true);
-        }
-
-        refreshParticipants();
-        return r;
-      };
-
-      let lastErr: any;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          return await attemptConnect();
-        } catch (err) {
-          lastErr = err;
-          console.warn(`[groupcall] connect attempt ${attempt + 1}/3 failed:`, err);
-          if (attempt < 2) {
-            await new Promise((res) => setTimeout(res, 700 * (attempt + 1)));
+          try {
+            await room.localParticipant.setCameraEnabled(true);
+          } catch (err) {
+            console.warn('[groupcall] setCameraEnabled failed (non-fatal):', err);
           }
         }
+      } catch (err) {
+        try { await room.disconnect(); } catch { /* noop */ }
+        throw err;
       }
-      throw lastErr;
+
+      refreshParticipants();
+      return room;
     },
     [user, t, cleanup],
   );
