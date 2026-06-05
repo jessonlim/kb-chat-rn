@@ -10,7 +10,6 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
-import callkeepService from './callkeepService';
 import { getNotifications, getDevice } from '../utils/nativeModules';
 
 // ── Foreground notification display ─────────────────────────────────
@@ -27,16 +26,18 @@ const configureHandler = () => {
     handleNotification: async (notification) => {
       const data = notification.request.content.data;
 
-      // If this is an incoming call notification, suppress the regular
-      // notification because the native full-screen call UI handles it.
-      if (data?.type === 'incoming_call') {
-        callkeepService.showIncomingCall({
-          callerId: data.callerId as string,
-          callerName: (data.callerName as string) || 'Unknown',
-          avatar: data.callerAvatar as string | undefined,
-          callType: (data.callType as 'voice' | 'video') || 'voice',
-          chatId: data.chatId as string,
-        });
+      // Incoming-call pushes — 1:1 ('call'), group ('group_call'), or legacy
+      // ('incoming_call'). This display handler only runs while the app is in
+      // the FOREGROUND, where the in-app call UI already shows the ring, so
+      // suppress the duplicate push banner entirely. (Backgrounded pushes are
+      // shown by the OS and open the app when tapped.) The backend sends type
+      // 'call' / 'group_call'; matching only 'incoming_call' here was the bug
+      // that let the banner show on top of the in-app call screen.
+      if (
+        data?.type === 'call' ||
+        data?.type === 'group_call' ||
+        data?.type === 'incoming_call'
+      ) {
         return {
           shouldShowAlert: false,
           shouldShowBanner: false,
