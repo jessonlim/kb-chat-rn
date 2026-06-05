@@ -372,10 +372,13 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       if (state === 'incoming') {
-        // 30s ringtone, default vibrate pattern, no iOS category override
-        getInCallManager().startRingtone('_BUNDLE_', [500, 1000], '', 30);
+        // Use the SYSTEM default ringtone with the 'default' iOS audio
+        // category — same params as the working 1:1 ringtone. The previous
+        // '_BUNDLE_' value needs a bundled sound file that doesn't exist, so
+        // it played NOTHING on iOS (no group-call ringtone).
+        getInCallManager().startRingtone('_DEFAULT_', 1000, 'default', 30);
       } else if (state === 'joining') {
-        getInCallManager().startRingback('_BUNDLE_');
+        getInCallManager().startRingback('_DEFAULT_');
       } else {
         getInCallManager().stopRingtone();
         getInCallManager().stopRingback();
