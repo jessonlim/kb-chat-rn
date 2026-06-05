@@ -132,71 +132,96 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
     async (targetChatId: string, callType: GroupCallType): Promise<Room> => {
       // Resolve LiveKit lazily here, the first time a call connects (M4).
       const { Room, RoomEvent } = getLiveKitClient();
-      const { token, url } = await groupCallService.getToken(targetChatId);
-      const r = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
+      // Call setup is sensitive to transient network blips (mobile networks +
+      // the LiveKit websocket handshake), which surfaced as intermittent
+      // "Network Error" on group-call start. Retry the whole token-fetch +
+      // connect a few times with backoff before giving up.
+      const attemptConnect = async (): Promise<Room> => {
+        const { token, url } = await groupCallService.getToken(targetChatId);
+        const r = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
 
-      // Keep participant list in sync as people join / leave / mute
-      const refreshParticipants = () => {
-        const all: Participant[] = [
-          r.localParticipant,
-          ...Array.from(r.remoteParticipants.values()),
-        ];
-        setParticipants(all);
+        // Keep participant list in sync as people join / leave / mute
+        const refreshParticipants = () => {
+          const all: Participant[] = [
+            r.localParticipant,
+            ...Array.from(r.remoteParticipants.values()),
+          ];
+          setParticipants(all);
+        };
+
+        r.on(RoomEvent.ParticipantConnected, refreshParticipants);
+        r.on(RoomEvent.ParticipantDisconnected, (_p: RemoteParticipant) => {
+          refreshParticipants();
+          // If we're the last one, end the call
+          if (r.remoteParticipants.size === 0) {
+            Toast.show({ type: 'info', text1: t('groupCall.everyoneLeft') });
+            cleanup();
+          }
+        });
+        r.on(RoomEvent.TrackMuted, refreshParticipants);
+        r.on(RoomEvent.TrackUnmuted, refreshParticipants);
+        r.on(RoomEvent.TrackPublished, refreshParticipants);
+        r.on(RoomEvent.TrackUnpublished, refreshParticipants);
+        // CRITICAL: a remote participant's video only becomes renderable once
+        // its track is SUBSCRIBED (publication.track goes from null -> a track).
+        // Without re-rendering on subscribe, remote video never appears even
+        // though it's flowing — each person only ever sees their own camera.
+        r.on(RoomEvent.TrackSubscribed, refreshParticipants);
+        r.on(RoomEvent.TrackUnsubscribed, refreshParticipants);
+        r.on(RoomEvent.LocalTrackPublished, refreshParticipants);
+        r.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
+        r.on(RoomEvent.Disconnected, () => { cleanup(); });
+
+        try {
+          await r.connect(url, token);
+        } catch (e) {
+          // Tear down the half-open room before retrying so its handlers and
+          // websocket don't leak.
+          try { await r.disconnect(); } catch { /* noop */ }
+          throw e;
+        }
+
+        // Publish our identity so other participants see our name + avatar.
+        // Non-fatal: if the token somehow lacks canUpdateOwnMetadata, joining
+        // without metadata is far better than failing the whole call.
+        if (user) {
+          try {
+            await r.localParticipant.setMetadata(JSON.stringify({
+              displayName: user.displayName,
+              username: user.username,
+              avatar: user.avatar || '',
+            }));
+          } catch (err) {
+            console.warn('[groupcall] setMetadata failed (non-fatal):', err);
+          }
+        }
+
+        // Turn on mic always, camera only for video calls
+        await r.localParticipant.setMicrophoneEnabled(true);
+        if (callType === 'video') {
+          await r.localParticipant.setCameraEnabled(true);
+        }
+
+        refreshParticipants();
+        return r;
       };
 
-      r.on(RoomEvent.ParticipantConnected, refreshParticipants);
-      r.on(RoomEvent.ParticipantDisconnected, (_p: RemoteParticipant) => {
-        refreshParticipants();
-        // If we're the last one, end the call
-        if (r.remoteParticipants.size === 0) {
-          Toast.show({ type: 'info', text1: t('groupCall.everyoneLeft') });
-          cleanup();
-        }
-      });
-      r.on(RoomEvent.TrackMuted, refreshParticipants);
-      r.on(RoomEvent.TrackUnmuted, refreshParticipants);
-      r.on(RoomEvent.TrackPublished, refreshParticipants);
-      r.on(RoomEvent.TrackUnpublished, refreshParticipants);
-      // CRITICAL: a remote participant's video only becomes renderable once
-      // its track is SUBSCRIBED (publication.track goes from null -> a track).
-      // Without re-rendering on subscribe, remote video never appears even
-      // though it's flowing — each person only ever sees their own camera.
-      r.on(RoomEvent.TrackSubscribed, refreshParticipants);
-      r.on(RoomEvent.TrackUnsubscribed, refreshParticipants);
-      r.on(RoomEvent.LocalTrackPublished, refreshParticipants);
-      r.on(RoomEvent.LocalTrackUnpublished, refreshParticipants);
-      r.on(RoomEvent.Disconnected, () => { cleanup(); });
-
-      await r.connect(url, token);
-
-      // Publish our identity so other participants see our name + avatar.
-      // Non-fatal: if the token somehow lacks canUpdateOwnMetadata, joining
-      // without metadata is far better than failing the whole call (this is
-      // exactly what surfaced as "does not have permission to update own
-      // metadata" and killed group calls for whoever started one).
-      if (user) {
+      let lastErr: any;
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          await r.localParticipant.setMetadata(JSON.stringify({
-            displayName: user.displayName,
-            username: user.username,
-            avatar: user.avatar || '',
-          }));
+          return await attemptConnect();
         } catch (err) {
-          console.warn('[groupcall] setMetadata failed (non-fatal):', err);
+          lastErr = err;
+          console.warn(`[groupcall] connect attempt ${attempt + 1}/3 failed:`, err);
+          if (attempt < 2) {
+            await new Promise((res) => setTimeout(res, 700 * (attempt + 1)));
+          }
         }
       }
-
-      // Turn on mic always, camera only for video calls
-      await r.localParticipant.setMicrophoneEnabled(true);
-      if (callType === 'video') {
-        await r.localParticipant.setCameraEnabled(true);
-      }
-
-      refreshParticipants();
-      return r;
+      throw lastErr;
     },
     [user, t, cleanup],
   );
