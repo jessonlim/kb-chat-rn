@@ -400,11 +400,12 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     if (state === 'in_call' || state === 'joining') {
-      showOngoingCall({ name: groupName || '', isVideo: type === 'video' });
+      showOngoingCall({ name: groupName || '', isVideo: type === 'video', source: 'group' });
       setEndCallHandler(() => { void leaveGroupCall(); });
     } else if (state === 'idle') {
-      hideOngoingCall();
-      setEndCallHandler(null);
+      // Pass 'group' so this can't tear down a 1:1 call's notification.
+      // hideOngoingCall clears the end handler too when we own it.
+      hideOngoingCall('group');
     }
   }, [state, groupName, type, leaveGroupCall]);
 

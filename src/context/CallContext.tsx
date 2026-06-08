@@ -627,11 +627,13 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       showOngoingCall({
         name: remoteUser?.displayName || remoteUser?.username || '',
         isVideo: callType === 'video',
+        source: 'direct',
       });
       setEndCallHandler(() => endCall());
     } else if (callState === 'idle') {
-      hideOngoingCall();
-      setEndCallHandler(null);
+      // Pass 'direct' so this can't tear down a group call's notification.
+      // hideOngoingCall clears the end handler too when we own it.
+      hideOngoingCall('direct');
     }
   }, [callState, remoteUser, callType, endCall]);
 

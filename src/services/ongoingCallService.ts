@@ -5,12 +5,21 @@
 // the app is backgrounded AND surfaces Android's green microphone indicator
 // (the service declares the microphone foreground-service type). ANDROID ONLY;
 // every export is a no-op on iOS (which uses its own call UI).
+//
+// OWNERSHIP: there is ONE notification + ONE end-call handler, but BOTH the 1:1
+// call context and the group call context drive it. To stop one context from
+// tearing down the other's call, every show/hide is tagged with a `source`
+// ('direct' | 'group'). A hide from a context that doesn't currently own the
+// notification is ignored — this is what previously nulled the group call's
+// "End call" handler (the 1:1 context's idle effect re-firing mid-group-call).
 
 import { Platform, PermissionsAndroid } from 'react-native';
 import { getNotifee } from '../utils/nativeModules';
 
 const CHANNEL_ID = 'ongoing_call';
 const NOTIF_ID = 'ongoing_call';
+
+export type CallSource = 'direct' | 'group';
 
 // ROOT CAUSE of the 2026-06-08 Samsung/Android-14 crash (FIXED): the foreground
 // service was started with the `microphone`/`camera` types, but the app's
@@ -22,6 +31,14 @@ const NOTIF_ID = 'ongoing_call';
 
 let setupDone = false;
 let endCallHandler: (() => void) | null = null;
+// Which call context currently owns the notification (null = nothing shown).
+let activeSource: CallSource | null = null;
+// Monotonic token bumped on every show-start AND every hide. showOngoingCall is
+// async (awaits permission checks + channel + displayNotification); if a hide (or
+// a newer show) lands while a show is parked on an await, the token diverges and
+// the stale show aborts before painting an orphaned notification. This closes the
+// show-after-hide race that otherwise strands the notification on a failed call.
+let showToken = 0;
 
 /** The active call registers its hang-up fn so the notification's "End call"
  *  action can terminate the call. */
@@ -29,9 +46,17 @@ export const setEndCallHandler = (fn: (() => void) | null) => {
   endCallHandler = fn;
 };
 
-const handleEvent = (type: number, actionId: string | undefined, ACTION_PRESS: number) => {
+const handleEvent = async (
+  type: number,
+  actionId: string | undefined,
+  ACTION_PRESS: number
+) => {
   if (type === ACTION_PRESS && actionId === 'end_call') {
+    // End the live call (if a handler is registered)…
     try { endCallHandler?.(); } catch { /* noop */ }
+    // …and ALWAYS force the notification down as a fallback, so a stale/orphaned
+    // notification (call already ended, handler gone) is still dismissable.
+    try { await hideOngoingCall(); } catch { /* noop */ }
   }
 };
 
@@ -49,9 +74,9 @@ export const registerOngoingCallService = () => {
     notifee.onBackgroundEvent(async ({ type, detail }) =>
       handleEvent(type, detail?.pressAction?.id, ACTION_PRESS)
     );
-    notifee.onForegroundEvent(({ type, detail }) =>
-      handleEvent(type, detail?.pressAction?.id, ACTION_PRESS)
-    );
+    notifee.onForegroundEvent(({ type, detail }) => {
+      void handleEvent(type, detail?.pressAction?.id, ACTION_PRESS);
+    });
     setupDone = true;
   } catch (err) {
     console.warn('[ongoingCall] register failed:', err);
@@ -59,8 +84,16 @@ export const registerOngoingCallService = () => {
 };
 
 /** Show the persistent ongoing-call notification (call connected). */
-export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) => {
+export const showOngoingCall = async (opts: {
+  name: string;
+  isVideo: boolean;
+  source: CallSource;
+}) => {
   if (Platform.OS !== 'android') return;
+  // Claim ownership SYNCHRONOUSLY (before any await) so a concurrent hide can see
+  // + invalidate this in-flight show. `myToken` lets us detect being superseded.
+  const myToken = ++showToken;
+  activeSource = opts.source;
   try {
     // Android 14+ throws SecurityException at startForeground() unless the
     // DANGEROUS runtime grant behind each FGS type is actually granted at that
@@ -72,7 +105,11 @@ export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) 
     const micGranted = await PermissionsAndroid.check(
       PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
     ).catch(() => false);
-    if (!micGranted) return;
+    if (!micGranted) {
+      if (myToken === showToken) activeSource = null; // release the claim we took
+      return;
+    }
+    if (myToken !== showToken) return; // a hide / newer show superseded us
 
     const mod = getNotifee();
     const notifee = mod.default;
@@ -97,6 +134,8 @@ export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) 
         types.push(AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_CAMERA);
       }
     }
+    if (myToken !== showToken) return; // superseded while resolving permissions
+
     await notifee.displayNotification({
       id: NOTIF_ID,
       title: opts.isVideo ? 'Ongoing video call' : 'Ongoing voice call',
@@ -114,17 +153,38 @@ export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) 
         actions: [{ title: 'End call', pressAction: { id: 'end_call' } }],
       },
     });
+
+    // Self-heal: if a hide landed DURING displayNotification's await (activeSource
+    // nulled, token bumped), the call is already gone → tear down the orphan now.
+    if (myToken !== showToken && activeSource === null) {
+      try { await notifee.stopForegroundService(); } catch { /* noop */ }
+      try { await notifee.cancelNotification(NOTIF_ID); } catch { /* noop */ }
+    }
   } catch (err) {
     console.warn('[ongoingCall] show failed:', err);
   }
 };
 
-/** Hide the notification + stop the foreground service (call ended). */
-export const hideOngoingCall = async () => {
+/**
+ * Hide the notification + stop the foreground service (call ended).
+ *
+ * @param source If given, the hide is IGNORED unless this source currently owns
+ *   the notification — so the 1:1 context's idle effect can't kill a group call
+ *   (and vice-versa). Omit `source` to force the hide (used by the "End call"
+ *   action fallback and any hard teardown).
+ */
+export const hideOngoingCall = async (source?: CallSource) => {
   if (Platform.OS !== 'android') return;
-  try {
-    await getNotifee().default.stopForegroundService();
-  } catch (err) {
-    console.warn('[ongoingCall] hide failed:', err);
-  }
+  // Stale cross-context hide: a different call owns the notification → ignore.
+  if (source && activeSource !== null && activeSource !== source) return;
+  showToken++; // invalidate any in-flight showOngoingCall parked on an await
+  activeSource = null;
+  endCallHandler = null;
+  const notifee = getNotifee().default;
+  // stopForegroundService() detaches the service; cancelNotification() then
+  // removes the (ongoing) notification, which stopForegroundService alone does
+  // NOT reliably do — that lingering notification was the "still there after the
+  // call ended" bug.
+  try { await notifee.stopForegroundService(); } catch { /* noop */ }
+  try { await notifee.cancelNotification(NOTIF_ID); } catch { /* noop */ }
 };
