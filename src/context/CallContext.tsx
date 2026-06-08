@@ -523,13 +523,32 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('[callkeep] Answer triggered, callState:', callStateRef.current);
         if (callStateRef.current === 'ringing') {
           acceptCall();
+        } else {
+          // Cold launch from a KILLED state (the FCM full-screen ring): the
+          // WebRTC offer hasn't arrived yet. Queue the answer — the backend
+          // replays incoming_call when our socket reconnects (callState ->
+          // 'ringing') and the shared auto-accept effect connects the call.
+          // Mirrors the iOS CallKit cold-launch path.
+          pendingCallKitAnswerRef.current = true;
+          if (pendingAnswerTimerRef.current) clearTimeout(pendingAnswerTimerRef.current);
+          pendingAnswerTimerRef.current = setTimeout(() => {
+            pendingCallKitAnswerRef.current = false;
+            pendingAnswerTimerRef.current = null;
+          }, 40000);
         }
       },
       // User tapped Decline on native notification (or it timed out)
-      (_info, timedOut) => {
+      (info, timedOut) => {
         console.log('[callkeep] Decline triggered, timedOut:', timedOut);
         if (callStateRef.current === 'ringing') {
           rejectCall(timedOut ? 'timeout' : undefined);
+        } else if (!timedOut && info?.callerId) {
+          // Cold-launch decline before the offer arrived: best-effort tell the
+          // caller (if the socket is up by now); otherwise the caller's ring
+          // window expires on its own.
+          try {
+            socketService.emit('reject_call', { callerId: info.callerId, reason: 'declined' });
+          } catch { /* socket not ready — caller will time out */ }
         }
       },
     );
@@ -558,7 +577,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
           pendingAnswerTimerRef.current = setTimeout(() => {
             pendingCallKitAnswerRef.current = false;
             pendingAnswerTimerRef.current = null;
-          }, 20000);
+          }, 40000); // 40s: a slow Samsung cold-start can exceed 20s before the offer replays
         }
       },
       // User ended / declined from the iOS system call UI

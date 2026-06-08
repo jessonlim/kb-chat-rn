@@ -59,7 +59,10 @@
           }
         }
       ],
-      "./plugins/withNotifeeForegroundServiceType"
+      "./plugins/withNotifeeForegroundServiceType",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "./plugins/withRemoveCallKitTelecomAndroidFcm"
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",

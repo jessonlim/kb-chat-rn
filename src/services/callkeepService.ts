@@ -31,6 +31,14 @@ const callkeepService = {
   showIncomingCall(info: IncomingCallInfo) {
     if (Platform.OS !== 'android') return;
 
+    // De-dupe: the FCM background handler AND the live-socket onIncomingCall can
+    // both fire for the same call (app backgrounded-but-alive). Drawing the
+    // native full-screen UI twice crashes some Samsung devices (Fold Z 6). If
+    // we're already showing this caller's call, ignore the second request.
+    if (currentCallUUID && pendingCallInfo?.callerId === info.callerId) {
+      return;
+    }
+
     // Create a unique ID for this call
     const uuid = `${info.callerId}_${Date.now()}`;
     currentCallUUID = uuid;

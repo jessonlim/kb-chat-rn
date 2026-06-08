@@ -10,7 +10,34 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
-import { getNotifications, getDevice } from '../utils/nativeModules';
+import { getNotifications, getDevice, getNotifee } from '../utils/nativeModules';
+
+// ── Android FCM via @react-native-firebase ──────────────────────────
+// On Android, expo-notifications' own Firebase service is stripped (by
+// expo-callkit-telecom's config plugin, which sets tools:node="remove" on it),
+// and our withRemoveCallKitTelecomAndroidFcm plugin strips callkit-telecom's
+// service too — so @react-native-firebase is the SOLE FCM handler. That means:
+//   • Backgrounded/killed CHAT notifications (notification-type messages) are
+//     still drawn by the OS automatically — no handler needed.
+//   • FOREGROUND display must be done by us (RNFirebase doesn't auto-display) →
+//     we draw it with Notifee (see setupAndroidForegroundFcm).
+//   • TAP navigation moves to messaging().onNotificationOpenedApp /
+//     getInitialNotification (see setupTapHandler / handleInitialNotification).
+// iOS is UNCHANGED — it never uses RNFirebase (no GoogleService-Info.plist yet);
+// it keeps the expo-notifications path. Everything here is Platform-guarded so
+// the Firebase native module is never touched on iOS.
+let getMessaging: (() => any) | null = null;
+const messaging = () => {
+  if (!getMessaging) getMessaging = require('@react-native-firebase/messaging').default;
+  return getMessaging!();
+};
+
+// Call-type pushes are handled by the call UI / socket — never draw them as a
+// plain chat banner.
+const isCallData = (type?: string) =>
+  type === 'call' || type === 'group_call' || type === 'incoming_call' || type === 'missed_call';
+
+let androidFcmUnsub: (() => void) | null = null;
 
 // ── Foreground notification display ─────────────────────────────────
 // Registers the handler that decides how a notification renders while the
@@ -147,6 +174,11 @@ const notificationService = {
       // Register with backend
       await this.registerToken(token);
       currentToken = token;
+      // Android: RNFirebase owns the FCM pipeline now, so draw foreground
+      // notifications + handle their taps ourselves (iOS keeps the expo path).
+      if (Platform.OS === 'android' && !androidFcmUnsub) {
+        androidFcmUnsub = this.setupAndroidForegroundFcm();
+      }
       return token;
     } catch (err) {
       console.warn('[notifications] Failed to get push token:', err);
@@ -157,7 +189,16 @@ const notificationService = {
   /** Register FCM token with the backend */
   async registerToken(token: string) {
     try {
-      await api.post('/api/notifications/register-token', { token });
+      await api.post('/api/notifications/register-token', {
+        token,
+        // Android builds ship the @react-native-firebase background handler, so
+        // they can receive the DATA-ONLY call push that draws the full-screen
+        // lock-screen ring. The backend gates on this flag: call-capable tokens
+        // get data-only, everyone else gets the legacy notification-block push.
+        // (This Android FCM device token is the same one Firebase messaging
+        // listens on, so the background handler will receive these pushes.)
+        callCapable: Platform.OS === 'android',
+      });
       console.log('[notifications] Token registered with backend');
     } catch (err) {
       console.warn('[notifications] Failed to register token:', err);
@@ -166,6 +207,12 @@ const notificationService = {
 
   /** Unregister FCM token (call on logout) */
   async unregisterToken() {
+    // Tear down the Android foreground-FCM subscriptions so a re-login re-arms
+    // them cleanly (and we don't double-draw).
+    if (androidFcmUnsub) {
+      try { androidFcmUnsub(); } catch { /* noop */ }
+      androidFcmUnsub = null;
+    }
     if (!currentToken) return;
     try {
       await api.post('/api/notifications/unregister-token', { token: currentToken });
@@ -209,10 +256,73 @@ const notificationService = {
   },
 
   /**
+   * Android only: draw FOREGROUND chat notifications (RNFirebase doesn't
+   * auto-display foreground messages) and navigate when one is tapped.
+   * Backgrounded/killed chat notifications are drawn by the OS and their taps
+   * are handled by setupTapHandler's onNotificationOpenedApp. Returns a cleanup.
+   */
+  setupAndroidForegroundFcm(): () => void {
+    if (Platform.OS !== 'android') return () => {};
+    const self = this;
+    const unsubMessage = messaging().onMessage(async (msg: any) => {
+      const data = msg?.data || {};
+      if (isCallData(data.type)) return; // calls handled by socket / full-screen UI
+      try {
+        const notifeeMod = getNotifee();
+        await notifeeMod.default.displayNotification({
+          title: msg.notification?.title || data.title || 'KB Chat',
+          body: msg.notification?.body || data.body || '',
+          data,
+          android: {
+            channelId: 'messages',
+            smallIcon: 'notification_icon',
+            pressAction: { id: 'open_chat', launchActivity: 'default' },
+          },
+        });
+      } catch (err) {
+        console.warn('[fcm] foreground display failed:', err);
+      }
+    });
+    // Tap on the foreground banner we just drew → navigate.
+    const notifeeMod = getNotifee();
+    const unsubPress = notifeeMod.default.onForegroundEvent(({ type, detail }: any) => {
+      if (type === notifeeMod.EventType.PRESS) {
+        const data = detail?.notification?.data;
+        if (data?.chatId && navigationRef.isReady()) self._navigateToChat(String(data.chatId));
+      }
+    });
+    return () => {
+      try { unsubMessage(); } catch { /* noop */ }
+      try { unsubPress(); } catch { /* noop */ }
+    };
+  },
+
+  /**
    * Set up notification tap handler — navigates to the right screen.
-   * Returns a cleanup function.
+   * Returns a cleanup function. Android taps come through RNFirebase
+   * (onNotificationOpenedApp); iOS keeps the expo-notifications listener.
    */
   setupTapHandler(): () => void {
+    if (Platform.OS === 'android') {
+      const unsub = messaging().onNotificationOpenedApp((msg: any) => {
+        const data = msg?.data;
+        if (!data || !navigationRef.isReady()) return;
+        if (data.chatId) {
+          this._navigateToChat(String(data.chatId));
+        } else if (data.channelId) {
+          try {
+            (navigationRef as any).navigate('DiscoverTab', {
+              screen: 'ChannelDetail',
+              params: { channelId: data.channelId },
+            });
+          } catch (err) {
+            console.warn('[notifications] navigate to channel failed:', err);
+          }
+        }
+      });
+      return () => { try { unsub(); } catch { /* noop */ } };
+    }
+
     const subscription = getNotifications().addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data;
@@ -239,8 +349,20 @@ const notificationService = {
 
   /**
    * Handle the notification that launched the app (cold start from tap).
+   * Android: RNFirebase getInitialNotification; iOS: expo getLastNotificationResponse.
    */
   async handleInitialNotification() {
+    if (Platform.OS === 'android') {
+      const msg = await messaging().getInitialNotification();
+      const data = msg?.data;
+      if (data?.chatId) {
+        setTimeout(() => {
+          if (navigationRef.isReady()) this._navigateToChat(String(data.chatId));
+        }, 1000);
+      }
+      return;
+    }
+
     const response = await getNotifications().getLastNotificationResponseAsync();
     if (!response) return;
 
