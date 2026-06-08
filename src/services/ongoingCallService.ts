@@ -6,11 +6,19 @@
 // (the service declares the microphone foreground-service type). ANDROID ONLY;
 // every export is a no-op on iOS (which uses its own call UI).
 
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import { getNotifee } from '../utils/nativeModules';
 
 const CHANNEL_ID = 'ongoing_call';
 const NOTIF_ID = 'ongoing_call';
+
+// ROOT CAUSE of the 2026-06-08 Samsung/Android-14 crash (FIXED): the foreground
+// service was started with the `microphone`/`camera` types, but the app's
+// manifest was missing the FOREGROUND_SERVICE_MICROPHONE / FOREGROUND_SERVICE_CAMERA
+// permissions those types require on Android 14+. startForeground() then threw a
+// SecurityException in Notifee's native code (uncatchable) → hard crash. We also
+// dropped the `phoneCall` type (its Telecom prerequisites aren't met by this app).
+// Fix: permissions added to app.json + runtime types reduced to microphone(+camera).
 
 let setupDone = false;
 let endCallHandler: (() => void) | null = null;
@@ -54,6 +62,18 @@ export const registerOngoingCallService = () => {
 export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) => {
   if (Platform.OS !== 'android') return;
   try {
+    // Android 14+ throws SecurityException at startForeground() unless the
+    // DANGEROUS runtime grant behind each FGS type is actually granted at that
+    // moment (RECORD_AUDIO for `microphone`, CAMERA for `camera`) — not just the
+    // normal FOREGROUND_SERVICE_* permission. Any connected call already holds
+    // the mic grant; if it somehow doesn't, bail rather than crash. Only add the
+    // `camera` type when the camera grant is truly present (a "video" call whose
+    // camera was denied/disabled would otherwise crash here).
+    const micGranted = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+    ).catch(() => false);
+    if (!micGranted) return;
+
     const mod = getNotifee();
     const notifee = mod.default;
     const { AndroidImportance, AndroidForegroundServiceType } = mod;
@@ -62,12 +82,20 @@ export const showOngoingCall = async (opts: { name: string; isVideo: boolean }) 
       name: 'Ongoing calls',
       importance: AndroidImportance.LOW, // persistent, no sound / heads-up
     });
+    // Only the `microphone` (+ `camera` for video) types — each backed by its
+    // FOREGROUND_SERVICE_* permission in app.json. We deliberately omit the
+    // `phoneCall` type: its Telecom prerequisites aren't satisfied by this app,
+    // and these two already trigger Android's green privacy indicators.
     const types = [
-      AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
       AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE,
     ];
     if (opts.isVideo) {
-      types.push(AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_CAMERA);
+      const camGranted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.CAMERA
+      ).catch(() => false);
+      if (camGranted) {
+        types.push(AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_CAMERA);
+      }
     }
     await notifee.displayNotification({
       id: NOTIF_ID,

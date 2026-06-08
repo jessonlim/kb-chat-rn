@@ -2,17 +2,25 @@
 // foreground service (app.notifee.core.ForegroundService).
 //
 // On Android 14+ (targetSdk 34) a foreground service started WITH a type must
-// have that type declared on the <service> in the merged manifest, or the OS
-// throws and the call notification crashes. Notifee's bundled service doesn't
-// declare one, so we override it here. The ongoing-call notification uses
-// phoneCall + microphone (+ camera for video calls), so the service must allow
-// that superset. The matching FOREGROUND_SERVICE_* permissions are already in
-// app.json.
+// (1) declare that type on the <service> in the merged manifest AND (2) the app
+// must hold the matching FOREGROUND_SERVICE_* runtime permission — otherwise the
+// OS throws a SecurityException at startForeground() and the call notification
+// HARD-CRASHES the app (native, uncatchable). Notifee's bundled service doesn't
+// declare a type, so we override it here.
+//
+// The ongoing-call notification uses microphone (+ camera for video calls). We
+// intentionally do NOT use the `phoneCall` type here — that type has strict
+// Telecom prerequisites (self-managed ConnectionService / default-dialer) that
+// this app doesn't satisfy, and microphone+camera already surface Android's
+// green mic/camera privacy indicators (the WhatsApp-style behaviour we want).
+// The matching FOREGROUND_SERVICE_MICROPHONE / FOREGROUND_SERVICE_CAMERA
+// permissions are declared in app.json. (The separate incoming-call library
+// keeps its own service with the phoneCall type — untouched by this plugin.)
 
 const { withAndroidManifest } = require('@expo/config-plugins');
 
 const SERVICE_NAME = 'app.notifee.core.ForegroundService';
-const FGS_TYPES = 'phoneCall|microphone|camera';
+const FGS_TYPES = 'microphone|camera';
 
 module.exports = function withNotifeeForegroundServiceType(config) {
   return withAndroidManifest(config, (cfg) => {

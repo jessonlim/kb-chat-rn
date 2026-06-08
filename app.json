@@ -87,6 +87,8 @@
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_CAMERA",
         "android.permission.VIBRATE",
         "android.permission.DISABLE_KEYGUARD",
         "android.permission.MANAGE_OWN_CALLS",
