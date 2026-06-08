@@ -19,6 +19,11 @@ import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
 import callkeepService from '../services/callkeepService';
+import {
+  showIncomingCallNotification,
+  hideIncomingCallNotification,
+  consumePendingCallAction,
+} from '../services/incomingCallNotification';
 import callkitService from '../services/callkitService';
 import {
   showOngoingCall,
@@ -189,8 +194,8 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       getInCallManager().stop();
     } catch {}
 
-    // Hide native call notification (if showing)
-    callkeepService.hideIncomingCall();
+    // Hide the incoming-call notification (Notifee full-screen) if showing.
+    void hideIncomingCallNotification();
 
     // Dismiss the iOS CallKit system UI if a call session is lingering
     // (fire-and-forget; no-op on Android / when no session exists).
@@ -636,6 +641,40 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [callState, acceptCall]);
 
+  // ── Consume a pending Answer/Decline from the Android lock-screen call
+  // notification (Notifee). The choice is persisted to MMKV by the headless FCM
+  // event handler (a SEPARATE JS context), so we read it when THIS context
+  // becomes active: on mount (cold launch) and on every return to foreground
+  // (backgrounded-but-alive). Feeds the SAME pendingCallKitAnswerRef machinery
+  // the iOS CallKit cold-launch already uses.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const consume = () => {
+      const pending = consumePendingCallAction();
+      if (!pending) return;
+      if (pending.action === 'answer') {
+        if (callStateRef.current === 'ringing') {
+          acceptCall(); // offer already here (backgrounded-alive) → connect now
+        } else {
+          // Cold launch: offer not here yet. Arm the auto-accept that fires once
+          // the backend replays incoming_call and callState -> 'ringing'.
+          pendingCallKitAnswerRef.current = true;
+          if (pendingAnswerTimerRef.current) clearTimeout(pendingAnswerTimerRef.current);
+          pendingAnswerTimerRef.current = setTimeout(() => {
+            pendingCallKitAnswerRef.current = false;
+            pendingAnswerTimerRef.current = null;
+          }, 40000);
+        }
+      } else if (pending.action === 'decline') {
+        try { socketService.emit('reject_call', { callerId: pending.callerId, reason: 'declined' }); } catch { /* socket not up — caller times out */ }
+        void hideIncomingCallNotification();
+      }
+    };
+    consume(); // cold launch
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') consume(); });
+    return () => sub.remove();
+  }, [acceptCall]);
+
   // ── Android ongoing-call notification (keep-alive + mic indicator) ──
   // While a call is connected, show a persistent foreground-service
   // notification (WhatsApp-style). It keeps the call running when the app is
@@ -706,14 +745,14 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       setIsSpeaker(data.type === 'video');
       setCallState('ringing');
 
-      // Show native full-screen incoming call notification ONLY when the
+      // Show the full-screen incoming-call notification (Notifee) ONLY when the
       // app isn't currently in the foreground. In foreground the JS
-      // IncomingCallOverlay handles the ringing UI; layering the native
-      // full-screen-notification on top of it crashes on some Samsung
-      // devices (including the Fold Z 6) and is redundant anyway.
+      // IncomingCallOverlay handles the ringing UI; layering the notification on
+      // top is redundant. (Notifee's fullScreenAction — unlike the old lib — does
+      // NOT start a foreground service, so it doesn't crash from a cold start.)
       const isForeground = AppState.currentState === 'active';
       if (!isForeground) {
-        callkeepService.showIncomingCall({
+        void showIncomingCallNotification({
           callerId: data.callerId,
           callerName: callerInfo.displayName,
           avatar: callerInfo.avatar,

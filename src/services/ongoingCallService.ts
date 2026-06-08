@@ -46,17 +46,53 @@ export const setEndCallHandler = (fn: (() => void) | null) => {
   endCallHandler = fn;
 };
 
-const handleEvent = async (
-  type: number,
-  actionId: string | undefined,
-  ACTION_PRESS: number
-) => {
-  if (type === ACTION_PRESS && actionId === 'end_call') {
+// THE app's single Notifee event handler. Notifee keeps only the LAST
+// onBackgroundEvent/onForegroundEvent registration, so BOTH the ongoing-call
+// "End call" action AND the incoming-call answer/decline route through here,
+// dispatched by data.type / pressAction.id. (Registering a second handler
+// anywhere would silently break whichever registered first.)
+const handleEvent = async (type: number, detail: any, EventType: any) => {
+  const actionId: string | undefined = detail?.pressAction?.id;
+  const dataType: string | undefined = detail?.notification?.data?.type;
+
+  // Ongoing-call "End call" action.
+  if (type === EventType.ACTION_PRESS && actionId === 'end_call') {
     // End the live call (if a handler is registered)…
     try { endCallHandler?.(); } catch { /* noop */ }
     // …and ALWAYS force the notification down as a fallback, so a stale/orphaned
     // notification (call already ended, handler gone) is still dismissable.
     try { await hideOngoingCall(); } catch { /* noop */ }
+    return;
+  }
+
+  // Incoming-call notification (answer / decline / tap-to-open) — delegate to
+  // the incoming-call service (it persists the choice for CallContext to act on
+  // once the app launches + the socket reconnects).
+  if (dataType === 'incoming_call') {
+    try {
+      const { handleIncomingCallNotifeeEvent } = require('./incomingCallNotification');
+      await handleIncomingCallNotifeeEvent(
+        type,
+        actionId,
+        detail?.notification?.data,
+        EventType.ACTION_PRESS,
+        EventType.PRESS
+      );
+    } catch (err) {
+      console.warn('[notifee] incoming-call event failed:', err);
+    }
+    return;
+  }
+
+  // Foreground chat / channel notification (drawn by notificationService) pressed
+  // → navigate. Routed here because notifee allows only one onForegroundEvent.
+  const data = detail?.notification?.data;
+  if (type === EventType.PRESS && (data?.chatId || data?.channelId)) {
+    try {
+      require('./notificationService').default.handleNotifeePress(data);
+    } catch (err) {
+      console.warn('[notifee] chat press nav failed:', err);
+    }
   }
 };
 
@@ -67,15 +103,13 @@ export const registerOngoingCallService = () => {
   try {
     const mod = getNotifee();
     const notifee = mod.default;
-    const ACTION_PRESS = mod.EventType.ACTION_PRESS;
+    const EventType = mod.EventType;
     // The runner promise never resolves → the service stays alive while the
     // notification is displayed.
     notifee.registerForegroundService(() => new Promise(() => { /* keep alive */ }));
-    notifee.onBackgroundEvent(async ({ type, detail }) =>
-      handleEvent(type, detail?.pressAction?.id, ACTION_PRESS)
-    );
+    notifee.onBackgroundEvent(async ({ type, detail }) => handleEvent(type, detail, EventType));
     notifee.onForegroundEvent(({ type, detail }) => {
-      void handleEvent(type, detail?.pressAction?.id, ACTION_PRESS);
+      void handleEvent(type, detail, EventType);
     });
     setupDone = true;
   } catch (err) {

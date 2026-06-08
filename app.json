@@ -63,7 +63,8 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "./plugins/withRemoveCallKitTelecomAndroidFcm",
-      "./plugins/withFirebaseNotificationMetaFix"
+      "./plugins/withFirebaseNotificationMetaFix",
+      "./plugins/withMainActivityLockScreen"
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",

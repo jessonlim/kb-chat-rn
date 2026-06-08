@@ -263,7 +263,6 @@ const notificationService = {
    */
   setupAndroidForegroundFcm(): () => void {
     if (Platform.OS !== 'android') return () => {};
-    const self = this;
     const unsubMessage = messaging().onMessage(async (msg: any) => {
       const data = msg?.data || {};
       if (isCallData(data.type)) return; // calls handled by socket / full-screen UI
@@ -283,18 +282,31 @@ const notificationService = {
         console.warn('[fcm] foreground display failed:', err);
       }
     });
-    // Tap on the foreground banner we just drew → navigate.
-    const notifeeMod = getNotifee();
-    const unsubPress = notifeeMod.default.onForegroundEvent(({ type, detail }: any) => {
-      if (type === notifeeMod.EventType.PRESS) {
-        const data = detail?.notification?.data;
-        if (data?.chatId && navigationRef.isReady()) self._navigateToChat(String(data.chatId));
-      }
-    });
+    // NOTE: the tap on the foreground banner is NOT handled with our own
+    // notifee.onForegroundEvent here — Notifee keeps only ONE foreground-event
+    // registration, and ongoingCallService already owns it. That single handler
+    // calls handleNotifeePress() (below) for chat/channel presses.
     return () => {
       try { unsubMessage(); } catch { /* noop */ }
-      try { unsubPress(); } catch { /* noop */ }
     };
+  },
+
+  /** Navigate when a Notifee-drawn chat/channel notification is pressed. Invoked
+   *  by the app's single notifee event handler (in ongoingCallService). */
+  handleNotifeePress(data: any) {
+    if (!data || !navigationRef.isReady()) return;
+    if (data.chatId) {
+      this._navigateToChat(String(data.chatId));
+    } else if (data.channelId) {
+      try {
+        (navigationRef as any).navigate('DiscoverTab', {
+          screen: 'ChannelDetail',
+          params: { channelId: data.channelId },
+        });
+      } catch (err) {
+        console.warn('[notifications] navigate to channel failed:', err);
+      }
+    }
   },
 
   /**
