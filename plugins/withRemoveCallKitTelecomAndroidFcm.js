@@ -42,6 +42,11 @@ module.exports = function withRemoveCallKitTelecomAndroidFcm(config) {
     }
     // tools:node="remove" deletes the library-contributed service during merge.
     service.$['tools:node'] = 'remove';
+    // The release "lintVitalRelease" task runs the Instantiatable check against
+    // this declaration and (false-positive) demands the to-be-removed service
+    // class extend android.app.Service, failing the build. Suppress that one
+    // check on this node — it's a removal directive, not a real registration.
+    service.$['tools:ignore'] = 'Instantiatable';
 
     return cfg;
   });
