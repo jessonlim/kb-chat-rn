@@ -24,8 +24,14 @@ import type {
   RemoteParticipant,
   Participant,
 } from 'livekit-client';
+import { Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../stores/authStore';
+import {
+  showOngoingCall,
+  hideOngoingCall,
+  setEndCallHandler,
+} from '../services/ongoingCallService';
 import { useT } from '../i18n/I18nContext';
 import socketService from '../services/socketService';
 import groupCallService from '../services/groupCallService';
@@ -387,6 +393,20 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* noop */ }
     };
   }, [state]);
+
+  // ── Android ongoing-call notification (keep-alive + mic indicator) ──
+  // Persistent foreground-service notification while a group call is
+  // connected, like WhatsApp. No-op on iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    if (state === 'in_call' || state === 'joining') {
+      showOngoingCall({ name: groupName || '', isVideo: type === 'video' });
+      setEndCallHandler(() => { void leaveGroupCall(); });
+    } else if (state === 'idle') {
+      hideOngoingCall();
+      setEndCallHandler(null);
+    }
+  }, [state, groupName, type, leaveGroupCall]);
 
   return (
     <GroupCallContext.Provider

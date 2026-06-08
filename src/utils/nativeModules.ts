@@ -42,6 +42,7 @@ import type * as NotificationsType from 'expo-notifications';
 import type * as DeviceType from 'expo-device';
 import type * as LocationType from 'expo-location';
 import type * as CallKitType from 'expo-callkit-telecom';
+import type * as NotifeeType from '@notifee/react-native';
 
 // ── @livekit/react-native-webrtc (1:1 calls — RTCPeerConnection etc.) ──
 let _webrtc: typeof WebRTCType | undefined;
@@ -107,4 +108,13 @@ let _callkit: typeof CallKitType | undefined;
 export const getCallKit = (): typeof CallKitType => {
   if (!_callkit) _callkit = require('expo-callkit-telecom');
   return _callkit!;
+};
+
+// ── @notifee/react-native (Android ongoing-call foreground notification) ─
+// Android-only in practice — used to keep an active call alive + show the
+// persistent "ongoing call" notification (and Android's mic indicator).
+let _notifee: typeof NotifeeType | undefined;
+export const getNotifee = (): typeof NotifeeType => {
+  if (!_notifee) _notifee = require('@notifee/react-native');
+  return _notifee!;
 };

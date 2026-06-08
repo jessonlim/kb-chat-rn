@@ -20,6 +20,11 @@ import callService from '../services/callService';
 import userService from '../services/userService';
 import callkeepService from '../services/callkeepService';
 import callkitService from '../services/callkitService';
+import {
+  showOngoingCall,
+  hideOngoingCall,
+  setEndCallHandler,
+} from '../services/ongoingCallService';
 import { useAuth } from '../stores/authStore';
 import { getWebRTC, getInCallManager } from '../utils/nativeModules';
 
@@ -611,6 +616,24 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       acceptCall();
     }
   }, [callState, acceptCall]);
+
+  // ── Android ongoing-call notification (keep-alive + mic indicator) ──
+  // While a call is connected, show a persistent foreground-service
+  // notification (WhatsApp-style). It keeps the call running when the app is
+  // backgrounded and surfaces Android's green mic indicator. No-op on iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    if (callState === 'in_call' || callState === 'connecting') {
+      showOngoingCall({
+        name: remoteUser?.displayName || remoteUser?.username || '',
+        isVideo: callType === 'video',
+      });
+      setEndCallHandler(() => endCall());
+    } else if (callState === 'idle') {
+      hideOngoingCall();
+      setEndCallHandler(null);
+    }
+  }, [callState, remoteUser, callType, endCall]);
 
   // ── Socket event handlers ─────────────────────────────────────
   useEffect(() => {

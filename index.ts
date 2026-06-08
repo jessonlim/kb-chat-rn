@@ -6,6 +6,12 @@ registerGlobals();
 
 import { registerRootComponent } from 'expo';
 
+// Register the Android ongoing-call foreground service + its notification-action
+// handlers. Must run at the top level (before the app renders) so background
+// "End call" presses are caught. No-op on iOS / if Notifee is unavailable.
+import { registerOngoingCallService } from './src/services/ongoingCallService';
+registerOngoingCallService();
+
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

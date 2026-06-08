@@ -58,7 +58,8 @@
             "deploymentTarget": "16.0"
           }
         }
-      ]
+      ],
+      "./plugins/withNotifeeForegroundServiceType"
     ],
     "ios": {
       "bundleIdentifier": "com.kbchat.app",
