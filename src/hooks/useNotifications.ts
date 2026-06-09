@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import notificationService from '../services/notificationService';
 import callkitService from '../services/callkitService';
+import { maybePromptCallPermissions } from '../services/callPermissions';
 
 const useNotifications = (isLoggedIn: boolean) => {
   const initialized = useRef(false);
@@ -26,6 +27,10 @@ const useNotifications = (isLoggedIn: boolean) => {
       notificationService.handleInitialNotification();
       // iOS VoIP push registration for CallKit (no-op on Android).
       callkitService.init();
+      // One-time Android prompt for the full-screen-intent + battery permissions
+      // (so locked-screen calls ring full-screen). Delayed so it doesn't collide
+      // with the post-login screen transition. Shows once, then never again.
+      setTimeout(() => maybePromptCallPermissions(), 2500);
     }
 
     // Set up tap handler
