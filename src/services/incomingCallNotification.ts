@@ -147,12 +147,17 @@ export async function handleIncomingCallNotifeeEvent(
   PRESS: number
 ) {
   const info = data || {};
-  if (type === ACTION_PRESS && actionId === 'decline') {
+  if (type === ACTION_PRESS && actionId === 'answer') {
+    // ONLY the "Answer" button auto-accepts.
+    setPendingCallAction('answer', info);
+    await hideIncomingCallNotification();
+  } else if (type === ACTION_PRESS && actionId === 'decline') {
     setPendingCallAction('decline', info);
     await hideIncomingCallNotification();
-  } else if ((type === ACTION_PRESS && actionId === 'answer') || type === PRESS) {
-    // Answer button OR tapping the notification body = answer.
-    setPendingCallAction('answer', info);
-    try { await getNotifee().default.cancelNotification(NOTIF_ID); } catch { /* noop */ }
+  } else if (type === PRESS) {
+    // Tapping the notification BODY just opens the app (launchActivity does
+    // that) → the in-app ringing screen shows and the user answers there.
+    // Do NOT auto-answer on a body tap.
+    await hideIncomingCallNotification();
   }
 }
