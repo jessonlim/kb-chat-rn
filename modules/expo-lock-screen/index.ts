@@ -3,6 +3,7 @@ import { requireNativeModule } from 'expo-modules-core';
 
 interface ExpoLockScreenNativeModule {
   isLocked(): boolean;
+  setShowWhenLocked(value: boolean): void;
   dropBehindKeyguardIfLocked(): void;
 }
 
@@ -36,4 +37,16 @@ export function dropBehindKeyguardIfLocked(): void {
   nativeModule.dropBehindKeyguardIfLocked();
 }
 
-export default { isLocked, dropBehindKeyguardIfLocked };
+/**
+ * Re-enable (true) or clear (false) the current Activity's show-over-lock-screen
+ * flags. Call with `true` when an incoming call is shown so a back-to-back
+ * BACKGROUNDED call can still ring full-screen over the keyguard (the prior
+ * call's dropBehindKeyguardIfLocked clears the flags on the live Activity).
+ * No-op on iOS/web and when there's no current Activity (cold/killed start).
+ */
+export function setShowWhenLocked(value: boolean): void {
+  if (!nativeModule) return;
+  nativeModule.setShowWhenLocked(value);
+}
+
+export default { isLocked, setShowWhenLocked, dropBehindKeyguardIfLocked };

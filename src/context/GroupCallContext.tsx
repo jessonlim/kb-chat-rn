@@ -105,22 +105,19 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   const wasEngagedRef = useRef(false);
   const prevStateRef = useRef<GroupCallState>('idle');
 
-  // ── Drop behind the lock screen when an engaged group call ends (Android) ─
+  // ── Drop behind the lock screen when a group call ends while LOCKED (Android) ─
   // Group cleanup() awaits room.disconnect() before setState('idle'), so the
-  // non-idle -> 'idle' edge here lands after LiveKit teardown. Gated by
-  // wasEngagedRef so a declined / cancelled-before-join incoming call never
-  // backgrounds the app. The native check no-ops if the phone is unlocked.
+  // non-idle -> 'idle' edge here lands after LiveKit teardown. We drop on ANY
+  // locked call-end (answered, declined, missed) — the native check re-reads the
+  // keyguard and no-ops when the phone is unlocked, which is the real gate.
   useEffect(() => {
     const prev = prevStateRef.current;
     prevStateRef.current = state;
     if (Platform.OS !== 'android') return;
-    if (prev !== 'idle' && state === 'idle' && wasEngagedRef.current) {
-      wasEngagedRef.current = false;
+    if (prev !== 'idle' && state === 'idle') {
       setTimeout(() => {
         try { getLockScreen().dropBehindKeyguardIfLocked(); } catch {}
       }, 0);
-    } else if (state === 'idle') {
-      wasEngagedRef.current = false;
     }
   }, [state]);
 

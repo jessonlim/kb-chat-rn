@@ -39,6 +39,27 @@ class ExpoLockScreenModule : Module() {
     // NOTE: written WITHOUT an early `return@Function` — a bare return (Unit)
     // confuses the Expo Function overload resolution ("expected Any?, actual
     // Unit"). Plain if-nesting keeps the body a single Unit-typed statement.
+    // Re-enable (or disable) the current Activity's "show over the lock screen"
+    // flags at runtime. Needed because dropBehindKeyguardIfLocked CLEARS these
+    // flags at call-end (to stop Samsung re-surfacing the app over the keyguard).
+    // If the app then stays alive in the background, the SAME Activity instance
+    // would have the flags off, so the NEXT call couldn't ring full-screen over
+    // the lock screen. We call this with `true` whenever an incoming call is
+    // shown, so a back-to-back backgrounded call still rings full-screen.
+    // (No-op when there is no current Activity — e.g. a cold/killed start, where
+    // the static android:showWhenLocked manifest default already applies.)
+    Function("setShowWhenLocked") { value: Boolean ->
+      val activity = appContext.currentActivity
+      if (activity != null) {
+        activity.runOnUiThread {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            activity.setShowWhenLocked(value)
+            activity.setTurnScreenOn(value)
+          }
+        }
+      }
+    }
+
     Function("dropBehindKeyguardIfLocked") {
       val activity = appContext.currentActivity
       if (activity != null) {

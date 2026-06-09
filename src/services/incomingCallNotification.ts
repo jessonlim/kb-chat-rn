@@ -14,7 +14,7 @@
 
 import { Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { getNotifee } from '../utils/nativeModules';
+import { getNotifee, getLockScreen } from '../utils/nativeModules';
 
 // Default MMKV instance — same underlying store as `storage` in api.ts. Using a
 // fresh handle here avoids importing api.ts (axios etc.) into the headless path.
@@ -38,6 +38,11 @@ export interface IncomingCallData {
 /** Show the full-screen incoming-call notification (no foreground service). */
 export async function showIncomingCallNotification(info: IncomingCallData) {
   if (Platform.OS !== 'android') return;
+  // Re-enable lock-screen visibility on the live Activity (if any). A prior
+  // call's end cleared it; without this, a back-to-back BACKGROUNDED call would
+  // ring as a heads-up, not full-screen, because the same Activity instance is
+  // reused with the flag off. No-op on a cold/killed start (static manifest flag).
+  try { getLockScreen().setShowWhenLocked(true); } catch { /* noop */ }
   // Cross-context de-dupe: the FCM bg handler (headless ctx) AND the live-socket
   // onIncomingCall (foreground ctx) can both fire for the same call. They're
   // separate JS runtimes, so an in-memory guard can't see across them — use MMKV.

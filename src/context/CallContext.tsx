@@ -167,28 +167,26 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => { callTypeRef.current = callType; }, [callType]);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
-  // ── Drop behind the lock screen when an engaged call ends (Android) ──
-  // Every end path (endCall, rejectCall, onCallEnded, onCallRejected,
-  // connection failed/closed, cleanup) funnels through setCallState('idle'),
-  // so observing the non-idle -> 'idle' edge here catches them all. Gated by
-  // wasEngagedRef (the user actually answered/connected) so missed, declined,
-  // busy, timed-out and cancelled-outgoing calls never background the app.
-  // The native dropBehindKeyguardIfLocked() re-checks the keyguard at end-time
-  // and no-ops if the phone is unlocked — so answered-while-unlocked and
-  // unlock-mid-call are handled there, not by a stale JS snapshot.
+  // ── Drop behind the lock screen when a call ends while LOCKED (Android) ──
+  // Every end path (endCall, rejectCall, onCallEnded, onCallRejected, connection
+  // failed/closed, cleanup, decline, timeout) funnels through setCallState('idle'),
+  // so the non-idle -> 'idle' edge catches them all. We drop on ANY locked
+  // call-end — answered, DECLINED, or missed — because any call that rang over
+  // the lock screen launched the app over the keyguard (full-screen intent), so
+  // it must drop back (a declined call was leaving the app open over the lock
+  // screen). The native dropBehindKeyguardIfLocked() RE-CHECKS the keyguard and
+  // no-ops when unlocked — that's the real gate (answered-while-unlocked,
+  // outgoing calls, unlock-mid-call all stay put).
   useEffect(() => {
     const prev = prevCallStateRef.current;
     prevCallStateRef.current = callState;
     if (Platform.OS !== 'android') return;
-    if (prev !== 'idle' && callState === 'idle' && wasEngagedRef.current) {
-      wasEngagedRef.current = false;
+    if (prev !== 'idle' && callState === 'idle') {
       // Defer one tick so cleanup's state resets + notification teardown
       // commit before the activity goes to the back.
       setTimeout(() => {
         try { getLockScreen().dropBehindKeyguardIfLocked(); } catch {}
       }, 0);
-    } else if (callState === 'idle') {
-      wasEngagedRef.current = false; // reset for the next (e.g. missed) call
     }
   }, [callState]);
 
