@@ -36,7 +36,7 @@ import { useT } from '../i18n/I18nContext';
 import socketService from '../services/socketService';
 import groupCallService from '../services/groupCallService';
 import { storage } from '../services/api';
-import { getLiveKitClient, getInCallManager } from '../utils/nativeModules';
+import { getLiveKitClient, getInCallManager, getLockScreen } from '../utils/nativeModules';
 
 // LiveKit + InCallManager loaded lazily (audit M4). Types are erased at
 // compile time via `import type`; the runtime classes (Room, RoomEvent,
@@ -97,6 +97,32 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
   const chatIdRef = useRef(chatId);
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
+
+  // Lock-screen drop (Android): true once the user actually joined the room
+  // (reached 'in_call'). declineIncoming() and the cancelled-incoming path
+  // never reach 'in_call', so they're correctly excluded. prevStateRef lets
+  // the edge effect see the previous state.
+  const wasEngagedRef = useRef(false);
+  const prevStateRef = useRef<GroupCallState>('idle');
+
+  // ── Drop behind the lock screen when an engaged group call ends (Android) ─
+  // Group cleanup() awaits room.disconnect() before setState('idle'), so the
+  // non-idle -> 'idle' edge here lands after LiveKit teardown. Gated by
+  // wasEngagedRef so a declined / cancelled-before-join incoming call never
+  // backgrounds the app. The native check no-ops if the phone is unlocked.
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (Platform.OS !== 'android') return;
+    if (prev !== 'idle' && state === 'idle' && wasEngagedRef.current) {
+      wasEngagedRef.current = false;
+      setTimeout(() => {
+        try { getLockScreen().dropBehindKeyguardIfLocked(); } catch {}
+      }, 0);
+    } else if (state === 'idle') {
+      wasEngagedRef.current = false;
+    }
+  }, [state]);
 
   // ── Timer helpers ─────────────────────────────────────────────────
   const stopDurationTimer = () => {
@@ -258,6 +284,7 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
       try {
         const r = await connectToRoom(targetChatId, callType);
         setRoom(r);
+        wasEngagedRef.current = true; // joined the room — eligible for keyguard drop on end
         setState('in_call');
         startDurationTimer();
         applyAudioRouting(callType);
@@ -286,6 +313,7 @@ export const GroupCallProvider = ({ children }: { children: ReactNode }) => {
     try {
       const r = await connectToRoom(targetChatId, callType);
       setRoom(r);
+      wasEngagedRef.current = true; // joined the room — eligible for keyguard drop on end
       setState('in_call');
       startDurationTimer();
       applyAudioRouting(callType);

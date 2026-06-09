@@ -43,6 +43,7 @@ import type * as DeviceType from 'expo-device';
 import type * as LocationType from 'expo-location';
 import type * as CallKitType from 'expo-callkit-telecom';
 import type * as NotifeeType from '@notifee/react-native';
+import type * as LockScreenType from '../../modules/expo-lock-screen';
 
 // ── @livekit/react-native-webrtc (1:1 calls — RTCPeerConnection etc.) ──
 let _webrtc: typeof WebRTCType | undefined;
@@ -117,4 +118,14 @@ let _notifee: typeof NotifeeType | undefined;
 export const getNotifee = (): typeof NotifeeType => {
   if (!_notifee) _notifee = require('@notifee/react-native');
   return _notifee!;
+};
+
+// ── expo-lock-screen (local module — Android keyguard drop after a call) ──
+// Android-only in practice; the JS wrapper is a safe no-op on iOS/web.
+// Drops the app behind the lock screen when a call the user engaged with
+// ends while the phone is still locked (WhatsApp-style).
+let _lockScreen: typeof LockScreenType | undefined;
+export const getLockScreen = (): typeof LockScreenType => {
+  if (!_lockScreen) _lockScreen = require('../../modules/expo-lock-screen');
+  return _lockScreen!;
 };

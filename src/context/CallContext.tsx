@@ -31,7 +31,7 @@ import {
   setEndCallHandler,
 } from '../services/ongoingCallService';
 import { useAuth } from '../stores/authStore';
-import { getWebRTC, getInCallManager } from '../utils/nativeModules';
+import { getWebRTC, getInCallManager, getLockScreen } from '../utils/nativeModules';
 
 // Native modules (WebRTC + InCallManager) are accessed lazily via the
 // getters above (audit M4). Types are `import type` so they're erased at
@@ -153,6 +153,12 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   // connects the call once callState becomes 'ringing'.
   const pendingCallKitAnswerRef = useRef(false);
   const pendingAnswerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lock-screen drop (Android): true once the user is actively in the call
+  // (callee answered / caller connected). Gates the end-of-call keyguard
+  // drop so missed/declined/busy/timed-out/cancelled calls never background
+  // the app. prevCallStateRef lets the edge effect see the previous state.
+  const wasEngagedRef = useRef(false);
+  const prevCallStateRef = useRef<CallState>('idle');
 
   // Keep refs in sync with state
   useEffect(() => { callStateRef.current = callState; }, [callState]);
@@ -160,6 +166,31 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
   useEffect(() => { callTypeRef.current = callType; }, [callType]);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+
+  // ── Drop behind the lock screen when an engaged call ends (Android) ──
+  // Every end path (endCall, rejectCall, onCallEnded, onCallRejected,
+  // connection failed/closed, cleanup) funnels through setCallState('idle'),
+  // so observing the non-idle -> 'idle' edge here catches them all. Gated by
+  // wasEngagedRef (the user actually answered/connected) so missed, declined,
+  // busy, timed-out and cancelled-outgoing calls never background the app.
+  // The native dropBehindKeyguardIfLocked() re-checks the keyguard at end-time
+  // and no-ops if the phone is unlocked — so answered-while-unlocked and
+  // unlock-mid-call are handled there, not by a stale JS snapshot.
+  useEffect(() => {
+    const prev = prevCallStateRef.current;
+    prevCallStateRef.current = callState;
+    if (Platform.OS !== 'android') return;
+    if (prev !== 'idle' && callState === 'idle' && wasEngagedRef.current) {
+      wasEngagedRef.current = false;
+      // Defer one tick so cleanup's state resets + notification teardown
+      // commit before the activity goes to the back.
+      setTimeout(() => {
+        try { getLockScreen().dropBehindKeyguardIfLocked(); } catch {}
+      }, 0);
+    } else if (callState === 'idle') {
+      wasEngagedRef.current = false; // reset for the next (e.g. missed) call
+    }
+  }, [callState]);
 
   // ── Cleanup helper ─────────────────────────────────────────────
   const cleanup = useCallback(() => {
@@ -262,6 +293,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('[call] connection state:', state);
 
       if (state === 'connected') {
+        wasEngagedRef.current = true; // call is live — eligible for keyguard drop on end
         setCallState('in_call');
         callStartTimeRef.current = Date.now();
         durationRef.current = setInterval(() => {
@@ -282,6 +314,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('[call] ICE state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         if (callStateRef.current === 'connecting') {
+          wasEngagedRef.current = true; // call is live — eligible for keyguard drop on end
           setCallState('in_call');
           callStartTimeRef.current = Date.now();
           durationRef.current = setInterval(() => {
@@ -403,6 +436,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   const acceptCall = useCallback(async () => {
     if (callStateRef.current !== 'ringing') return;
 
+    wasEngagedRef.current = true; // callee answered — eligible for keyguard drop on end
     setCallState('connecting');
 
     try {
