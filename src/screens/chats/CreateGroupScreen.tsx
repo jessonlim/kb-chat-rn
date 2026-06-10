@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import userService from '../../services/userService';
+import contactService from '../../services/contactService';
 import chatService from '../../services/chatService';
 import { useAuth } from '../../stores/authStore';
 import Avatar from '../../components/common/Avatar';
@@ -32,11 +32,11 @@ const CreateGroupScreen = ({ navigation }: Props) => {
   // Step 1: select members   Step 2: enter group name + create
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Search state
+  // Friends-only: a group can only include your friends, so we load your accepted
+  // contacts and let you pick from them (filtered locally by the search box).
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<User[]>([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [allContacts, setAllContacts] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Selection state
   const [selected, setSelected] = useState<User[]>([]);
@@ -45,35 +45,34 @@ const CreateGroupScreen = ({ navigation }: Props) => {
   const [groupName, setGroupName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const doSearch = useCallback(
-    async (q: string) => {
-      const trimmed = q.trim();
-      if (trimmed.length < 2) {
-        setResults([]);
-        return;
-      }
-
-      setSearching(true);
+  useEffect(() => {
+    let active = true;
+    (async () => {
       try {
-        const { users } = await userService.searchUsers(trimmed);
-        setResults(users.filter((u) => u.id !== user?.id));
+        const { contacts } = await contactService.getContacts();
+        if (active) setAllContacts(contacts.filter((u) => u.id !== user?.id));
       } catch {
-        setResults([]);
+        if (active) setAllContacts([]);
       } finally {
-        setSearching(false);
+        if (active) setLoading(false);
       }
-    },
-    [user?.id]
-  );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
-  const handleChangeText = useCallback(
-    (text: string) => {
-      setQuery(text);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => doSearch(text), 400);
-    },
-    [doSearch]
-  );
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allContacts;
+    return allContacts.filter(
+      (u) =>
+        (u.displayName || '').toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q)
+    );
+  }, [allContacts, query]);
+
+  const handleChangeText = useCallback((text: string) => setQuery(text), []);
 
   const toggleUser = useCallback((u: User) => {
     setSelected((prev) => {
@@ -200,7 +199,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
         <Ionicons name="search" size={20} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder={t('group.searchByUsername')}
+          placeholder={t('group.searchContacts')}
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={handleChangeText}
@@ -211,10 +210,7 @@ const CreateGroupScreen = ({ navigation }: Props) => {
         />
         {query.length > 0 && (
           <TouchableOpacity
-            onPress={() => {
-              setQuery('');
-              setResults([]);
-            }}
+            onPress={() => setQuery('')}
             activeOpacity={0.7}
           >
             <Ionicons name="close-circle" size={20} color={colors.textMuted} />
@@ -248,8 +244,8 @@ const CreateGroupScreen = ({ navigation }: Props) => {
 
       <View style={styles.divider} />
 
-      {/* Loading */}
-      {searching && (
+      {/* Loading contacts */}
+      {loading && (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
           <Text style={styles.loadingText}>{t('chats.searching')}</Text>
@@ -294,18 +290,17 @@ const CreateGroupScreen = ({ navigation }: Props) => {
           );
         }}
         ListEmptyComponent={
-          !searching ? (
+          !loading ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyText}>{t('group.searchByUsername')}</Text>
-              <Text style={styles.emptySubtext}>
-                {t('chat.searchHint')}
+              <Text style={styles.emptyText}>
+                {allContacts.length === 0 ? t('group.noContacts') : t('group.noMatches')}
               </Text>
             </View>
           ) : null
         }
         contentContainerStyle={
-          results.length === 0 && !searching
+          results.length === 0 && !loading
             ? { flex: 1, justifyContent: 'center' }
             : undefined
         }
