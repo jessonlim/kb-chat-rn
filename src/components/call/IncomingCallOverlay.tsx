@@ -9,6 +9,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
@@ -44,8 +45,13 @@ const IncomingCallOverlay = () => {
     return () => pulse.stop();
   }, [callState, pulseAnim]);
 
-  // Only show when ringing (we are the callee)
-  if (callState !== 'ringing') return null;
+  // Only show when ringing (we are the callee). On iOS, CallKit's native call UI
+  // is the incoming-call experience — a banner while you're in the app, a
+  // full-screen screen when the phone is locked. Rendering our own overlay on
+  // top of it is a duplicate ("full-screen overlay + CallKit drop-down"), so on
+  // iOS we never show this; CallKit owns incoming UI and the answer flows back
+  // through callkitService → acceptCall. (Android still uses this overlay.)
+  if (Platform.OS === 'ios' || callState !== 'ringing') return null;
 
   const name = remoteUser?.displayName || remoteUser?.username || 'Unknown';
   const isVideo = callType === 'video';
