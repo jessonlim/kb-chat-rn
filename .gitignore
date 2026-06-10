@@ -45,3 +45,7 @@ yarn-error.*
 
 # EAS local signing credentials (NEVER commit — contains keystore password)
 /credentials.json
+
+# Firebase config (provided to EAS builds via secure file env vars — kept out of git)
+GoogleService-Info.plist
+google-services.json
