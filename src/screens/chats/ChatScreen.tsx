@@ -802,33 +802,26 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
   // Edit message via socket
   const handleSendEdit = useCallback(
-    (messageId: string, newContent: string) => {
-      const socket = socketService.getSocket();
-      if (!socket) {
-        // No optimistic update — edits modify existing bubbles, so the
-        // safer fallback is to toast and bail rather than show a half-
-        // applied edit that gets reverted when the next message_updated
-        // event lands.
+    async (messageId: string, newContent: string) => {
+      setEditMessage(null);
+      try {
+        // REST edit (the backend persists it, enforces the 15-min window, and
+        // broadcasts `message_edited` to the other participants/devices).
+        await chatService.editMessageRest(chatId, messageId, newContent);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === messageId ? { ...m, content: newContent, edited: true } : m
+          )
+        );
+      } catch (e: any) {
+        const expired = e?.response?.data?.code === 'edit_window_expired';
         Toast.show({
           type: 'error',
-          text1: t('chat.noConnection'),
-          text2: t('chat.editFailed'),
+          text1: expired ? t('chat.editWindowExpired') : t('chat.editFailed'),
         });
-        return;
       }
-
-      socket.emit('edit_message', { messageId, content: newContent });
-
-      // Optimistic update
-      setMessages((prev) =>
-        prev.map((m) =>
-          m._id === messageId ? { ...m, content: newContent, edited: true } : m
-        )
-      );
-
-      setEditMessage(null);
     },
-    [t]
+    [chatId, t]
   );
 
   // Delete message via socket

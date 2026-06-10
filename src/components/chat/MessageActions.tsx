@@ -73,8 +73,15 @@ const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose }:
     if (a.ownOnly && !isOwn) return false;
     // Can't copy non-text messages
     if (a.key === 'copy' && !message.content) return false;
-    // Can't edit deleted messages
-    if (a.key === 'edit' && message.deleted) return false;
+    // Edit: your own TEXT message, not deleted, and only within 15 minutes of
+    // sending (matches the backend's edit window — hide it once it's too late so
+    // the user isn't offered an option that would just fail).
+    if (a.key === 'edit') {
+      if (message.deleted) return false;
+      if (message.type !== 'text' || !message.content) return false;
+      const sentAt = message.createdAt ? new Date(message.createdAt).getTime() : 0;
+      if (sentAt && Date.now() - sentAt > 15 * 60 * 1000) return false;
+    }
     // Can't translate non-text messages
     if (a.key === 'translate' && (message.type !== 'text' || !message.content)) return false;
     // Transcribe is only meaningful for voice messages

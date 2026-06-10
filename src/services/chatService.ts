@@ -37,6 +37,13 @@ const chatService = {
     return data;
   },
 
+  /** Edit a sent text message (REST). The backend enforces the 15-minute edit
+   *  window and broadcasts `message_edited` to participants. Throws on failure —
+   *  err.response.data.code === 'edit_window_expired' when the window has passed. */
+  editMessageRest: async (chatId: string, messageId: string, content: string): Promise<void> => {
+    await api.patch(`/api/chats/${chatId}/messages/${messageId}`, { content });
+  },
+
   createGroup: async (body: {
     groupName: string;
     memberIds: string[];

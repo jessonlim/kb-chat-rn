@@ -102,6 +102,7 @@ export const STRINGS = {
   'chat.noConnection':        { en: 'No connection',  zh: '无网络连接' },
   'chat.messageWillRetry':    { en: 'Message saved — will resend when connection is back', zh: '消息已保存，连接恢复后会自动重发' },
   'chat.editFailed':          { en: 'Could not save edit — try again', zh: '编辑保存失败，请重试' },
+  'chat.editWindowExpired':   { en: 'Messages can only be edited within 15 minutes', zh: '消息只能在发送后 15 分钟内编辑' },
   'chat.loadFailed':          { en: 'Could not open chat', zh: '无法打开聊天' },
   'auth.sessionExpired':      { en: 'Session expired',     zh: '会话已过期' },
   'auth.signInAgain':         { en: 'Please sign in again',  zh: '请重新登录' },
