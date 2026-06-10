@@ -23,6 +23,7 @@ import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../stores/authStore';
 import userService from '../../services/userService';
+import chatService from '../../services/chatService';
 import { spacing, fontSize } from '../../utils/theme';
 
 interface Props {
@@ -33,6 +34,11 @@ interface Props {
 //   https://kb-chat.com/u/<userId>?u=<username>   (legacy / shareable URL)
 //   kbchat://user/<userId>?u=<username>           (custom-scheme deep link)
 const QR_HOST_PATTERN = /(?:https?:\/\/(?:www\.)?kb-chat\.com\/u\/|kbchat:\/\/user\/)([a-fA-F0-9]+)/i;
+
+// Group invite QR:
+//   https://kb-chat.com/g/<chatId>   (shareable URL)
+//   kbchat://group/<chatId>          (custom-scheme deep link)
+const GROUP_QR_PATTERN = /(?:https?:\/\/(?:www\.)?kb-chat\.com\/g\/|kbchat:\/\/group\/)([a-fA-F0-9]+)/i;
 
 const ScanQRScreenInner = ({ navigation }: Props) => {
   const { t } = useT();
@@ -49,11 +55,11 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
       // frame. We only want to process the first one.
       if (handlingRef.current) return;
 
+      const groupMatch = data.match(GROUP_QR_PATTERN);
       const match = data.match(QR_HOST_PATTERN);
-      if (!match) {
+      if (!groupMatch && !match) {
         // Not our QR. Show a toast but don't navigate away — let the user
         // try again with a different code.
-        if (handlingRef.current) return;
         handlingRef.current = true;
         Toast.show({ type: 'error', text1: t('qr.invalidQR') });
         // Allow another scan after a short delay
@@ -64,7 +70,28 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
       handlingRef.current = true;
       setHandling(true);
 
-      const scannedUserId = match[1];
+      // ── Group invite QR → join the group + open it ──
+      if (groupMatch) {
+        const groupId = groupMatch[1];
+        try {
+          const res = await chatService.joinGroup(groupId);
+          const cid = (res.chat as any)?._id || (res.chat as any)?.id;
+          if (!cid) throw new Error('no chat in join response');
+          if (res.joined) Toast.show({ type: 'success', text1: t('qr.joinedGroup') });
+          navigation.replace('ChatScreen', { chatId: cid });
+        } catch (err: any) {
+          const status = err?.response?.status;
+          Toast.show({
+            type: 'error',
+            text1: status === 404 ? t('qr.groupNotFound') : t('qr.joinGroupFailed'),
+          });
+          setHandling(false);
+          setTimeout(() => { handlingRef.current = false; }, 1500);
+        }
+        return;
+      }
+
+      const scannedUserId = match![1];
 
       if (user && scannedUserId === user.id) {
         Toast.show({ type: 'info', text1: t('qr.cantScanSelf') });

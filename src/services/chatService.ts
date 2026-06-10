@@ -76,6 +76,12 @@ const chatService = {
     return data;
   },
 
+  /** Join a group via its QR / invite link (chatId is the invite token). Idempotent. */
+  joinGroup: async (chatId: string): Promise<ChatResponse & { joined?: boolean }> => {
+    const { data } = await api.post<ChatResponse & { joined?: boolean }>(`/api/chats/group/${chatId}/join`);
+    return data;
+  },
+
   togglePin: async (chatId: string): Promise<{ ok: boolean; isPinned: boolean }> => {
     const { data } = await api.post(`/api/chats/${chatId}/pin`);
     return data;
