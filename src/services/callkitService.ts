@@ -141,15 +141,21 @@ const callkitService = {
    * @param onAnswer fired when the user answers from the system call UI
    * @param onEnd    fired when the user ends/declines from the system call UI
    */
-  setupCallListeners(onAnswer: () => void, onEnd: () => void): () => void {
+  setupCallListeners(
+    onAnswer: (event: { id: string; requestId: string }) => void,
+    onEnd: () => void,
+  ): () => void {
     if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return () => {};
     let answeredSub: { remove: () => void } | null = null;
     let endedSub: { remove: () => void } | null = null;
     try {
       const CallKit = getCallKit();
-      answeredSub = CallKit.addCallAnsweredListener(() => {
-        console.log('[callkit] answered from system UI');
-        onAnswer();
+      answeredSub = CallKit.addCallAnsweredListener((event: { id: string; requestId: string }) => {
+        // requestId is REQUIRED to ack CallKit's answer action via
+        // fulfillIncomingCallConnected — without it CallKit kills the call ~30s
+        // later and audio never activates.
+        console.log('[callkit] answered from system UI', event?.requestId);
+        onAnswer({ id: event?.id, requestId: event?.requestId });
       });
       endedSub = CallKit.addCallEndedListener(() => {
         console.log('[callkit] ended from system UI');
@@ -162,6 +168,94 @@ const callkitService = {
       try { answeredSub?.remove(); } catch { /* noop */ }
       try { endedSub?.remove(); } catch { /* noop */ }
     };
+  },
+
+  // ── CallKit call lifecycle (iOS) — drive the native session so audio works ──
+  // expo-callkit-telecom puts WebRTC in MANUAL-AUDIO mode process-wide, so the
+  // WebRTC audio unit only turns on inside CallKit's didActivate. Therefore
+  // EVERY iOS 1:1 call must open a CallKit session (incoming via reportIncoming,
+  // outgoing via startOutgoing) or there is no audio.
+
+  /** Report an incoming call to CallKit (rings the system UI). serverCallId
+   *  doubles as the de-dupe key (we pass the chatId). iOS only. */
+  async reportIncoming(info: {
+    chatId: string;
+    callerId: string;
+    callerName?: string;
+    avatar?: string;
+    hasVideo: boolean;
+  }): Promise<void> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return;
+    try {
+      await getCallKit().reportIncomingCall({
+        eventId: `${info.chatId}:${info.callerId}`,
+        serverCallId: info.chatId,
+        caller: {
+          id: info.callerId,
+          displayName: info.callerName || 'Incoming call',
+          ...(info.avatar ? { avatarUrl: info.avatar } : {}),
+        },
+        hasVideo: info.hasVideo,
+      });
+    } catch (err) {
+      console.warn('[callkit] reportIncoming failed:', err);
+    }
+  },
+
+  /** Ack a CallKit-answered incoming call once WebRTC media is connected. This
+   *  is what makes CallKit activate the audio session → two-way audio. */
+  async fulfillAnswer(requestId: string): Promise<void> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios' || !requestId) return;
+    try { await getCallKit().fulfillIncomingCallConnected(requestId); }
+    catch (err) { console.warn('[callkit] fulfillAnswer failed:', err); }
+  },
+
+  /** Fail a CallKit-answered call (media setup error) so the system UI clears
+   *  instead of hanging ~30s. */
+  async failAnswer(id: string, requestId: string): Promise<void> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios' || !requestId) return;
+    try { await getCallKit().failIncomingCallConnected(id, requestId); }
+    catch (err) { console.warn('[callkit] failAnswer failed:', err); }
+  },
+
+  /** Start an OUTGOING CallKit session (so outgoing iOS calls get audio).
+   *  Returns the CallKit call id (or null). iOS only. */
+  async startOutgoing(info: {
+    recipientId: string;
+    recipientName?: string;
+    avatar?: string;
+    hasVideo: boolean;
+  }): Promise<string | null> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return null;
+    try {
+      return await getCallKit().startOutgoingCall(
+        {
+          id: info.recipientId,
+          displayName: info.recipientName || 'Call',
+          ...(info.avatar ? { avatarUrl: info.avatar } : {}),
+        },
+        { hasVideo: info.hasVideo },
+      );
+    } catch (err) {
+      console.warn('[callkit] startOutgoing failed:', err);
+      return null;
+    }
+  },
+
+  /** Tell CallKit an outgoing call's media connected (stops the dialing state +
+   *  fixes the timer). Audio still activates via didActivate either way. */
+  async reportOutgoingConnected(id: string): Promise<void> {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios' || !id) return;
+    try { await getCallKit().reportOutgoingCallConnected(id); }
+    catch (err) { console.warn('[callkit] reportOutgoingConnected failed:', err); }
+  },
+
+  /** Route audio to speaker (true) / earpiece (false) via CallKit's audio
+   *  session — replaces InCallManager.setSpeakerphoneOn on iOS. */
+  setSpeaker(on: boolean): void {
+    if (!CALLKIT_ENABLED || Platform.OS !== 'ios') return;
+    try { getCallKit().setAudioSessionPortOverride(on); }
+    catch (err) { console.warn('[callkit] setSpeaker failed:', err); }
   },
 };
 

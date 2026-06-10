@@ -153,6 +153,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
   // connects the call once callState becomes 'ringing'.
   const pendingCallKitAnswerRef = useRef(false);
   const pendingAnswerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // iOS CallKit: the {id, requestId} from the system-UI answer action — needed to
+  // fulfillIncomingCallConnected once media connects (else CallKit kills the call
+  // ~30s later and audio never activates). And the outgoing CallKit call id.
+  const pendingAnswerRef = useRef<{ id: string; requestId: string } | null>(null);
+  const outgoingCallKitIdRef = useRef<string | null>(null);
   // Lock-screen drop (Android): true once the user is actively in the call
   // (callee answered / caller connected). Gates the end-of-call keyguard
   // drop so missed/declined/busy/timed-out/cancelled calls never background
@@ -218,10 +223,14 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
     }
 
-    // Stop InCallManager
-    try {
-      getInCallManager().stop();
-    } catch {}
+    // Stop InCallManager (Android only — on iOS CallKit owns the audio session
+    // and tears it down itself in provider:didDeactivate; calling stop() here
+    // fights it). Clear the iOS CallKit refs either way.
+    if (Platform.OS === 'android') {
+      try { getInCallManager().stop(); } catch {}
+    }
+    outgoingCallKitIdRef.current = null;
+    pendingAnswerRef.current = null;
 
     // Hide the incoming-call notification (Notifee full-screen) if showing.
     void hideIncomingCallNotification();
@@ -293,6 +302,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       if (state === 'connected') {
         wasEngagedRef.current = true; // call is live — eligible for keyguard drop on end
         setCallState('in_call');
+        // iOS outgoing: tell CallKit the outgoing call connected (stops the
+        // dialing state). Audio activates via CallKit didActivate regardless.
+        if (Platform.OS === 'ios' && outgoingCallKitIdRef.current) {
+          callkitService.reportOutgoingConnected(outgoingCallKitIdRef.current);
+        }
         callStartTimeRef.current = Date.now();
         durationRef.current = setInterval(() => {
           setDuration(Math.floor((Date.now() - callStartTimeRef.current) / 1000));
@@ -378,11 +392,21 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     setIsSpeaker(type === 'video');
 
     try {
-      // Start InCallManager
-      getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
-      getInCallManager().setKeepScreenOn(true);
-      if (type === 'video') {
-        getInCallManager().setSpeakerphoneOn(true);
+      if (Platform.OS === 'android') {
+        getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
+        getInCallManager().setKeepScreenOn(true);
+        if (type === 'video') getInCallManager().setSpeakerphoneOn(true);
+      } else {
+        // iOS: open an OUTGOING CallKit session so the WebRTC audio unit
+        // (process-wide manual-audio mode) activates on CallKit didActivate.
+        // Without a CallKit session there is NO audio on iOS.
+        outgoingCallKitIdRef.current = await callkitService.startOutgoing({
+          recipientId: target.id,
+          recipientName: target.displayName,
+          avatar: target.avatar,
+          hasVideo: type === 'video',
+        });
+        if (type === 'video') callkitService.setSpeaker(true);
       }
 
       // Get media
@@ -440,12 +464,14 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const type = callTypeRef.current || 'voice';
 
-      // Start InCallManager
-      getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
-      getInCallManager().setKeepScreenOn(true);
-      getInCallManager().stopRingtone();
-      if (type === 'video') {
-        getInCallManager().setSpeakerphoneOn(true);
+      if (Platform.OS === 'android') {
+        getInCallManager().start({ media: type === 'video' ? 'video' : 'audio' });
+        getInCallManager().setKeepScreenOn(true);
+        getInCallManager().stopRingtone();
+        if (type === 'video') getInCallManager().setSpeakerphoneOn(true);
+      } else if (type === 'video') {
+        // iOS: CallKit owns the audio session; just route video to speaker.
+        callkitService.setSpeaker(true);
       }
 
       // Get media
@@ -481,8 +507,23 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
         callerId: remoteUserRef.current?.id,
         answer: { type: answer.type, sdp: answer.sdp },
       });
+
+      // iOS: ack the CallKit answer now that media is negotiated → CallKit
+      // activates the audio session → two-way audio. Done HERE (not on
+      // ICE-connected) to avoid CallKit's ~30s answer-action timeout.
+      if (Platform.OS === 'ios' && pendingAnswerRef.current) {
+        const ans = pendingAnswerRef.current;
+        pendingAnswerRef.current = null;
+        callkitService.fulfillAnswer(ans.requestId);
+      }
     } catch (err) {
       console.error('[call] Failed to accept call:', err);
+      // iOS: fail the CallKit answer so the system UI clears instead of hanging.
+      if (Platform.OS === 'ios' && pendingAnswerRef.current) {
+        const ans = pendingAnswerRef.current;
+        pendingAnswerRef.current = null;
+        callkitService.failAnswer(ans.id, ans.requestId);
+      }
       cleanup();
     }
   }, [getMedia, createPeer, flushCandidates, cleanup]);
@@ -493,9 +534,9 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     if (callerId) {
       socketService.emit('reject_call', { callerId, reason });
     }
-    try {
-      getInCallManager().stopRingtone();
-    } catch {}
+    if (Platform.OS === 'android') {
+      try { getInCallManager().stopRingtone(); } catch {}
+    }
     cleanup();
   }, [cleanup]);
 
@@ -534,7 +575,8 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     setIsSpeaker((prev) => {
       const next = !prev;
       try {
-        getInCallManager().setSpeakerphoneOn(next);
+        if (Platform.OS === 'android') getInCallManager().setSpeakerphoneOn(next);
+        else callkitService.setSpeaker(next); // iOS: route via CallKit's audio session
       } catch {}
       return next;
     });
@@ -601,8 +643,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     const cleanup_ckit = callkitService.setupCallListeners(
       // User answered from the iOS system call UI
-      () => {
+      (event) => {
         console.log('[callkit] Answer triggered, callState:', callStateRef.current);
+        // Stash {id, requestId} so acceptCall can fulfillIncomingCallConnected
+        // once media is negotiated (survives the cold-launch queue detour too).
+        pendingAnswerRef.current = event;
         if (callStateRef.current === 'ringing') {
           acceptCall();
         } else {
@@ -793,10 +838,28 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
 
-      // Play ringtone
-      try {
-        getInCallManager().startRingtone('_DEFAULT_', 1000, 'default', 30);
-      } catch {}
+      // Ringtone — Android only. On iOS, CallKit plays the system ringtone and
+      // (critically) provides the audio session: WebRTC is in process-wide
+      // manual-audio mode, so audio only works inside a CallKit session.
+      if (Platform.OS === 'android') {
+        try { getInCallManager().startRingtone('_DEFAULT_', 1000, 'default', 30); } catch {}
+      } else {
+        // Ensure a CallKit session exists. If the VoIP push already reported the
+        // call (app was killed/backgrounded), a session is live → skip the
+        // duplicate. When foreground (no push), this is what rings + enables audio.
+        try {
+          const alive = await callkitService.hasActiveCallSession();
+          if (!alive) {
+            await callkitService.reportIncoming({
+              chatId: data.chatId,
+              callerId: data.callerId,
+              callerName: callerInfo.displayName,
+              avatar: callerInfo.avatar,
+              hasVideo: data.type === 'video',
+            });
+          }
+        } catch (e) { console.warn('[callkit] reportIncoming gate failed:', e); }
+      }
 
       // 50s timeout for ringing
       timeoutRef.current = setTimeout(() => {
