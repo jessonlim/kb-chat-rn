@@ -265,7 +265,19 @@ const notificationService = {
     if (Platform.OS !== 'android') return () => {};
     const unsubMessage = messaging().onMessage(async (msg: any) => {
       const data = msg?.data || {};
-      if (isCallData(data.type)) return; // calls handled by socket / full-screen UI
+      // A missed/cancelled call MUST dismiss the full-screen ring even in the
+      // foreground. The full-screen intent launches the app to the foreground, and
+      // the `call_ended` socket event can be lost if it fires before the socket
+      // reconnects — so the data-only missed_call push is the reliable backstop
+      // that stops a ring left hanging after the caller hung up.
+      if (data.type === 'missed_call') {
+        try {
+          const { hideIncomingCallNotification } = require('./incomingCallNotification');
+          await hideIncomingCallNotification();
+        } catch { /* noop */ }
+        return;
+      }
+      if (isCallData(data.type)) return; // other call types handled by socket / full-screen UI
       try {
         const notifeeMod = getNotifee();
         await notifeeMod.default.displayNotification({
