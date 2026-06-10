@@ -12,9 +12,14 @@
 
 import { Alert, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
+import * as Updates from 'expo-updates';
 
 const storage = new MMKV();
-const PROMPTED_KEY = 'callPerms.prompted.v1';
+// Stores the build/bundle id we last showed the prompt for. We re-guide the user
+// once per NEW build/update instead of once-ever: the full-screen-call permission
+// is NOT auto-granted to sideloaded test builds and can reset on install, so a
+// once-ever prompt left testers with a silently-missing ring (looks like a bug).
+const PROMPTED_KEY = 'callPerms.promptedBuild.v1';
 const PKG = 'com.kbchat.app';
 
 // Lazy require — keeps the native module off the iOS eval path.
@@ -63,8 +68,14 @@ async function runSetupFlow() {
  */
 export function maybePromptCallPermissions() {
   if (Platform.OS !== 'android') return;
-  if (storage.getBoolean(PROMPTED_KEY)) return;
-  storage.set(PROMPTED_KEY, true);
+  // The running bundle id changes with every new EAS build (and OTA), so each new
+  // install/update re-shows this once. New testers (and existing ones after an
+  // update) get guided to the setting instead of hitting a silently-missing
+  // full-screen ring and assuming the call feature is broken.
+  let buildId = 'embedded';
+  try { buildId = Updates.updateId || Updates.runtimeVersion || 'embedded'; } catch { /* noop */ }
+  if (storage.getString(PROMPTED_KEY) === buildId) return;
+  storage.set(PROMPTED_KEY, buildId);
 
   Alert.alert(
     'Ring me for calls',
