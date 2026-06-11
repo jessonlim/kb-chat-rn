@@ -10,6 +10,7 @@ import {
   Alert,
   TouchableOpacity,
   TextInput,
+  AppState,
 } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -204,6 +205,42 @@ const ChatScreen = ({ route, navigation }: Props) => {
     };
     init();
   }, [chatId, navigation, t]);
+
+  // Re-sync visible messages when the socket reconnects or the app returns to the
+  // foreground. Real-time events (edits, deletes, reactions) that fired while this
+  // device's socket was disconnected — iOS suspends it in the background / when idle
+  // — are otherwise lost, so the other side's edit stays invisible until the chat is
+  // reopened. Best-effort merge: update existing messages in place + append new ones.
+  const resyncMessages = useCallback(async () => {
+    try {
+      const { messages: fresh } = await chatService.getMessages(chatId);
+      if (!fresh?.length) return;
+      setMessages((prev) => {
+        const freshById = new Map(fresh.map((m) => [m._id, m]));
+        const updated = prev.map((m) =>
+          freshById.has(m._id) ? { ...m, ...(freshById.get(m._id) as Message) } : m
+        );
+        const existingIds = new Set(prev.map((m) => m._id));
+        const missing = fresh.filter((m) => !existingIds.has(m._id));
+        return missing.length ? [...updated, ...missing] : updated;
+      });
+    } catch {
+      /* best-effort — ignore */
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    const onConnect = () => { void resyncMessages(); };
+    socket?.on('connect', onConnect);
+    const appSub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void resyncMessages();
+    });
+    return () => {
+      try { socket?.off('connect', onConnect); } catch { /* noop */ }
+      appSub.remove();
+    };
+  }, [resyncMessages]);
 
   // Set header with online status / member count
   useEffect(() => {
