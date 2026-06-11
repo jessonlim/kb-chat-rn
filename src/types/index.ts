@@ -17,7 +17,10 @@ export interface Chat {
   participants: User[];
   groupName?: string;
   groupImage?: string;
-  groupAdmin?: string;
+  groupAdmin?: string; // the owner (creator)
+  groupAdmins?: string[]; // promoted admins
+  pinnedMessage?: string | Message; // pinned message id (or populated)
+  announcement?: string; // group announcement / notice
   lastMessage?: Message;
   unreadCount?: number;
   isPinned?: boolean;

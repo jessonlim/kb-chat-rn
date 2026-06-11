@@ -82,6 +82,30 @@ const chatService = {
     return data;
   },
 
+  /** Owner: promote a member to admin. */
+  promoteAdmin: async (chatId: string, userId: string): Promise<ChatResponse> => {
+    const { data } = await api.post<ChatResponse>(`/api/chats/group/${chatId}/admins`, { userId });
+    return data;
+  },
+
+  /** Owner: demote an admin back to a regular member. */
+  demoteAdmin: async (chatId: string, userId: string): Promise<ChatResponse> => {
+    const { data } = await api.delete<ChatResponse>(`/api/chats/group/${chatId}/admins/${userId}`);
+    return data;
+  },
+
+  /** Admin: pin a message in a group (pass null to unpin). */
+  setPinnedMessage: async (chatId: string, messageId: string | null): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/pinned-message`, { messageId });
+    return data;
+  },
+
+  /** Admin: set or clear the group announcement. */
+  setAnnouncement: async (chatId: string, announcement: string): Promise<{ ok: boolean; announcement: string }> => {
+    const { data } = await api.put(`/api/chats/${chatId}/announcement`, { announcement });
+    return data;
+  },
+
   togglePin: async (chatId: string): Promise<{ ok: boolean; isPinned: boolean }> => {
     const { data } = await api.post(`/api/chats/${chatId}/pin`);
     return data;
