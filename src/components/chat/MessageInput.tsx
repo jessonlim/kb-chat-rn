@@ -21,7 +21,7 @@ interface Props {
   onCancelReply?: () => void;
   editMessage?: Message | null;
   onCancelEdit?: () => void;
-  onSendEdit?: (messageId: string, newContent: string) => void;
+  onSendEdit?: (messageId: string, newContent: string) => void | Promise<boolean | void>;
   onAttachPress?: () => void;
   onMicPress?: () => void;
 }
@@ -81,14 +81,16 @@ const MessageInput = ({
     }, 2000);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
     if (editMessage && onSendEdit) {
-      // Edit mode — send edit
-      onSendEdit(editMessage._id, trimmed);
-      setText('');
+      // Edit mode — wait for the edit to actually save before clearing the box.
+      // On failure we keep the text + edit bar so the user can retry instead of
+      // silently losing what they typed.
+      const result = await onSendEdit(editMessage._id, trimmed);
+      if (result !== false) setText('');
       return;
     }
 

@@ -848,8 +848,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
   // Edit message via socket
   const handleSendEdit = useCallback(
-    async (messageId: string, newContent: string) => {
-      setEditMessage(null);
+    async (messageId: string, newContent: string): Promise<boolean> => {
       try {
         // REST edit (the backend persists it, enforces the 15-min window, and
         // broadcasts `message_edited` to the other participants/devices).
@@ -859,12 +858,18 @@ const ChatScreen = ({ route, navigation }: Props) => {
             m._id === messageId ? { ...m, content: newContent, edited: true } : m
           )
         );
+        setEditMessage(null); // close the composer only once the edit is saved
+        return true;
       } catch (e: any) {
         const expired = e?.response?.data?.code === 'edit_window_expired';
         Toast.show({
           type: 'error',
           text1: expired ? t('chat.editWindowExpired') : t('chat.editFailed'),
         });
+        // Past the 15-min window retrying is pointless — close the editor.
+        // For a transient failure keep it open so the typed text isn't lost.
+        if (expired) setEditMessage(null);
+        return false;
       }
     },
     [chatId, t]

@@ -587,14 +587,24 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
                         : ''}
               </Text>
               <TextInput
-                style={styles.editInput}
+                style={[
+                  styles.editInput,
+                  editingField === 'announcement' && {
+                    minHeight: 96,
+                    maxHeight: 200,
+                    textAlignVertical: 'top' as const,
+                  },
+                ]}
                 value={editingValue}
                 onChangeText={setEditingValue}
                 autoFocus
                 placeholderTextColor={colors.textMuted}
-                returnKeyType="done"
-                onSubmitEditing={handleSaveEdit}
-                maxLength={40}
+                // The group notice can be a short paragraph; the other fields
+                // (name/alias/remark) stay short single-line inputs.
+                multiline={editingField === 'announcement'}
+                returnKeyType={editingField === 'announcement' ? 'default' : 'done'}
+                onSubmitEditing={editingField === 'announcement' ? undefined : handleSaveEdit}
+                maxLength={editingField === 'announcement' ? 1000 : 40}
               />
               <View style={styles.editActions}>
                 <TouchableOpacity
