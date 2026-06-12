@@ -15,6 +15,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,24 +71,40 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
       handlingRef.current = true;
       setHandling(true);
 
-      // ── Group invite QR → join the group + open it ──
+      // ── Group invite QR → confirm, then join + open ──
       if (groupMatch) {
         const groupId = groupMatch[1];
-        try {
-          const res = await chatService.joinGroup(groupId);
-          const cid = (res.chat as any)?._id || (res.chat as any)?.id;
-          if (!cid) throw new Error('no chat in join response');
-          if (res.joined) Toast.show({ type: 'success', text1: t('qr.joinedGroup') });
-          navigation.replace('ChatScreen', { chatId: cid });
-        } catch (err: any) {
-          const status = err?.response?.status;
-          Toast.show({
-            type: 'error',
-            text1: status === 404 ? t('qr.groupNotFound') : t('qr.joinGroupFailed'),
-          });
-          setHandling(false);
-          setTimeout(() => { handlingRef.current = false; }, 1500);
-        }
+        const joinNow = async () => {
+          try {
+            const res = await chatService.joinGroup(groupId);
+            const cid = (res.chat as any)?._id || (res.chat as any)?.id;
+            if (!cid) throw new Error('no chat in join response');
+            if (res.joined) Toast.show({ type: 'success', text1: t('qr.joinedGroup') });
+            navigation.replace('ChatScreen', { chatId: cid });
+          } catch (err: any) {
+            const status = err?.response?.status;
+            Toast.show({
+              type: 'error',
+              text1: status === 404 ? t('qr.groupNotFound') : t('qr.joinGroupFailed'),
+            });
+            setHandling(false);
+            setTimeout(() => { handlingRef.current = false; }, 1500);
+          }
+        };
+        // Ask before joining (scanning a code shouldn't silently add you to a group).
+        Alert.alert(
+          t('qr.joinGroupTitle'),
+          t('qr.joinGroupConfirm'),
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+              onPress: () => { setHandling(false); handlingRef.current = false; },
+            },
+            { text: t('qr.joinGroupAction'), onPress: () => { void joinNow(); } },
+          ],
+          { cancelable: false },
+        );
         return;
       }
 
