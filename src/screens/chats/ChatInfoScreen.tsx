@@ -61,7 +61,7 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const prefs = useChatPrefs(chatId);
   // Inline-edit modal state. Replaces Alert.prompt (iOS-only) so the
   // edit flow works on Android too.
-  const [editingField, setEditingField] = useState<null | 'groupName' | 'alias' | 'remark'>(null);
+  const [editingField, setEditingField] = useState<null | 'groupName' | 'alias' | 'remark' | 'announcement'>(null);
   const [editingValue, setEditingValue] = useState('');
 
   // ── Load chat metadata ──────────────────────────────────────────
@@ -167,6 +167,12 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     setEditingField('remark');
   }, [prefs.remark]);
 
+  const handleEditAnnouncement = useCallback(() => {
+    if (!chat || chat.type !== 'group') return;
+    setEditingValue(chat.announcement || '');
+    setEditingField('announcement');
+  }, [chat]);
+
   // Commit the edit modal — dispatch the right action based on which field.
   const handleSaveEdit = useCallback(async () => {
     const field = editingField;
@@ -187,6 +193,14 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           type: 'error',
           text1: err?.response?.data?.message || t('common.failed'),
         });
+      }
+    } else if (field === 'announcement') {
+      try {
+        await chatService.setAnnouncement(chatId, value);
+        setChat((prev) => (prev ? { ...prev, announcement: value } : prev));
+        Toast.show({ type: 'success', text1: t('common.save') });
+      } catch (err: any) {
+        Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
       }
     } else if (field === 'alias') {
       chatPrefsStore.set(chatId, 'alias', value);
@@ -252,6 +266,52 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     ? chat.participants
     : chat.participants.filter((p) => p.id !== user?.id);
 
+  // ── Group admin roles (#5) ──────────────────────────────────────
+  const isOwner = !!(isGroup && chat.groupAdmin && chat.groupAdmin === user?.id);
+  const adminIdSet = new Set(
+    [chat.groupAdmin, ...(chat.groupAdmins || [])].filter(Boolean) as string[]
+  );
+  const isAdmin = !!(isGroup && user && adminIdSet.has(user.id));
+
+  const goToProfile = (uid: string) => {
+    const tabs = navigation.getParent?.();
+    if (tabs) tabs.navigate('ContactsTab', { screen: 'UserProfile', params: { userId: uid } });
+  };
+  const handlePromote = async (uid: string) => {
+    try {
+      const res = await chatService.promoteAdmin(chatId, uid);
+      setChat(res.chat);
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
+    }
+  };
+  const handleDemote = async (uid: string) => {
+    try {
+      const res = await chatService.demoteAdmin(chatId, uid);
+      setChat(res.chat);
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
+    }
+  };
+  // Tap a member tile: the group OWNER gets admin controls (+ profile); everyone
+  // else just opens the profile. Your own tile does nothing.
+  const handleMemberPress = (u: User) => {
+    if (u.id === user?.id) return;
+    if (isGroup && isOwner && u.id !== chat.groupAdmin) {
+      const already = adminIdSet.has(u.id);
+      Alert.alert(u.displayName || u.username, undefined, [
+        {
+          text: already ? t('group.removeAdmin') : t('group.makeAdmin'),
+          onPress: () => (already ? handleDemote(u.id) : handlePromote(u.id)),
+        },
+        { text: t('chatInfo.viewProfile'), onPress: () => goToProfile(u.id) },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]);
+      return;
+    }
+    goToProfile(u.id);
+  };
+
   const handleAddPeople = () => {
     if (isGroup) {
       navigation.navigate('AddGroupMembers', {
@@ -305,12 +365,7 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
             key={u.id}
             style={styles.tile}
             activeOpacity={0.7}
-            onPress={() => {
-              // Don't navigate to your own profile
-              if (u.id === user?.id) return;
-              const tabs = navigation.getParent?.();
-              if (tabs) tabs.navigate('ContactsTab', { screen: 'UserProfile', params: { userId: u.id } });
-            }}
+            onPress={() => handleMemberPress(u)}
           >
             <Avatar
               name={u.displayName || u.username}
@@ -320,6 +375,11 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
             <Text style={styles.tileName} numberOfLines={1}>
               {u.id === user?.id ? t('common.you') : (u.displayName || u.username)}
             </Text>
+            {isGroup && u.id === chat.groupAdmin ? (
+              <Text style={styles.roleBadge}>{t('group.owner')}</Text>
+            ) : isGroup && adminIdSet.has(u.id) ? (
+              <Text style={styles.roleBadge}>{t('group.admin')}</Text>
+            ) : null}
           </TouchableOpacity>
         ))}
         {/* "+" to add more members */}
@@ -360,7 +420,12 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           />
           <Row
             label={t('chatInfo.groupNotice')}
-            onPress={() => showSoon(t('chatInfo.groupNotice'))}
+            valueRight={chat.announcement || t('chatInfo.noNotice')}
+            onPress={() => {
+              if (isAdmin) handleEditAnnouncement();
+              else if (chat.announcement) Alert.alert(t('chatInfo.groupNotice'), chat.announcement);
+              else showSoon(t('chatInfo.groupNotice'));
+            }}
             chevron
             bordered
             colors={colors}
@@ -517,7 +582,9 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
                     ? t('chatInfo.editAlias')
                     : editingField === 'remark'
                       ? t('chatInfo.editRemark')
-                      : ''}
+                      : editingField === 'announcement'
+                        ? t('chatInfo.groupNotice')
+                        : ''}
               </Text>
               <TextInput
                 style={styles.editInput}
@@ -667,6 +734,12 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     fontSize: fontSize.xs,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  roleBadge: {
+    fontSize: 9,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 1,
   },
   addTile: {
     width: 56,
