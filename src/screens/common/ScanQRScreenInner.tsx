@@ -8,7 +8,7 @@
 // lazy-`require()`s this file the first time the QR screen renders — so
 // expo-camera only resolves when the user actually opens the scanner.
 
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  InteractionManager,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -49,6 +51,22 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [handling, setHandling] = useState(false);
   const handlingRef = useRef(false);
+
+  const isFocused = useIsFocused();
+  const [cameraReady, setCameraReady] = useState(false);
+  // Mount the camera only when the screen is focused AND the navigation transition
+  // has settled. Mounting CameraView mid-transition can leave the preview black until
+  // a remount (the surface fails to attach) — which is why closing + reopening the app
+  // "fixed" it. Deferring the mount + tying it to focus makes it attach reliably and
+  // re-attach every time you return to the scanner.
+  useEffect(() => {
+    if (!isFocused) {
+      setCameraReady(false);
+      return;
+    }
+    const task = InteractionManager.runAfterInteractions(() => setCameraReady(true));
+    return () => task.cancel();
+  }, [isFocused]);
 
   const handleScanned = useCallback(
     async ({ data }: { data: string }) => {
@@ -181,12 +199,14 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={handling ? undefined : handleScanned}
-      />
+      {isFocused && cameraReady && (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={handling ? undefined : handleScanned}
+        />
+      )}
 
       {/* Dim mask with a clear cutout in the middle */}
       <View pointerEvents="none" style={styles.overlay}>
