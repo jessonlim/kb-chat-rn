@@ -1414,6 +1414,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
             selected={selectedIds.has(item._id)}
             onSelectToggle={toggleSelected}
             translation={translations[item._id]}
+            isPinned={pinnedMessageIds.includes(item._id)}
           />
         )}
         contentContainerStyle={styles.messageList}

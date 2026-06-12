@@ -38,6 +38,9 @@ interface Props {
   // Optional translated version of the text — rendered as a faint
   // sub-text below the original when present.
   translation?: string;
+  // True if this message is currently pinned in the chat — shows a pin icon
+  // on the bubble (pinned state lives on the chat, so it's passed in).
+  isPinned?: boolean;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -425,6 +428,7 @@ const MessageBubble = ({
   onSelectToggle,
   onPress,
   translation,
+  isPinned,
 }: Props) => {
   const { colors, fontScaleMultiplier } = useTheme();
   const { user } = useAuth();
@@ -608,6 +612,14 @@ const MessageBubble = ({
 
         {/* Timestamp + status */}
         <View style={styles.meta}>
+          {isPinned && (
+            <Ionicons
+              name="bookmark"
+              size={11}
+              color={colors.primary}
+              style={{ marginRight: 3 }}
+            />
+          )}
           {isStarred && (
             <Ionicons
               name="star"
