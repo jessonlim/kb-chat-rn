@@ -27,6 +27,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../stores/authStore';
 import userService from '../../services/userService';
 import chatService from '../../services/chatService';
+import { approveWebLogin } from '../../services/authService';
 import { spacing, fontSize } from '../../utils/theme';
 
 interface Props {
@@ -42,6 +43,10 @@ const QR_HOST_PATTERN = /(?:https?:\/\/(?:www\.)?kb-chat\.com\/u\/|kbchat:\/\/us
 //   https://kb-chat.com/g/<chatId>   (shareable URL)
 //   kbchat://group/<chatId>          (custom-scheme deep link)
 const GROUP_QR_PATTERN = /(?:https?:\/\/(?:www\.)?kb-chat\.com\/g\/|kbchat:\/\/group\/)([a-fA-F0-9]+)/i;
+
+// Web login approval QR (shown by the web app's "Log in with phone"):
+//   kbchat://weblogin/<token>
+const WEBLOGIN_QR_PATTERN = /kbchat:\/\/weblogin\/([a-fA-F0-9]+)/i;
 
 const ScanQRScreenInner = ({ navigation }: Props) => {
   const { t } = useT();
@@ -74,9 +79,10 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
       // frame. We only want to process the first one.
       if (handlingRef.current) return;
 
+      const webloginMatch = data.match(WEBLOGIN_QR_PATTERN);
       const groupMatch = data.match(GROUP_QR_PATTERN);
       const match = data.match(QR_HOST_PATTERN);
-      if (!groupMatch && !match) {
+      if (!webloginMatch && !groupMatch && !match) {
         // Not our QR. Show a toast but don't navigate away — let the user
         // try again with a different code.
         handlingRef.current = true;
@@ -88,6 +94,39 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
 
       handlingRef.current = true;
       setHandling(true);
+
+      // ── Web login approval QR → confirm, then approve the web session ──
+      if (webloginMatch) {
+        const token = webloginMatch[1];
+        const approve = async () => {
+          try {
+            await approveWebLogin(token);
+            Toast.show({ type: 'success', text1: t('qr.webLoginSuccess') });
+            navigation.goBack();
+          } catch (err: any) {
+            Toast.show({
+              type: 'error',
+              text1: err?.response?.data?.message || t('qr.webLoginFailed'),
+            });
+            setHandling(false);
+            setTimeout(() => { handlingRef.current = false; }, 1500);
+          }
+        };
+        Alert.alert(
+          t('qr.webLoginTitle'),
+          t('qr.webLoginConfirm'),
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+              onPress: () => { setHandling(false); handlingRef.current = false; },
+            },
+            { text: t('qr.webLoginAction'), onPress: () => { void approve(); } },
+          ],
+          { cancelable: false },
+        );
+        return;
+      }
 
       // ── Group invite QR → confirm, then join + open ──
       if (groupMatch) {

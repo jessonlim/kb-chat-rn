@@ -24,6 +24,11 @@ export const logout = async (): Promise<void> => {
   await api.post('/api/auth/logout');
 };
 
+// Web QR login (Batch 3 Phase 2): the phone approves a web login it scanned.
+export const approveWebLogin = async (token: string): Promise<void> => {
+  await api.post('/api/auth/qr/approve', { token });
+};
+
 export const getMe = async (): Promise<{ user: User }> => {
   const res = await api.get('/api/auth/me');
   return res.data;
