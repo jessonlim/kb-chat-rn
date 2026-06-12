@@ -109,6 +109,8 @@ export const STRINGS = {
   'chat.loadFailed':          { en: 'Could not open chat', zh: '无法打开聊天' },
   'auth.sessionExpired':      { en: 'Session expired',     zh: '会话已过期' },
   'auth.signInAgain':         { en: 'Please sign in again',  zh: '请重新登录' },
+  'auth.kickedTitle':         { en: 'Signed out',          zh: '已退出登录' },
+  'auth.kickedMessage':       { en: 'Your account was just signed in on another device, so you have been signed out here.', zh: '您的账号刚刚在另一台设备登录，因此此设备已退出登录。' },
   'chat.typing':              { en: 'typing...',      zh: '正在输入...' },
   'chat.typingNamed':         { en: '{name} is typing...', zh: '{name} 正在输入...' },
   'chat.typingTwo':           { en: '{name1} and {name2} are typing...', zh: '{name1} 和 {name2} 正在输入...' },

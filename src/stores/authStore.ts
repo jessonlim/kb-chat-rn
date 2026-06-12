@@ -2,6 +2,7 @@
 // Uses React Context (same pattern as the Capacitor app).
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Alert } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { storage } from '../services/api';
 import { authEvents } from '../services/authEvents';
@@ -89,7 +90,9 @@ export const useAuthProvider = () => {
       secureStorage.clearAll();
       socketService.disconnect();
       setUser(null);
-      // Toast will be shown by the component that handles this
+      // Tell the user WHY they landed back on the login screen — their account
+      // was just signed in on another device (one phone per account).
+      Alert.alert(tStatic('auth.kickedTitle'), tStatic('auth.kickedMessage'));
     };
 
     socket.on('force_logout', onForceLogout);
