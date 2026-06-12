@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import Toast from 'react-native-toast-message';
 import { storage } from '../services/api';
 import { authEvents } from '../services/authEvents';
+import { getDeviceId } from '../services/device';
 import { secureStorage, initSecureStorage } from '../services/secureStorage';
 import { tStatic } from '../i18n/I18nContext';
 import * as authService from '../services/authService';
@@ -74,7 +75,17 @@ export const useAuthProvider = () => {
     const socket = socketService.getSocket();
     if (!socket) return;
 
-    const onForceLogout = () => {
+    const onForceLogout = (payload?: { deviceIds?: string[] }) => {
+      // Targeted kick (Batch 3): when the server names the kicked devices, only
+      // log out if WE are one of them — so a login on another phone doesn't sign
+      // out a different device. No deviceIds = a blanket logout (legacy) → apply.
+      if (
+        payload?.deviceIds &&
+        payload.deviceIds.length > 0 &&
+        !payload.deviceIds.includes(getDeviceId())
+      ) {
+        return;
+      }
       secureStorage.clearAll();
       socketService.disconnect();
       setUser(null);

@@ -108,8 +108,11 @@ api.interceptors.response.use(
       const refreshToken = secureStorage.getToken('refreshToken');
       if (!refreshToken) throw new Error('No refresh token');
 
+      // Lazy require to avoid the device -> api.storage import cycle.
+      const { deviceMeta } = require('./device');
       const { data } = await axios.post(`${API_URL}/api/auth/refresh`, {
         refreshToken,
+        ...deviceMeta(),
       });
 
       secureStorage.setToken('accessToken', data.accessToken);
@@ -125,6 +128,15 @@ api.interceptors.response.use(
       return api(original);
     } catch (refreshError) {
       processQueue(refreshError, null);
+
+      // A revoked session (kicked by a newer login, or logged out elsewhere)
+      // is terminal — end the session now instead of waiting out the 2-strike
+      // window. This is the catch-up path for a device that was offline when
+      // it got kicked and missed the realtime force_logout.
+      if ((refreshError as any)?.response?.data?.code === 'session_revoked') {
+        declareSessionDead();
+        return Promise.reject(refreshError);
+      }
 
       // Audit finding M8 — guard against the indefinite refresh loop.
       // Increment the counter; if we're past the threshold within the

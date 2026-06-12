@@ -1,4 +1,5 @@
 import api from './api';
+import { deviceMeta } from './device';
 import type { AuthResponse, User } from '../types';
 
 export const register = async (data: {
@@ -7,7 +8,7 @@ export const register = async (data: {
   password: string;
   displayName?: string;
 }): Promise<AuthResponse> => {
-  const res = await api.post('/api/auth/register', data);
+  const res = await api.post('/api/auth/register', { ...data, ...deviceMeta() });
   return res.data;
 };
 
@@ -15,7 +16,7 @@ export const login = async (data: {
   email: string;
   password: string;
 }): Promise<AuthResponse> => {
-  const res = await api.post('/api/auth/login', data);
+  const res = await api.post('/api/auth/login', { ...data, ...deviceMeta() });
   return res.data;
 };
 
