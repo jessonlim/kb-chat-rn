@@ -94,9 +94,13 @@ const chatService = {
     return data;
   },
 
-  /** Admin: pin a message in a group (pass null to unpin). */
-  setPinnedMessage: async (chatId: string, messageId: string | null): Promise<{ ok: boolean }> => {
-    const { data } = await api.post(`/api/chats/${chatId}/pinned-message`, { messageId });
+  /** Admin: pin (pinned=true) or unpin (pinned=false) one message; null messageId clears all. */
+  setPinnedMessage: async (
+    chatId: string,
+    messageId: string | null,
+    pinned = true
+  ): Promise<{ ok: boolean }> => {
+    const { data } = await api.post(`/api/chats/${chatId}/pinned-message`, { messageId, pinned });
     return data;
   },
 

@@ -1117,24 +1117,33 @@ const ChatScreen = ({ route, navigation }: Props) => {
       [chat.groupAdmin, ...(chat.groupAdmins || [])].filter(Boolean) as string[]
     ).has(user.id);
   }, [chat, user]);
-  const pinnedMessage = useMemo<Message | null>(() => {
+  // Pinned messages (Telegram-style multiple). Prefer the array; fall back to
+  // the legacy single field. Newest pin shown first.
+  const pinnedMessages = useMemo<Message[]>(() => {
+    const arr = (chat?.pinnedMessages as (Message | string)[] | undefined) || [];
+    const objs = arr.filter((m): m is Message => !!m && typeof m === 'object');
+    if (objs.length > 0) return [...objs].reverse();
     const pm = chat?.pinnedMessage;
-    return pm && typeof pm === 'object' ? (pm as Message) : null;
-  }, [chat?.pinnedMessage]);
-  const pinnedMessageId =
-    pinnedMessage?._id ?? (typeof chat?.pinnedMessage === 'string' ? chat.pinnedMessage : undefined);
+    return pm && typeof pm === 'object' ? [pm as Message] : [];
+  }, [chat?.pinnedMessages, chat?.pinnedMessage]);
+  const pinnedMessageIds = useMemo(() => pinnedMessages.map((m) => m._id), [pinnedMessages]);
+
+  // Which pinned message the banner currently shows; tapping cycles through them.
+  const [pinnedIndex, setPinnedIndex] = useState(0);
+  const safePinnedIndex = pinnedMessages.length ? pinnedIndex % pinnedMessages.length : 0;
+  const currentPinned = pinnedMessages[safePinnedIndex] || null;
 
   const handleTogglePin = useCallback(
     async (msg: Message) => {
-      const currentlyPinned = pinnedMessageId === msg._id;
+      const currentlyPinned = pinnedMessageIds.includes(msg._id);
       try {
-        await chatService.setPinnedMessage(chatId, currentlyPinned ? null : msg._id);
+        await chatService.setPinnedMessage(chatId, msg._id, !currentlyPinned);
         // The backend emits chat_changed → the listener updates the banner.
       } catch (e: any) {
         Toast.show({ type: 'error', text1: e?.response?.data?.message || t('common.failed') });
       }
     },
-    [pinnedMessageId, chatId, t]
+    [pinnedMessageIds, chatId, t]
   );
 
   // Handle action selection
@@ -1261,6 +1270,22 @@ const ChatScreen = ({ route, navigation }: Props) => {
     [reversedMessages],
   );
 
+  // Tap the pinned banner → scroll to the current pinned message, then advance
+  // to the next one (cycling), Telegram-style.
+  const handlePinnedBannerTap = useCallback(() => {
+    if (pinnedMessages.length === 0) return;
+    const target = pinnedMessages[safePinnedIndex];
+    const idx = reversedMessages.findIndex((m) => m._id === target._id);
+    if (idx >= 0 && flatListRef.current) {
+      try {
+        flatListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      } catch { /* not measured yet */ }
+    }
+    if (pinnedMessages.length > 1) {
+      setPinnedIndex((i) => (i + 1) % pinnedMessages.length);
+    }
+  }, [pinnedMessages, safePinnedIndex, reversedMessages]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -1347,29 +1372,25 @@ const ChatScreen = ({ route, navigation }: Props) => {
         </View>
       )}
 
-      {/* Pinned-message banner (groups) */}
-      {pinnedMessage && (
-        <View style={styles.pinnedBanner}>
+      {/* Pinned-message banner (groups). Tap = scroll to it + cycle to the next
+          pinned message. Unpin happens via long-press → Unpin, not from here. */}
+      {currentPinned && (
+        <TouchableOpacity
+          style={styles.pinnedBanner}
+          activeOpacity={0.7}
+          onPress={handlePinnedBannerTap}
+        >
           <Ionicons name="bookmark" size={16} color={colors.primary} />
-          <TouchableOpacity
-            style={styles.pinnedBannerText}
-            activeOpacity={0.7}
-            onPress={() => Alert.alert(t('chat.pinnedMessage'), pinnedMessage.content || '')}
-          >
-            <Text style={styles.pinnedBannerLabel}>{t('chat.pinnedMessage')}</Text>
-            <Text style={styles.pinnedBannerContent} numberOfLines={1}>
-              {pinnedMessage.content || '…'}
+          <View style={styles.pinnedBannerText}>
+            <Text style={styles.pinnedBannerLabel}>
+              {t('chat.pinnedMessage')}
+              {pinnedMessages.length > 1 ? ` (${safePinnedIndex + 1}/${pinnedMessages.length})` : ''}
             </Text>
-          </TouchableOpacity>
-          {isGroupAdmin && (
-            <TouchableOpacity
-              onPress={() => handleTogglePin(pinnedMessage)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+            <Text style={styles.pinnedBannerContent} numberOfLines={1}>
+              {currentPinned.content || '…'}
+            </Text>
+          </View>
+        </TouchableOpacity>
       )}
 
       <FlatList
@@ -1458,7 +1479,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         message={actionMessage}
         isOwn={actionMessage ? isOwnMessage(actionMessage) : false}
         canPin={isGroupAdmin}
-        isPinned={!!actionMessage && actionMessage._id === pinnedMessageId}
+        isPinned={!!actionMessage && pinnedMessageIds.includes(actionMessage._id)}
         onAction={handleAction}
         onReact={(emoji) => {
           if (!actionMessage) return;
