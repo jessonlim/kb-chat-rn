@@ -533,7 +533,15 @@ const ChatScreen = ({ route, navigation }: Props) => {
       setTypingUsers((prev) => prev.filter((id) => id !== data.userId));
     };
 
+    // Group metadata changed (pinned message, announcement, admins, name, members).
+    const onChatChanged = (data: { chat?: { _id?: string } }) => {
+      if (data?.chat && (data.chat as { _id?: string })._id === chatId) {
+        setChat(data.chat as Chat);
+      }
+    };
+
     socket.on('receive_message', onReceiveMessage);
+    socket.on('chat_changed', onChatChanged);
     socket.on('message_deleted', onMessageDeleted);
     socket.on('message_edited', onMessageEdited);
     socket.on('messages_read', onMessagesRead);
@@ -551,6 +559,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
       socket.off('message_reaction', onReaction);
       socket.off('typing_start', onTypingStart);
       socket.off('typing_stop', onTypingStop);
+      socket.off('chat_changed', onChatChanged);
     };
   }, [chatId, user?.id]);
 
@@ -1096,6 +1105,33 @@ const ChatScreen = ({ route, navigation }: Props) => {
     exitSelectMode();
   }, [selectedMessages, t, exitSelectMode]);
 
+  // ── Pin a message (#6) ──────────────────────────────────────────
+  const isGroupAdmin = useMemo(() => {
+    if (chat?.type !== 'group' || !user) return false;
+    return new Set(
+      [chat.groupAdmin, ...(chat.groupAdmins || [])].filter(Boolean) as string[]
+    ).has(user.id);
+  }, [chat, user]);
+  const pinnedMessage = useMemo<Message | null>(() => {
+    const pm = chat?.pinnedMessage;
+    return pm && typeof pm === 'object' ? (pm as Message) : null;
+  }, [chat?.pinnedMessage]);
+  const pinnedMessageId =
+    pinnedMessage?._id ?? (typeof chat?.pinnedMessage === 'string' ? chat.pinnedMessage : undefined);
+
+  const handleTogglePin = useCallback(
+    async (msg: Message) => {
+      const currentlyPinned = pinnedMessageId === msg._id;
+      try {
+        await chatService.setPinnedMessage(chatId, currentlyPinned ? null : msg._id);
+        // The backend emits chat_changed → the listener updates the banner.
+      } catch (e: any) {
+        Toast.show({ type: 'error', text1: e?.response?.data?.message || t('common.failed') });
+      }
+    },
+    [pinnedMessageId, chatId, t]
+  );
+
   // Handle action selection
   const handleAction = useCallback(
     (action: MessageAction) => {
@@ -1124,6 +1160,10 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
         case 'star':
           handleToggleStar(actionMessage._id);
+          break;
+
+        case 'pin':
+          handleTogglePin(actionMessage);
           break;
 
         case 'forward':
@@ -1171,7 +1211,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
 
       setActionMessage(null);
     },
-    [actionMessage, handleDeleteMessage, handleToggleStar, enterSelectMode, navigation, t]
+    [actionMessage, handleDeleteMessage, handleToggleStar, handleTogglePin, enterSelectMode, navigation, t]
   );
 
   const isGroup = chat?.type === 'group';
@@ -1302,6 +1342,31 @@ const ChatScreen = ({ route, navigation }: Props) => {
         </View>
       )}
 
+      {/* Pinned-message banner (groups) */}
+      {pinnedMessage && (
+        <View style={styles.pinnedBanner}>
+          <Ionicons name="bookmark" size={16} color={colors.primary} />
+          <TouchableOpacity
+            style={styles.pinnedBannerText}
+            activeOpacity={0.7}
+            onPress={() => Alert.alert(t('chat.pinnedMessage'), pinnedMessage.content || '')}
+          >
+            <Text style={styles.pinnedBannerLabel}>{t('chat.pinnedMessage')}</Text>
+            <Text style={styles.pinnedBannerContent} numberOfLines={1}>
+              {pinnedMessage.content || '…'}
+            </Text>
+          </TouchableOpacity>
+          {isGroupAdmin && (
+            <TouchableOpacity
+              onPress={() => handleTogglePin(pinnedMessage)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         // inverted means: data[0] sits at the visual bottom, last entry at top.
@@ -1387,6 +1452,8 @@ const ChatScreen = ({ route, navigation }: Props) => {
         visible={showActions}
         message={actionMessage}
         isOwn={actionMessage ? isOwnMessage(actionMessage) : false}
+        canPin={isGroupAdmin}
+        isPinned={!!actionMessage && actionMessage._id === pinnedMessageId}
         onAction={handleAction}
         onReact={(emoji) => {
           if (!actionMessage) return;
@@ -1468,6 +1535,26 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   container: {
     flex: 1,
     backgroundColor: colors.bgDark,
+  },
+  pinnedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.bgInput,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pinnedBannerText: { flex: 1 },
+  pinnedBannerLabel: {
+    fontSize: fontSize.xs,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  pinnedBannerContent: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
   },
   center: {
     flex: 1,

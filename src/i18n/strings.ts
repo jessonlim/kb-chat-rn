@@ -15,6 +15,9 @@ export const STRINGS = {
   'common.failed':            { en: 'Failed',         zh: '失败' },
   // Starred messages
   'msg.star':                 { en: 'Star',           zh: '收藏' },
+  'msg.pin':                  { en: 'Pin',            zh: '置顶' },
+  'msg.unpin':                { en: 'Unpin',          zh: '取消置顶' },
+  'chat.pinnedMessage':       { en: 'Pinned message', zh: '置顶消息' },
   'msg.unstar':               { en: 'Unstar',         zh: '取消收藏' },
   'msg.starFailed':           { en: 'Could not star',  zh: '收藏失败' },
   'starred.title':            { en: 'Starred messages', zh: '收藏的消息' },

@@ -24,7 +24,8 @@ export type MessageAction =
   | 'select'
   | 'info'
   | 'translate'
-  | 'transcribe';
+  | 'transcribe'
+  | 'pin';
 
 interface Props {
   visible: boolean;
@@ -36,6 +37,10 @@ interface Props {
   // the legacy 👍 reaction.
   onReact?: (emoji: string) => void;
   onClose: () => void;
+  // Group admins can pin/unpin a message. `isPinned` = this message is the
+  // currently-pinned one (so the action toggles to "Unpin").
+  canPin?: boolean;
+  isPinned?: boolean;
 }
 
 interface ActionItem {
@@ -48,7 +53,7 @@ interface ActionItem {
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose }: Props) => {
+const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose, canPin, isPinned }: Props) => {
   const { colors } = useTheme();
   const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -59,6 +64,7 @@ const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose }:
     { key: 'edit', label: t('msg.edit'), icon: 'create-outline', ownOnly: true },
     { key: 'forward', label: t('msg.forward'), icon: 'arrow-redo-outline' },
     { key: 'star', label: t('msg.star'), icon: 'star-outline' },
+    { key: 'pin', label: isPinned ? t('msg.unpin') : t('msg.pin'), icon: 'bookmark-outline' },
     { key: 'react', label: t('msg.react'), icon: 'happy-outline' },
     { key: 'select', label: t('select.menu'), icon: 'checkmark-circle-outline' },
     { key: 'translate', label: t('translate.action'), icon: 'language-outline' },
@@ -81,6 +87,11 @@ const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose }:
       if (message.type !== 'text' || !message.content) return false;
       const sentAt = message.createdAt ? new Date(message.createdAt).getTime() : 0;
       if (sentAt && Date.now() - sentAt > 15 * 60 * 1000) return false;
+    }
+    // Pin/unpin: group admins only, and not on deleted/system messages.
+    if (a.key === 'pin') {
+      if (!canPin) return false;
+      if (message.deleted || message.type === 'system') return false;
     }
     // Can't translate non-text messages
     if (a.key === 'translate' && (message.type !== 'text' || !message.content)) return false;
