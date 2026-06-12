@@ -59,19 +59,36 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
 
   const isFocused = useIsFocused();
   const [cameraReady, setCameraReady] = useState(false);
+  // Bumping this key forces CameraView to recreate its surface. On some Android
+  // devices a surface reused across visits — or one attached mid-transition —
+  // stays black; a brand-new surface + a short settle delay fixes it.
+  const [mountId, setMountId] = useState(0);
   // Mount the camera only when the screen is focused AND the navigation transition
-  // has settled. Mounting CameraView mid-transition can leave the preview black until
-  // a remount (the surface fails to attach) — which is why closing + reopening the app
-  // "fixed" it. Deferring the mount + tying it to focus makes it attach reliably and
-  // re-attach every time you return to the scanner.
+  // has settled, then give the GL surface a moment to attach before we render it.
   useEffect(() => {
     if (!isFocused) {
       setCameraReady(false);
       return;
     }
-    const task = InteractionManager.runAfterInteractions(() => setCameraReady(true));
-    return () => task.cancel();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => {
+        setMountId((n) => n + 1);
+        setCameraReady(true);
+      }, 250);
+    });
+    return () => {
+      task.cancel();
+      if (timer) clearTimeout(timer);
+    };
   }, [isFocused]);
+
+  // Manual recovery if the preview is still black — recreate the camera surface.
+  const remountCamera = useCallback(() => {
+    setCameraReady(false);
+    setMountId((n) => n + 1);
+    setTimeout(() => setCameraReady(true), 80);
+  }, []);
 
   const handleScanned = useCallback(
     async ({ data }: { data: string }) => {
@@ -240,6 +257,7 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
     <View style={styles.container}>
       {isFocused && cameraReady && (
         <CameraView
+          key={mountId}
           style={StyleSheet.absoluteFill}
           facing="back"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
@@ -264,6 +282,14 @@ const ScanQRScreenInner = ({ navigation }: Props) => {
           <Text style={styles.hint}>{t('qr.aimAtCode')}</Text>
         </View>
       </View>
+
+      {/* Manual recovery for the occasional black preview on Android */}
+      {isFocused && (
+        <TouchableOpacity style={styles.retryBtn} onPress={remountCamera} activeOpacity={0.7}>
+          <Ionicons name="refresh" size={15} color="#fff" />
+          <Text style={styles.retryText}>{t('qr.cameraBlackRetry')}</Text>
+        </TouchableOpacity>
+      )}
 
       {handling && (
         <View style={styles.handlingBadge}>
@@ -347,6 +373,22 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       fontSize: fontSize.md,
       textAlign: 'center',
       paddingHorizontal: spacing.xl,
+    },
+    retryBtn: {
+      position: 'absolute',
+      bottom: 48,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    retryText: {
+      color: '#fff',
+      fontSize: fontSize.sm,
     },
     handlingBadge: {
       position: 'absolute',

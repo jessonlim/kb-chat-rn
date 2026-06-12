@@ -585,6 +585,7 @@ export const STRINGS = {
   'qr.scanQR':                { en: 'Scan QR Code',         zh: '扫一扫' },
   'qr.scanToAdd':             { en: 'Scan this code to add me as a friend', zh: '扫描此二维码添加我为好友' },
   'qr.aimAtCode':             { en: 'Point your camera at a QR code', zh: '将摄像头对准二维码' },
+  'qr.cameraBlackRetry':      { en: 'Screen black? Tap to retry', zh: '黑屏？点此重试' },
   'qr.cameraDenied':          { en: 'Camera access denied', zh: '摄像头权限被拒绝' },
   'qr.invalidQR':             { en: 'This QR code is not from KB Chat', zh: '此二维码不是 KB Chat 的好友码' },
   'qr.userNotFound':          { en: 'User not found',       zh: '未找到用户' },
