@@ -29,6 +29,11 @@ export const approveWebLogin = async (token: string): Promise<void> => {
   await api.post('/api/auth/qr/approve', { token });
 };
 
+// Phase 2b: the phone rejects a credential web login it was asked to approve.
+export const denyWebLogin = async (token: string): Promise<void> => {
+  await api.post('/api/auth/qr/deny', { token });
+};
+
 export const getMe = async (): Promise<{ user: User }> => {
   const res = await api.get('/api/auth/me');
   return res.data;

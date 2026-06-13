@@ -95,8 +95,40 @@ export const useAuthProvider = () => {
       Alert.alert(tStatic('auth.kickedTitle'), tStatic('auth.kickedMessage'));
     };
 
+    // Phase 2b: this phone is the main device — approve/deny a web login that
+    // someone started with this account's email + password.
+    const onWebLoginRequest = (payload?: { token?: string; deviceName?: string }) => {
+      if (!payload?.token) return;
+      const token = payload.token;
+      Alert.alert(
+        tStatic('qr.webReqTitle'),
+        tStatic('qr.webReqMessage'),
+        [
+          {
+            text: tStatic('qr.webReqDeny'),
+            style: 'cancel',
+            onPress: () => { authService.denyWebLogin(token).catch(() => {}); },
+          },
+          {
+            text: tStatic('qr.webReqApprove'),
+            onPress: () => {
+              authService.approveWebLogin(token)
+                .then(() => Toast.show({ type: 'success', text1: tStatic('qr.webLoginSuccess') }))
+                .catch((e: any) =>
+                  Toast.show({ type: 'error', text1: e?.response?.data?.message || tStatic('qr.webLoginFailed') })
+                );
+            },
+          },
+        ],
+      );
+    };
+
     socket.on('force_logout', onForceLogout);
-    return () => { socket.off('force_logout', onForceLogout); };
+    socket.on('web_login_request', onWebLoginRequest);
+    return () => {
+      socket.off('force_logout', onForceLogout);
+      socket.off('web_login_request', onWebLoginRequest);
+    };
   }, [user]);
 
   // Listen for `session_expired` from the axios refresh interceptor.
