@@ -41,6 +41,9 @@ interface Props {
   // True if this message is currently pinned in the chat — shows a pin icon
   // on the bubble (pinned state lives on the chat, so it's passed in).
   isPinned?: boolean;
+  // Briefly true right after the user jumps to this message (tapping the pinned
+  // banner or a search result) — the row flashes a tint so it's easy to spot.
+  highlighted?: boolean;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -429,6 +432,7 @@ const MessageBubble = ({
   onPress,
   translation,
   isPinned,
+  highlighted,
 }: Props) => {
   const { colors, fontScaleMultiplier } = useTheme();
   const { user } = useAuth();
@@ -509,7 +513,12 @@ const MessageBubble = ({
       onLongPress={handleLongPress}
       onPress={handlePress}
       delayLongPress={300}
-      style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther, selected && styles.selectedRow]}
+      style={[
+        styles.row,
+        isOwn ? styles.rowOwn : styles.rowOther,
+        selected && styles.selectedRow,
+        highlighted && styles.highlightedRow,
+      ]}
     >
       {checkbox}
       <View
@@ -656,6 +665,13 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
   selectedRow: {
     backgroundColor: colors.primary + '12', // ~7% opacity tint
+  },
+  highlightedRow: {
+    // Brief flash when you jump to a message (pinned banner / search). A bit
+    // stronger than the select tint so it reads as "here it is", then the
+    // parent clears it after ~1.8s.
+    backgroundColor: colors.primary + '33', // ~20% opacity tint
+    borderRadius: borderRadius.md,
   },
   selectionCheckbox: {
     width: 28,

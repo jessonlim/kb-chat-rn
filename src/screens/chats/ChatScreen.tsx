@@ -1133,6 +1133,17 @@ const ChatScreen = ({ route, navigation }: Props) => {
   const safePinnedIndex = pinnedMessages.length ? pinnedIndex % pinnedMessages.length : 0;
   const currentPinned = pinnedMessages[safePinnedIndex] || null;
 
+  // Briefly flash a message after jumping to it (pinned banner / search), so the
+  // user can spot which one they landed on. Cleared after a short delay.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashHighlight = useCallback((id: string) => {
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedId(id);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 1800);
+  }, []);
+  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
+
   const handleTogglePin = useCallback(
     async (msg: Message) => {
       const currentlyPinned = pinnedMessageIds.includes(msg._id);
@@ -1266,8 +1277,9 @@ const ChatScreen = ({ route, navigation }: Props) => {
           flatListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
         } catch { /* ignore — message not measured yet */ }
       }
+      flashHighlight(msg._id);
     },
-    [reversedMessages],
+    [reversedMessages, flashHighlight],
   );
 
   // Tap the pinned banner → scroll to the current pinned message, then advance
@@ -1281,10 +1293,11 @@ const ChatScreen = ({ route, navigation }: Props) => {
         flatListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
       } catch { /* not measured yet */ }
     }
+    flashHighlight(target._id);
     if (pinnedMessages.length > 1) {
       setPinnedIndex((i) => (i + 1) % pinnedMessages.length);
     }
-  }, [pinnedMessages, safePinnedIndex, reversedMessages]);
+  }, [pinnedMessages, safePinnedIndex, reversedMessages, flashHighlight]);
 
   if (loading) {
     return (
@@ -1415,10 +1428,25 @@ const ChatScreen = ({ route, navigation }: Props) => {
             onSelectToggle={toggleSelected}
             translation={translations[item._id]}
             isPinned={pinnedMessageIds.includes(item._id)}
+            highlighted={highlightedId === item._id}
           />
         )}
         contentContainerStyle={styles.messageList}
         inverted
+        // When we jump to a message that isn't measured yet, scrollToIndex throws
+        // and RN calls this. Approximate-scroll there, then retry exactly once it's
+        // laid out — without this, "jump to pinned/search result" silently no-ops.
+        onScrollToIndexFailed={(info) => {
+          flatListRef.current?.scrollToOffset({
+            offset: info.averageItemLength * info.index,
+            animated: true,
+          });
+          setTimeout(() => {
+            try {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            } catch { /* give up — still not measured */ }
+          }, 400);
+        }}
         // With inverted, "end" = top of screen = OLDER messages → load more there
         onEndReachedThreshold={0.1}
         onEndReached={() => loadMore()}
