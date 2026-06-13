@@ -147,6 +147,20 @@ export const secureStorage = {
     plainStorage.delete('accessToken');
     plainStorage.delete('refreshToken');
   },
+  // Generic encrypted key/value — used for the saved-accounts blob (Phase 3),
+  // which holds other accounts' refresh tokens and so must be encrypted too.
+  getItem(key: string): string | undefined {
+    if (secureInstance) return secureInstance.getString(key);
+    return plainStorage.getString(key);
+  },
+  setItem(key: string, value: string): void {
+    if (secureInstance) secureInstance.set(key, value);
+    else plainStorage.set(key, value);
+  },
+  removeItem(key: string): void {
+    if (secureInstance) secureInstance.delete(key);
+    plainStorage.delete(key);
+  },
   /** True if the secure store is active. False if we fell back. */
   isEncrypted(): boolean {
     return secureInstance !== null && !fellBackToPlaintext;

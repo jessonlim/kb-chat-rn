@@ -34,6 +34,7 @@ import AboutScreen from '../screens/me/AboutScreen';
 import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
 import MyQRScreen from '../screens/me/MyQRScreen';
 import HiddenChatsScreen from '../screens/me/HiddenChatsScreen';
+import AccountSwitcherScreen from '../screens/me/AccountSwitcherScreen';
 import ScanQRScreen from '../screens/common/ScanQRScreen';
 import SetRemarkScreen from '../screens/contacts/SetRemarkScreen';
 import FindFromContactsScreen from '../screens/contacts/FindFromContactsScreen';
@@ -380,6 +381,11 @@ const MeStackScreen = () => {
         name="HiddenChats"
         component={HiddenChatsScreen as any}
         options={{ title: t('hidden.title') }}
+      />
+      <MeStack.Screen
+        name="AccountSwitcher"
+        component={AccountSwitcherScreen as any}
+        options={{ title: t('account.switch') }}
       />
     </MeStack.Navigator>
   );

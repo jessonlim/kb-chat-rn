@@ -6,7 +6,7 @@ import MainTabs from './MainTabs';
 import { useTheme } from '../context/ThemeContext';
 
 const RootNavigator = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, addingAccount } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -18,7 +18,9 @@ const RootNavigator = () => {
     );
   }
 
-  return user ? <MainTabs /> : <AuthStack />;
+  // While adding an account, show the auth stack even though another account is
+  // still signed in — logging in there switches to the new account (Phase 3).
+  return user && !addingAccount ? <MainTabs /> : <AuthStack />;
 };
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({

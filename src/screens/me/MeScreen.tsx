@@ -44,6 +44,11 @@ const MeScreen = ({ navigation }: Props) => {
       onPress: () => navigation.navigate('MyQR'),
     },
     {
+      icon: 'people-circle-outline',
+      label: t('account.switch'),
+      onPress: () => navigation.navigate('AccountSwitcher'),
+    },
+    {
       icon: 'settings-outline',
       label: t('settings.title'),
       onPress: () => navigation.navigate('Settings'),

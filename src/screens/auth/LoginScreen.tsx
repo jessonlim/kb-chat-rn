@@ -21,7 +21,7 @@ interface Props {
 }
 
 const LoginScreen = ({ navigation }: Props) => {
-  const { login } = useAuth();
+  const { login, addingAccount, cancelAddAccount } = useAuth();
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -59,7 +59,9 @@ const LoginScreen = ({ navigation }: Props) => {
             resizeMode="contain"
           />
           <Text style={styles.title}>{t('about.appName')}</Text>
-          <Text style={styles.subtitle}>{t('auth.signInToContinue')}</Text>
+          <Text style={styles.subtitle}>
+            {addingAccount ? t('account.addTitle') : t('auth.signInToContinue')}
+          </Text>
         </View>
 
         {/* Form */}
@@ -108,6 +110,13 @@ const LoginScreen = ({ navigation }: Props) => {
             <Text style={styles.linkBold}>{t('auth.createOne')}</Text>
           </Text>
         </TouchableOpacity>
+
+        {/* Cancel adding an account → back to the current account (Phase 3) */}
+        {addingAccount && (
+          <TouchableOpacity onPress={cancelAddAccount} style={styles.linkRow}>
+            <Text style={styles.linkBold}>{t('account.cancelAdd')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
