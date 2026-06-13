@@ -14,12 +14,21 @@ import * as authService from '../services/authService';
 import socketService from '../services/socketService';
 import notificationService from '../services/notificationService';
 import { setSentryUser, clearSentryUser } from '../services/sentry';
-import type { User } from '../types';
+import type { AuthResponse, User } from '../types';
+
+// What login() resolves to. Empty object = signed in. When the account has 2FA
+// on and this is a new device, the server withholds tokens and returns a
+// challenge — the caller then collects a code and calls verifyTwoFa.
+export interface LoginResult {
+  twoFaRequired?: boolean;
+  challengeToken?: string;
+}
 
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  verifyTwoFa: (challengeToken: string, code: string) => Promise<void>;
   register: (data: { username: string; email: string; password: string; displayName?: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
@@ -35,7 +44,8 @@ interface AuthState {
 export const AuthContext = createContext<AuthState>({
   user: null,
   loading: true,
-  login: async () => {},
+  login: async () => ({}),
+  verifyTwoFa: async () => {},
   register: async () => {},
   logout: async () => {},
   updateUser: () => {},
@@ -207,8 +217,9 @@ export const useAuthProvider = () => {
     refreshAccounts();
   }, [refreshAccounts]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await authService.login({ email, password });
+  // Bring a fresh session up from a token-bearing auth response (shared by the
+  // password login, the 2FA verify step, and register).
+  const applyAuthResponse = useCallback((res: AuthResponse) => {
     // Persist the OUTGOING account's latest tokens before we overwrite them, so
     // switching back to it later uses a valid (non-rotated) refresh token.
     syncActiveTokens();
@@ -220,6 +231,23 @@ export const useAuthProvider = () => {
     saveActiveAccount(res);
   }, [saveActiveAccount, syncActiveTokens]);
 
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const res = await authService.login({ email, password });
+    // 2FA gate: server withheld tokens and handed back a challenge instead.
+    if ('twoFaRequired' in res) {
+      return { twoFaRequired: true, challengeToken: res.challengeToken };
+    }
+    applyAuthResponse(res);
+    return {};
+  }, [applyAuthResponse]);
+
+  // Finish a 2FA login: exchange the challenge token + authenticator code for
+  // real session tokens.
+  const verifyTwoFa = useCallback(async (challengeToken: string, code: string) => {
+    const res = await authService.verifyTwoFaLogin(challengeToken, code);
+    applyAuthResponse(res);
+  }, [applyAuthResponse]);
+
   const register = useCallback(async (data: {
     username: string;
     email: string;
@@ -227,14 +255,8 @@ export const useAuthProvider = () => {
     displayName?: string;
   }) => {
     const res = await authService.register(data);
-    syncActiveTokens();
-    secureStorage.setToken('accessToken', res.accessToken);
-    secureStorage.setToken('refreshToken', res.refreshToken);
-    setUser(res.user);
-    setSentryUser(res.user);
-    socketService.connect();
-    saveActiveAccount(res);
-  }, [saveActiveAccount, syncActiveTokens]);
+    applyAuthResponse(res);
+  }, [applyAuthResponse]);
 
   // Load a saved account's tokens and bring its session up. PURE: returns
   // true/false and does NOT mutate the accounts list on failure — the caller
@@ -355,7 +377,7 @@ export const useAuthProvider = () => {
   }, [refreshAccounts]);
 
   return {
-    user, loading, login, register, logout, updateUser,
+    user, loading, login, verifyTwoFa, register, logout, updateUser,
     accounts, addingAccount, switchAccount, beginAddAccount, cancelAddAccount, removeAccount,
   };
 };

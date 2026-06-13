@@ -21,13 +21,17 @@ interface Props {
 }
 
 const LoginScreen = ({ navigation }: Props) => {
-  const { login, addingAccount, cancelAddAccount } = useAuth();
+  const { login, verifyTwoFa, addingAccount, cancelAddAccount } = useAuth();
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  // 2FA step (Phase 4): when login returns a challenge instead of tokens, we
+  // hold the challenge token and switch the form to a 6-digit code prompt.
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -36,13 +40,41 @@ const LoginScreen = ({ navigation }: Props) => {
     }
     setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
+      const result = await login(email.trim().toLowerCase(), password);
+      if (result.twoFaRequired && result.challengeToken) {
+        // New device + 2FA on → ask for the authenticator code.
+        setChallengeToken(result.challengeToken);
+        setCode('');
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || t('auth.loginFailed');
       Toast.show({ type: 'error', text1: msg });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerify = async () => {
+    if (code.trim().length < 6) {
+      Toast.show({ type: 'error', text1: t('twofa.enterCode') });
+      return;
+    }
+    if (!challengeToken) return;
+    setLoading(true);
+    try {
+      await verifyTwoFa(challengeToken, code.trim());
+      // success → auth state flips and the navigator swaps to the app
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || t('twofa.invalidCode');
+      Toast.show({ type: 'error', text1: msg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelTwoFa = () => {
+    setChallengeToken(null);
+    setCode('');
   };
 
   return (
@@ -60,62 +92,102 @@ const LoginScreen = ({ navigation }: Props) => {
           />
           <Text style={styles.title}>{t('about.appName')}</Text>
           <Text style={styles.subtitle}>
-            {addingAccount ? t('account.addTitle') : t('auth.signInToContinue')}
+            {challengeToken
+              ? t('twofa.enterCodePrompt')
+              : addingAccount
+              ? t('account.addTitle')
+              : t('auth.signInToContinue')}
           </Text>
         </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('auth.email')}
-            placeholderTextColor={colors.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder={t('auth.password')}
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            onSubmitEditing={handleLogin}
-          />
+        {challengeToken ? (
+          /* 2FA code step (Phase 4) */
+          <>
+            <View style={styles.form}>
+              <TextInput
+                style={[styles.input, styles.codeInput]}
+                placeholder={t('twofa.codePlaceholder')}
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                autoFocus
+                maxLength={6}
+                value={code}
+                onChangeText={setCode}
+                onSubmitEditing={handleVerify}
+              />
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleVerify}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>{t('twofa.verify')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={cancelTwoFa} style={styles.linkRow}>
+              <Text style={styles.linkBold}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {/* Form */}
+            <View style={styles.form}>
+              <TextInput
+                style={styles.input}
+                placeholder={t('auth.email')}
+                placeholderTextColor={colors.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder={t('auth.password')}
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleLogin}
+              />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>{t('auth.signIn')}</Text>
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>{t('auth.signIn')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Register link */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Register')}
+              style={styles.linkRow}
+            >
+              <Text style={styles.linkText}>
+                {t('auth.dontHaveAccount')}{' '}
+                <Text style={styles.linkBold}>{t('auth.createOne')}</Text>
+              </Text>
+            </TouchableOpacity>
+
+            {/* Cancel adding an account → back to the current account (Phase 3) */}
+            {addingAccount && (
+              <TouchableOpacity onPress={cancelAddAccount} style={styles.linkRow}>
+                <Text style={styles.linkBold}>{t('account.cancelAdd')}</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Register link */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Register')}
-          style={styles.linkRow}
-        >
-          <Text style={styles.linkText}>
-            {t('auth.dontHaveAccount')}{' '}
-            <Text style={styles.linkBold}>{t('auth.createOne')}</Text>
-          </Text>
-        </TouchableOpacity>
-
-        {/* Cancel adding an account → back to the current account (Phase 3) */}
-        {addingAccount && (
-          <TouchableOpacity onPress={cancelAddAccount} style={styles.linkRow}>
-            <Text style={styles.linkBold}>{t('account.cancelAdd')}</Text>
-          </TouchableOpacity>
+          </>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -164,6 +236,12 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  codeInput: {
+    textAlign: 'center',
+    fontSize: fontSize.title,
+    letterSpacing: 8,
+    fontWeight: '700',
   },
   button: {
     backgroundColor: colors.primary,

@@ -12,12 +12,34 @@ export const register = async (data: {
   return res.data;
 };
 
+// Returns tokens, OR { twoFaRequired, challengeToken } when this account has 2FA
+// on and this is a new device (Phase 4) — then call verifyTwoFaLogin.
 export const login = async (data: {
   email: string;
   password: string;
-}): Promise<AuthResponse> => {
+}): Promise<AuthResponse | { twoFaRequired: true; challengeToken: string }> => {
   const res = await api.post('/api/auth/login', { ...data, ...deviceMeta() });
   return res.data;
+};
+
+// ─── Two-factor auth (Phase 4) ───────────────────────────────────────
+export const verifyTwoFaLogin = async (challengeToken: string, code: string): Promise<AuthResponse> => {
+  const res = await api.post('/api/auth/2fa/verify-login', { challengeToken, code, ...deviceMeta() });
+  return res.data;
+};
+export const twoFaStatus = async (): Promise<{ enabled: boolean }> => {
+  const res = await api.get('/api/auth/2fa/status');
+  return res.data;
+};
+export const twoFaSetup = async (): Promise<{ secret: string; otpauth: string }> => {
+  const res = await api.post('/api/auth/2fa/setup');
+  return res.data;
+};
+export const twoFaEnable = async (code: string): Promise<void> => {
+  await api.post('/api/auth/2fa/enable', { code });
+};
+export const twoFaDisable = async (code: string): Promise<void> => {
+  await api.post('/api/auth/2fa/disable', { code });
 };
 
 export const logout = async (): Promise<void> => {

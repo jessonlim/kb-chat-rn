@@ -30,6 +30,7 @@ import ProfileEditScreen from '../screens/me/ProfileEditScreen';
 import SettingsScreen from '../screens/me/SettingsScreen';
 import StarredMessagesScreen from '../screens/me/StarredMessagesScreen';
 import AccountSecurityScreen from '../screens/me/AccountSecurityScreen';
+import TwoFactorScreen from '../screens/me/TwoFactorScreen';
 import AboutScreen from '../screens/me/AboutScreen';
 import BlockedUsersScreen from '../screens/me/BlockedUsersScreen';
 import MyQRScreen from '../screens/me/MyQRScreen';
@@ -361,6 +362,11 @@ const MeStackScreen = () => {
         name="AccountSecurity"
         component={AccountSecurityScreen as any}
         options={{ title: t('settings.section.security') }}
+      />
+      <MeStack.Screen
+        name="TwoFactor"
+        component={TwoFactorScreen as any}
+        options={{ title: t('twofa.title') }}
       />
       <MeStack.Screen
         name="About"

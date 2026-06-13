@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,24 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
   const [saving, setSaving] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  // Two-step verification status, shown inline on the link row. Refreshed on
+  // focus so toggling it on the TwoFactor screen updates the badge here.
+  const [twoFaEnabled, setTwoFaEnabled] = useState<boolean | null>(null);
+
+  const loadTwoFaStatus = useCallback(async () => {
+    try {
+      const { enabled } = await authService.twoFaStatus();
+      setTwoFaEnabled(enabled);
+    } catch {
+      // leave as-is; the row just won't show a status badge
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTwoFaStatus();
+    const unsub = navigation.addListener('focus', loadTwoFaStatus);
+    return unsub;
+  }, [navigation, loadTwoFaStatus]);
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) return;
@@ -163,6 +181,25 @@ const AccountSecurityScreen = ({ navigation }: Props) => {
         )}
       </TouchableOpacity>
 
+      {/* Two-step verification (Phase 4) */}
+      <Text style={styles.sectionHeader}>{t('twofa.section')}</Text>
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.linkRow}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('TwoFactor')}
+        >
+          <Ionicons name="shield-checkmark-outline" size={22} color={colors.textSecondary} />
+          <Text style={styles.linkLabel}>{t('twofa.title')}</Text>
+          {twoFaEnabled !== null && (
+            <Text style={[styles.statusBadge, twoFaEnabled && styles.statusOn]}>
+              {twoFaEnabled ? t('twofa.on') : t('twofa.off')}
+            </Text>
+          )}
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+
       {/* Privacy / blocked users */}
       <Text style={styles.sectionHeader}>{t('settings.section.privacy')}</Text>
       <View style={styles.section}>
@@ -255,6 +292,15 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     flex: 1,
     fontSize: fontSize.md,
     color: colors.textPrimary,
+  },
+  statusBadge: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginRight: spacing.xs,
+  },
+  statusOn: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   dangerButton: {
     flexDirection: 'row',
