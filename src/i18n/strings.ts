@@ -646,6 +646,12 @@ export const STRINGS = {
   'twofa.verify':            { en: 'Verify',               zh: '验证' },
   'twofa.enterCodePrompt':   { en: 'Enter your authenticator code', zh: '请输入验证器验证码' },
 
+  // Chat export
+  'export.title':            { en: 'Export chat',     zh: '导出聊天' },
+  'export.downloading':      { en: 'Exporting…',      zh: '导出中…' },
+  'export.success':          { en: 'Chat exported',   zh: '聊天已导出' },
+  'export.failed':           { en: 'Export failed',   zh: '导出失败' },
+
   // Channels (Discover sub-feature, Telegram-style broadcast feeds)
   'channels.title':           { en: 'Channels',                zh: '视频号' },
   'channels.tab.discover':    { en: 'Discover',                zh: '发现' },

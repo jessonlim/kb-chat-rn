@@ -1143,6 +1143,9 @@ const ChatScreen = ({ route, navigation }: Props) => {
     highlightTimer.current = setTimeout(() => setHighlightedId(null), 1800);
   }, []);
   useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
+  // Reset the pinned-banner cycle position when the chat changes (in case this
+  // screen instance is reused for a different chatId).
+  useEffect(() => { setPinnedIndex(0); }, [chatId]);
 
   const handleTogglePin = useCallback(
     async (msg: Message) => {

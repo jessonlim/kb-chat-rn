@@ -125,6 +125,16 @@ const chatService = {
     return data;
   },
 
+  /** GET /api/chats/:id/export-transcript — full chat history as plain text.
+   *  tz = caller's offset in minutes east of UTC so times read in local time. */
+  exportChat: async (
+    chatId: string,
+  ): Promise<{ transcript: string; chatName: string; exportedAt: string; count: number }> => {
+    const tz = -new Date().getTimezoneOffset();
+    const { data } = await api.get(`/api/chats/${chatId}/export-transcript`, { params: { tz } });
+    return data;
+  },
+
   /** GET /api/chats/hidden — list chats the current user has hidden */
   listHiddenChats: async (): Promise<ChatsResponse> => {
     const { data } = await api.get<ChatsResponse>('/api/chats/hidden');

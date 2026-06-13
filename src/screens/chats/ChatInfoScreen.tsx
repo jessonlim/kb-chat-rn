@@ -22,6 +22,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -57,6 +58,7 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   const [isPinned, setIsPinned] = useState(false);
   const [isAlert, setIsAlert] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   // Local per-chat prefs (alias, remark, on-screen names, save-to-contacts)
   const prefs = useChatPrefs(chatId);
   // Inline-edit modal state. Replaces Alert.prompt (iOS-only) so the
@@ -243,6 +245,30 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
         },
       },
     ]);
+  };
+
+  // ── Export chat history ─────────────────────────────────────────
+  // Fetches the full transcript from the backend and hands it to the native
+  // share sheet (save to Files, email, etc.). We share the text directly rather
+  // than a file so it works on both platforms without expo-sharing (which would
+  // need a native rebuild).
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const { transcript, chatName } = await chatService.exportChat(chatId);
+      await Share.share({
+        title: `${chatName || 'Chat'} — KB Chat`,
+        message: transcript,
+      });
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || t('export.failed'),
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   // "Coming soon" rows — these features aren't built yet
@@ -456,6 +482,14 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
           label={t('chatInfo.sharedMedia')}
           onPress={() => navigation.navigate('SharedMedia', { chatId })}
           chevron
+          bordered
+          colors={colors}
+          styles={styles}
+        />
+        <Row
+          label={exporting ? t('export.downloading') : t('export.title')}
+          iconRight="download-outline"
+          onPress={handleExport}
           bordered
           colors={colors}
           styles={styles}
