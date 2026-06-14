@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import api from './api';
 import { navigationRef } from '../navigation/navigationRef';
 import { getNotifications, getDevice, getNotifee } from '../utils/nativeModules';
+import { promptWebLoginApproval } from './webLoginApproval';
 
 // ── Android FCM via @react-native-firebase ──────────────────────────
 // On Android, expo-notifications' own Firebase service is stripped (by
@@ -63,7 +64,10 @@ const configureHandler = () => {
       if (
         data?.type === 'call' ||
         data?.type === 'group_call' ||
-        data?.type === 'incoming_call'
+        data?.type === 'incoming_call' ||
+        // Web-login approval in the foreground is shown by the socket-driven
+        // in-app dialog (authStore) — suppress the duplicate banner here.
+        data?.type === 'web_login_approval'
       ) {
         return {
           shouldShowAlert: false,
@@ -278,6 +282,9 @@ const notificationService = {
         return;
       }
       if (isCallData(data.type)) return; // other call types handled by socket / full-screen UI
+      // Web-login approval in the FOREGROUND is handled by the socket event
+      // (authStore) which shows the in-app dialog — don't also draw a banner.
+      if (data.type === 'web_login_approval') return;
       try {
         const notifeeMod = getNotifee();
         await notifeeMod.default.displayNotification({
@@ -306,7 +313,9 @@ const notificationService = {
   /** Navigate when a Notifee-drawn chat/channel notification is pressed. Invoked
    *  by the app's single notifee event handler (in ongoingCallService). */
   handleNotifeePress(data: any) {
-    if (!data || !navigationRef.isReady()) return;
+    if (!data) return;
+    if (data.type === 'web_login_approval') { promptWebLoginApproval(data.token); return; }
+    if (!navigationRef.isReady()) return;
     if (data.chatId) {
       this._navigateToChat(String(data.chatId));
     } else if (data.channelId) {
@@ -330,6 +339,7 @@ const notificationService = {
     if (Platform.OS === 'android') {
       const unsub = messaging().onNotificationOpenedApp((msg: any) => {
         const data = msg?.data;
+        if (data?.type === 'web_login_approval') { promptWebLoginApproval(data.token); return; }
         if (!data || !navigationRef.isReady()) return;
         if (data.chatId) {
           this._navigateToChat(String(data.chatId));
@@ -351,6 +361,7 @@ const notificationService = {
       (response) => {
         const data = response.notification.request.content.data;
 
+        if (data?.type === 'web_login_approval') { promptWebLoginApproval(data.token as string); return; }
         if (!navigationRef.isReady()) return;
 
         if (data?.chatId) {
@@ -379,6 +390,10 @@ const notificationService = {
     if (Platform.OS === 'android') {
       const msg = await messaging().getInitialNotification();
       const data = msg?.data;
+      if (data?.type === 'web_login_approval') {
+        setTimeout(() => promptWebLoginApproval(data.token), 1200);
+        return;
+      }
       if (data?.chatId) {
         setTimeout(() => {
           if (navigationRef.isReady()) this._navigateToChat(String(data.chatId));
@@ -391,6 +406,10 @@ const notificationService = {
     if (!response) return;
 
     const data = response.notification.request.content.data;
+    if (data?.type === 'web_login_approval') {
+      setTimeout(() => promptWebLoginApproval(data.token as string), 1200);
+      return;
+    }
     if (data?.chatId) {
       // Small delay to let navigation mount
       setTimeout(() => {

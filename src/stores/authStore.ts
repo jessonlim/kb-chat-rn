@@ -11,6 +11,7 @@ import { secureStorage, initSecureStorage } from '../services/secureStorage';
 import { accountsStore, MAX_ACCOUNTS, type AccountSummary, type SavedAccount } from './accountsStore';
 import { tStatic } from '../i18n/I18nContext';
 import * as authService from '../services/authService';
+import { promptWebLoginApproval } from '../services/webLoginApproval';
 import socketService from '../services/socketService';
 import notificationService from '../services/notificationService';
 import { setSentryUser, clearSentryUser } from '../services/sentry';
@@ -148,31 +149,10 @@ export const useAuthProvider = () => {
     };
 
     // Phase 2b: this phone is the main device — approve/deny a web login that
-    // someone started with this account's email + password.
+    // someone started with this account's email + password. Shared with the
+    // push-notification path (when the app was closed) via promptWebLoginApproval.
     const onWebLoginRequest = (payload?: { token?: string; deviceName?: string }) => {
-      if (!payload?.token) return;
-      const token = payload.token;
-      Alert.alert(
-        tStatic('qr.webReqTitle'),
-        tStatic('qr.webReqMessage'),
-        [
-          {
-            text: tStatic('qr.webReqDeny'),
-            style: 'cancel',
-            onPress: () => { authService.denyWebLogin(token).catch(() => {}); },
-          },
-          {
-            text: tStatic('qr.webReqApprove'),
-            onPress: () => {
-              authService.approveWebLogin(token)
-                .then(() => Toast.show({ type: 'success', text1: tStatic('qr.webLoginSuccess') }))
-                .catch((e: any) =>
-                  Toast.show({ type: 'error', text1: e?.response?.data?.message || tStatic('qr.webLoginFailed') })
-                );
-            },
-          },
-        ],
-      );
+      promptWebLoginApproval(payload?.token);
     };
 
     socket.on('force_logout', onForceLogout);
