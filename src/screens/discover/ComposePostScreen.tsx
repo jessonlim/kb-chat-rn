@@ -29,6 +29,7 @@ interface PendingPhoto {
   localUri: string;
   uploaded?: ChannelPostAttachment;
   uploading: boolean;
+  isVideo?: boolean;
 }
 
 interface Props {
@@ -55,7 +56,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
       selectionLimit: remaining,
       quality: 0.8,
@@ -65,22 +66,26 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
 
     for (const asset of result.assets) {
       const id = ++nextPhotoId;
+      const isVideo = asset.type === 'video';
       setPhotos((prev) => [
         ...prev,
-        { id, localUri: asset.uri, uploading: true },
+        { id, localUri: asset.uri, uploading: true, isVideo },
       ]);
 
       // Upload in background
       (async () => {
         try {
           let fileUri = asset.uri;
-          const fileName = asset.fileName || `photo-${id}.jpg`;
-          const mimeType = asset.mimeType || 'image/jpeg';
-          try {
-            const compressed = await compressImage(fileUri);
-            fileUri = compressed.uri;
-          } catch {
-            // Use original
+          const fileName = asset.fileName || (isVideo ? `video-${id}.mp4` : `photo-${id}.jpg`);
+          const mimeType = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+          // Only still images get compressed; videos upload as-is.
+          if (!isVideo) {
+            try {
+              const compressed = await compressImage(fileUri);
+              fileUri = compressed.uri;
+            } catch {
+              // Use original
+            }
           }
           const uploaded = await uploadFile(fileUri, fileName, mimeType);
           setPhotos((prev) =>
@@ -89,7 +94,7 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
                 ? {
                     ...p,
                     uploading: false,
-                    uploaded: { url: uploaded.url, type: 'image' },
+                    uploaded: { url: uploaded.url, type: isVideo ? 'video' : 'image' },
                   }
                 : p
             )
@@ -174,6 +179,11 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
                   style={styles.photoImage}
                   resizeMode="cover"
                 />
+                {p.isVideo && !p.uploading && (
+                  <View style={styles.photoOverlay}>
+                    <Ionicons name="play-circle" size={28} color="#fff" />
+                  </View>
+                )}
                 {p.uploading && (
                   <View style={styles.photoOverlay}>
                     <ActivityIndicator size="small" color="#fff" />

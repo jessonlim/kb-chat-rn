@@ -93,10 +93,11 @@ const MessageActions = ({ visible, message, isOwn, onAction, onReact, onClose, c
       if (!canPin) return false;
       if (message.deleted || message.type === 'system') return false;
     }
-    // Can't translate non-text messages
-    if (a.key === 'translate' && (message.type !== 'text' || !message.content)) return false;
-    // Transcribe is only meaningful for voice messages
-    if (a.key === 'transcribe' && message.type !== 'audio') return false;
+    // Translate + transcribe are hidden until their backend endpoints exist
+    // (POST .../translate and .../transcribe aren't implemented) — showing them
+    // only produced a silent "failed" toast. Re-enable when the backend is built.
+    if (a.key === 'translate') return false;
+    if (a.key === 'transcribe') return false;
     // Can't get info for messages still sending or already deleted
     if (a.key === 'info' && (message.status === 'sending' || message.deleted)) return false;
     return true;

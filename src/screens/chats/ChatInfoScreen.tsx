@@ -319,20 +319,52 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
       Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
     }
   };
-  // Tap a member tile: the group OWNER gets admin controls (+ profile); everyone
-  // else just opens the profile. Your own tile does nothing.
+  const handleRemoveMember = (u: User) => {
+    Alert.alert(
+      t('group.removeMember'),
+      t('group.confirmRemove', { name: u.displayName || u.username }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('group.removeMember'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await chatService.removeMember(chatId, u.id);
+              setChat(res.chat);
+              Toast.show({ type: 'success', text1: t('group.memberRemoved') });
+            } catch (err: any) {
+              Toast.show({ type: 'error', text1: err?.response?.data?.message || t('common.failed') });
+            }
+          },
+        },
+      ]
+    );
+  };
+  // Tap a member tile: admins get management controls (+ profile); everyone
+  // else just opens the profile. Your own tile does nothing. The remove/admin
+  // options mirror the backend rules (owner can't be removed; only the owner can
+  // remove or promote/demote another admin).
   const handleMemberPress = (u: User) => {
     if (u.id === user?.id) return;
-    if (isGroup && isOwner && u.id !== chat.groupAdmin) {
-      const already = adminIdSet.has(u.id);
-      Alert.alert(u.displayName || u.username, undefined, [
-        {
-          text: already ? t('group.removeAdmin') : t('group.makeAdmin'),
-          onPress: () => (already ? handleDemote(u.id) : handlePromote(u.id)),
-        },
-        { text: t('chatInfo.viewProfile'), onPress: () => goToProfile(u.id) },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]);
+    const isTargetOwner = u.id === chat.groupAdmin;
+    const targetIsAdmin = adminIdSet.has(u.id);
+    if (isGroup && isAdmin && !isTargetOwner) {
+      const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+      // Only the owner can promote/demote admins.
+      if (isOwner) {
+        buttons.push({
+          text: targetIsAdmin ? t('group.removeAdmin') : t('group.makeAdmin'),
+          onPress: () => (targetIsAdmin ? handleDemote(u.id) : handlePromote(u.id)),
+        });
+      }
+      // Owner can remove anyone; a promoted admin can remove only non-admins.
+      if (isOwner || !targetIsAdmin) {
+        buttons.push({ text: t('group.removeMember'), style: 'destructive', onPress: () => handleRemoveMember(u) });
+      }
+      buttons.push({ text: t('chatInfo.viewProfile'), onPress: () => goToProfile(u.id) });
+      buttons.push({ text: t('common.cancel'), style: 'cancel' });
+      Alert.alert(u.displayName || u.username, undefined, buttons);
       return;
     }
     goToProfile(u.id);
