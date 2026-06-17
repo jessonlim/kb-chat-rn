@@ -44,6 +44,8 @@ interface Props {
   // Briefly true right after the user jumps to this message (tapping the pinned
   // banner or a search result) — the row flashes a tint so it's easy to spot.
   highlighted?: boolean;
+  // Tapping an existing reaction chip toggles that emoji for the current user.
+  onReactionPress?: (emoji: string) => void;
 }
 
 const formatTime = (dateStr: string): string => {
@@ -433,11 +435,22 @@ const MessageBubble = ({
   translation,
   isPinned,
   highlighted,
+  onReactionPress,
 }: Props) => {
   const { colors, fontScaleMultiplier } = useTheme();
   const { user } = useAuth();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const sender = typeof message.sender === 'object' ? message.sender : null;
+  // Cluster reactions by emoji → { emoji, count, mine } for the chips below the bubble.
+  const reactionGroups = useMemo(() => {
+    const groups: Record<string, { count: number; mine: boolean }> = {};
+    for (const r of message.reactions || []) {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, mine: false };
+      groups[r.emoji].count += 1;
+      if (String(r.user) === user?.id) groups[r.emoji].mine = true;
+    }
+    return Object.entries(groups);
+  }, [message.reactions, user?.id]);
   // Starred BY ME — starredBy is per-user, so a message shows a star only
   // if the current user starred it. IDs may arrive as ObjectId strings, so
   // compare stringified.
@@ -645,6 +658,23 @@ const MessageBubble = ({
             </Text>
           )}
         </View>
+
+        {/* Reaction chips — tap one to toggle that emoji for yourself */}
+        {reactionGroups.length > 0 && (
+          <View style={styles.reactionsWrap}>
+            {reactionGroups.map(([emoji, info]) => (
+              <TouchableOpacity
+                key={emoji}
+                style={[styles.reactionChip, info.mine && styles.reactionChipMine]}
+                activeOpacity={0.7}
+                onPress={() => onReactionPress?.(emoji)}
+              >
+                <Text style={styles.reactionChipEmoji}>{emoji}</Text>
+                {info.count > 1 && <Text style={styles.reactionChipCount}>{info.count}</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -781,6 +811,36 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   },
   statusRead: {
     color: '#60a5fa',
+  },
+  reactionsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: spacing.xs,
+  },
+  reactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  reactionChipMine: {
+    backgroundColor: colors.primary + '22',
+    borderColor: colors.primary,
+  },
+  reactionChipEmoji: {
+    fontSize: 13,
+  },
+  reactionChipCount: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   systemRow: {
     alignItems: 'center',

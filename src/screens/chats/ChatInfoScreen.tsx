@@ -370,6 +370,16 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
     goToProfile(u.id);
   };
 
+  // Whether the current user may remove this member — drives the visible "−"
+  // badge on the tile (so removing isn't hidden behind a long-press). Mirrors
+  // the backend rules: owner can't be removed; a promoted admin can't remove
+  // another admin; only admins can remove at all.
+  const canRemoveMember = (u: User): boolean => {
+    if (!isGroup || !isAdmin) return false;
+    if (u.id === user?.id || u.id === chat.groupAdmin) return false;
+    return isOwner || !adminIdSet.has(u.id);
+  };
+
   const handleAddPeople = () => {
     if (isGroup) {
       navigation.navigate('AddGroupMembers', {
@@ -438,6 +448,16 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
             ) : isGroup && adminIdSet.has(u.id) ? (
               <Text style={styles.roleBadge}>{t('group.admin')}</Text>
             ) : null}
+            {canRemoveMember(u) && (
+              <TouchableOpacity
+                style={styles.removeBadge}
+                activeOpacity={0.7}
+                onPress={() => handleRemoveMember(u)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="remove" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         ))}
         {/* "+" to add more members */}
@@ -816,6 +836,19 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     color: colors.primary,
     fontWeight: '600',
     marginTop: 1,
+  },
+  removeBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bgCard,
   },
   addTile: {
     width: 56,

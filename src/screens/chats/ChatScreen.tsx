@@ -1147,6 +1147,14 @@ const ChatScreen = ({ route, navigation }: Props) => {
   // screen instance is reused for a different chatId).
   useEffect(() => { setPinnedIndex(0); }, [chatId]);
 
+  // Toggle an emoji reaction on a message (used by the action-sheet quick row
+  // AND by tapping an existing reaction chip). The backend persists + broadcasts
+  // 'message_reaction', which the socket listener applies.
+  const emitReact = useCallback((messageId: string, emoji: string) => {
+    const socket = socketService.getSocket();
+    if (socket) socket.emit('react_message', { messageId, emoji });
+  }, []);
+
   const handleTogglePin = useCallback(
     async (msg: Message) => {
       const currentlyPinned = pinnedMessageIds.includes(msg._id);
@@ -1226,20 +1234,14 @@ const ChatScreen = ({ route, navigation }: Props) => {
           break;
 
         case 'react':
-          // Quick reaction — for now emit a default reaction
-          const socket = socketService.getSocket();
-          if (socket) {
-            socket.emit('react_message', {
-              messageId: actionMessage._id,
-              emoji: '👍',
-            });
-          }
+          // Quick reaction fallback — emit a default 👍.
+          emitReact(actionMessage._id, '👍');
           break;
       }
 
       setActionMessage(null);
     },
-    [actionMessage, handleDeleteMessage, handleToggleStar, handleTogglePin, enterSelectMode, navigation, t]
+    [actionMessage, handleDeleteMessage, handleToggleStar, handleTogglePin, enterSelectMode, navigation, t, emitReact]
   );
 
   const isGroup = chat?.type === 'group';
@@ -1432,6 +1434,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
             translation={translations[item._id]}
             isPinned={pinnedMessageIds.includes(item._id)}
             highlighted={highlightedId === item._id}
+            onReactionPress={(emoji) => emitReact(item._id, emoji)}
           />
         )}
         contentContainerStyle={styles.messageList}
@@ -1515,13 +1518,7 @@ const ChatScreen = ({ route, navigation }: Props) => {
         onAction={handleAction}
         onReact={(emoji) => {
           if (!actionMessage) return;
-          const socket = socketService.getSocket();
-          if (socket) {
-            socket.emit('react_message', {
-              messageId: actionMessage._id,
-              emoji,
-            });
-          }
+          emitReact(actionMessage._id, emoji);
           setActionMessage(null);
         }}
         onClose={() => {
