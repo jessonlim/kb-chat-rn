@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
 import channelService from '../../services/channelService';
 import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -68,11 +69,43 @@ const PostImage = ({ url, onPress }: { url: string; onPress: () => void }) => {
   );
 };
 
+// Inline video player for a channel post (native controls). Resolves the s3://
+// key to a signed URL the same way PostImage does.
+const PostVideo = ({ url }: { url: string }) => {
+  const { colors } = useTheme();
+  const postImgStyles = useMemo(() => makePostImgStyles(colors), [colors]);
+  const { uri, loading } = useMediaUrl(url);
+
+  if (loading || !uri) {
+    return (
+      <View style={postImgStyles.placeholder}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <Video
+      source={{ uri }}
+      style={postImgStyles.video}
+      useNativeControls
+      resizeMode={ResizeMode.CONTAIN}
+      isLooping={false}
+    />
+  );
+};
+
 const makePostImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   image: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: borderRadius.md,
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: borderRadius.md,
+    backgroundColor: '#000',
   },
   placeholder: {
     width: '100%',
@@ -567,6 +600,7 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
     const imageAttachments = post.attachments.filter(
       (a) => a.type === 'image'
     );
+    const videoAttachments = post.attachments.filter((a) => a.type === 'video');
 
     return (
       <View style={styles.postCard}>
@@ -624,6 +658,13 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
             ))}
           </View>
         )}
+
+        {/* Videos — inline players with native controls */}
+        {videoAttachments.map((att, i) => (
+          <View key={att.url + i} style={{ marginTop: spacing.sm }}>
+            <PostVideo url={att.url} />
+          </View>
+        ))}
 
         {/* Like + Comment buttons */}
         <View style={styles.actionRow}>

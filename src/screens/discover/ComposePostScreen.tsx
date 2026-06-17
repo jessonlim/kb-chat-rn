@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 import channelService from '../../services/channelService';
 import { uploadFile } from '../../services/uploadService';
 import { compressImage } from '../../utils/imageCompression';
@@ -64,7 +65,17 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
 
     if (result.canceled) return;
 
-    for (const asset of result.assets) {
+    // Android's multi-select picker can return the SAME asset twice — dedupe by
+    // assetId/uri so one pick doesn't become two tiles.
+    const seen = new Set<string>();
+    const assets = result.assets.filter((a) => {
+      const key = a.assetId || a.uri;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    for (const asset of assets) {
       const id = ++nextPhotoId;
       const isVideo = asset.type === 'video';
       setPhotos((prev) => [
@@ -174,11 +185,21 @@ const ComposePostScreen = ({ navigation, route }: Props) => {
           <View style={styles.photoGrid}>
             {photos.map((p) => (
               <View key={p.id} style={styles.photoItem}>
-                <Image
-                  source={{ uri: p.localUri }}
-                  style={styles.photoImage}
-                  resizeMode="cover"
-                />
+                {p.isVideo ? (
+                  <Video
+                    source={{ uri: p.localUri }}
+                    style={styles.photoImage}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={false}
+                    isMuted
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: p.localUri }}
+                    style={styles.photoImage}
+                    resizeMode="cover"
+                  />
+                )}
                 {p.isVideo && !p.uploading && (
                   <View style={styles.photoOverlay}>
                     <Ionicons name="play-circle" size={28} color="#fff" />
