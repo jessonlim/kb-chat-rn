@@ -22,6 +22,7 @@ import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import ChannelsScreen from '../screens/discover/ChannelsScreen';
 import ChannelDetailScreen from '../screens/discover/ChannelDetailScreen';
 import CreateChannelScreen from '../screens/discover/CreateChannelScreen';
+import EditChannelScreen from '../screens/discover/EditChannelScreen';
 import ComposePostScreen from '../screens/discover/ComposePostScreen';
 import MomentsScreen from '../screens/discover/MomentsScreen';
 import ComposeMomentScreen from '../screens/discover/ComposeMomentScreen';
@@ -300,6 +301,11 @@ const DiscoverStackScreen = () => {
         name="CreateChannel"
         component={CreateChannelScreen as any}
         options={{ title: t('channels.create.title') }}
+      />
+      <DiscoverStack.Screen
+        name="EditChannel"
+        component={EditChannelScreen as any}
+        options={{ title: t('channels.edit') }}
       />
       <DiscoverStack.Screen
         name="ComposePost"

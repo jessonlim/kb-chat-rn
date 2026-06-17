@@ -541,6 +541,20 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
             </Text>
           </TouchableOpacity>
         )}
+        {isOwner && (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => navigation.navigate('EditChannel', {
+              channelId: channel._id,
+              name: channel.name,
+              description: channel.description,
+              avatar: channel.avatar,
+            })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
       {channel.description ? (
         <Text style={styles.description}>{channel.description}</Text>
@@ -773,6 +787,16 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
     borderRadius: borderRadius.xl,
     paddingHorizontal: spacing.lg,
     paddingVertical: 8,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgInput,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   subButtonActive: {
     backgroundColor: colors.bgInput,
