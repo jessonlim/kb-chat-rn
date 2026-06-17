@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
+import VideoViewer from '../../components/chat/VideoViewer';
 import channelService from '../../services/channelService';
 import { useAuth } from '../../stores/authStore';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -69,9 +70,10 @@ const PostImage = ({ url, onPress }: { url: string; onPress: () => void }) => {
   );
 };
 
-// Inline video player for a channel post (native controls). Resolves the s3://
-// key to a signed URL the same way PostImage does.
-const PostVideo = ({ url }: { url: string }) => {
+// Video attachment in a channel post: shows the first frame as a poster with a
+// clear play-button overlay (so it reads as a video, not a static image), and
+// taps open the full-screen player. Resolves the s3:// key like PostImage.
+const PostVideo = ({ url, onPlay }: { url: string; onPlay: (uri: string) => void }) => {
   const { colors } = useTheme();
   const postImgStyles = useMemo(() => makePostImgStyles(colors), [colors]);
   const { uri, loading } = useMediaUrl(url);
@@ -85,13 +87,18 @@ const PostVideo = ({ url }: { url: string }) => {
   }
 
   return (
-    <Video
-      source={{ uri }}
-      style={postImgStyles.video}
-      useNativeControls
-      resizeMode={ResizeMode.CONTAIN}
-      isLooping={false}
-    />
+    <TouchableOpacity activeOpacity={0.85} onPress={() => onPlay(uri)}>
+      <Video
+        source={{ uri }}
+        style={postImgStyles.video}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay={false}
+        isMuted
+      />
+      <View style={postImgStyles.playOverlay} pointerEvents="none">
+        <Ionicons name="play-circle" size={56} color="rgba(255,255,255,0.92)" />
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -106,6 +113,11 @@ const makePostImgStyles = (_colors: ReturnType<typeof useTheme>['colors']) => St
     aspectRatio: 16 / 9,
     borderRadius: borderRadius.md,
     backgroundColor: '#000',
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   placeholder: {
     width: '100%',
@@ -344,6 +356,8 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
   const [expandedComments, setExpandedComments] = useState<Set<string>>(
     new Set()
   );
+  // Resolved URL of a post video the user tapped → opens the full-screen player.
+  const [videoUri, setVideoUri] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -659,10 +673,10 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
           </View>
         )}
 
-        {/* Videos — inline players with native controls */}
+        {/* Videos — poster + play button; tap opens the full-screen player */}
         {videoAttachments.map((att, i) => (
           <View key={att.url + i} style={{ marginTop: spacing.sm }}>
-            <PostVideo url={att.url} />
+            <PostVideo url={att.url} onPlay={setVideoUri} />
           </View>
         ))}
 
@@ -764,6 +778,7 @@ const ChannelDetailScreen = ({ navigation, route }: Props) => {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         style={{ backgroundColor: colors.bgDark }}
       />
+      <VideoViewer visible={!!videoUri} uri={videoUri} onClose={() => setVideoUri(null)} />
     </KeyboardAvoidingView>
   );
 };
