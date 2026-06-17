@@ -2,7 +2,7 @@
   "expo": {
     "name": "KB Chat",
     "slug": "kb-chat-rn",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -71,6 +71,7 @@
       "bundleIdentifier": "com.kbchat.app",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": ["applinks:kb-chat.com", "applinks:www.kb-chat.com"],
       "infoPlist": {
         "NSCameraUsageDescription": "KB Chat needs camera access to scan QR codes and make video calls",
         "NSMicrophoneUsageDescription": "KB Chat needs microphone access for voice and video calls",
@@ -128,6 +129,16 @@
               "scheme": "https",
               "host": "www.kb-chat.com",
               "pathPrefix": "/u/"
+            },
+            {
+              "scheme": "https",
+              "host": "kb-chat.com",
+              "pathPrefix": "/g/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.kb-chat.com",
+              "pathPrefix": "/g/"
             }
           ],
           "category": [

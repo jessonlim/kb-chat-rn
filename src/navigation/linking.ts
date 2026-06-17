@@ -29,6 +29,13 @@ export const linking: LinkingOptions<any> = {
           UserProfile: 'u/:userId',
         },
       },
+      // Group invite link → join + open the group (GroupJoin self-joins then
+      // replaces itself with the chat). Also handles kbchat://group/<chatId>.
+      ChatsTab: {
+        screens: {
+          GroupJoin: 'g/:chatId',
+        },
+      },
     },
   },
 };

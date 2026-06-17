@@ -7,6 +7,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import ChatListScreen from '../screens/chats/ChatListScreen';
 import ChatScreen from '../screens/chats/ChatScreen';
+import GroupJoinScreen from '../screens/chats/GroupJoinScreen';
 import ChatInfoScreen from '../screens/chats/ChatInfoScreen';
 import SharedMediaScreen from '../screens/chats/SharedMediaScreen';
 import ForwardMessageScreen from '../screens/chats/ForwardMessageScreen';
@@ -148,6 +149,11 @@ const ChatsStackScreen = () => {
         name="ChatScreen"
         component={ChatScreen as any}
         options={{ title: t('tab.chats') }}
+      />
+      <ChatsStack.Screen
+        name="GroupJoin"
+        component={GroupJoinScreen as any}
+        options={{ title: t('qr.joinGroupTitle'), headerShown: false }}
       />
       <ChatsStack.Screen
         name="ChatInfo"

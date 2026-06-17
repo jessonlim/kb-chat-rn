@@ -248,19 +248,35 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
   };
 
   // ── Export chat history ─────────────────────────────────────────
-  // Fetches the full transcript from the backend and hands it to the native
-  // share sheet (save to Files, email, etc.). We share the text directly rather
-  // than a file so it works on both platforms without expo-sharing (which would
-  // need a native rebuild).
+  // Fetches the full transcript, writes it to a .txt file, and opens the native
+  // share sheet so the user can save it to Files, email it, etc. Falls back to
+  // sharing the text directly if file-sharing isn't available on the device.
   const handleExport = async () => {
     if (exporting) return;
     setExporting(true);
     try {
+      // Lazy-require the native modules so they don't resolve at app launch
+      // (M4 convention) — and so this code can't crash an older build that
+      // lacks expo-sharing.
+      const FileSystem = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+      const Sharing = require('expo-sharing') as typeof import('expo-sharing');
       const { transcript, chatName } = await chatService.exportChat(chatId);
-      await Share.share({
-        title: `${chatName || 'Chat'} — KB Chat`,
-        message: transcript,
+      const safe = (chatName || 'chat').replace(/[^\w一-龥-]+/g, '_').slice(0, 50);
+      const date = new Date().toISOString().split('T')[0];
+      const fileUri = `${FileSystem.cacheDirectory}${safe}_${date}.txt`;
+      await FileSystem.writeAsStringAsync(fileUri, transcript, {
+        encoding: FileSystem.EncodingType.UTF8,
       });
+      const canShareFile = await Sharing.isAvailableAsync().catch(() => false);
+      if (canShareFile) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/plain',
+          dialogTitle: `${chatName || 'Chat'} — KB Chat`,
+          UTI: 'public.plain-text',
+        });
+      } else {
+        await Share.share({ title: `${chatName || 'Chat'} — KB Chat`, message: transcript });
+      }
     } catch (err: any) {
       Toast.show({
         type: 'error',
