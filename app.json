@@ -71,7 +71,6 @@
       "bundleIdentifier": "com.kbchat.app",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
-      "associatedDomains": ["applinks:kb-chat.com", "applinks:www.kb-chat.com"],
       "infoPlist": {
         "NSCameraUsageDescription": "KB Chat needs camera access to scan QR codes and make video calls",
         "NSMicrophoneUsageDescription": "KB Chat needs microphone access for voice and video calls",
