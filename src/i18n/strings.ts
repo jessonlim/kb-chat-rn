@@ -577,6 +577,10 @@ export const STRINGS = {
   // Group QR + extra ChatInfo strings
   'group.qr.title':           { en: 'Group QR Code',        zh: '群二维码' },
   'group.qr.scanToJoin':      { en: 'Scan this code to join the group', zh: '扫码加入群聊' },
+  'group.qr.reset':           { en: 'Reset link & QR',      zh: '重置链接和二维码' },
+  'group.qr.resetConfirm':    { en: 'Reset the invite link? The current QR code and link will stop working.', zh: '确定重置邀请链接？当前的二维码和链接将立即失效。' },
+  'group.qr.resetDone':       { en: 'Invite link reset',    zh: '邀请链接已重置' },
+  'group.qr.resetHint':       { en: 'Only admins can reset. The old link/QR becomes invalid.', zh: '仅管理员可重置。重置后旧的链接/二维码将失效。' },
   'chatInfo.groupName':       { en: 'Group Name',           zh: '群聊名称' },
   'chatInfo.groupQR':         { en: 'Group QR Code',        zh: '群二维码' },
   'chatInfo.groupNotice':     { en: 'Group Notice',         zh: '群公告' },

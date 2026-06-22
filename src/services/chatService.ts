@@ -82,6 +82,12 @@ const chatService = {
     return data;
   },
 
+  /** Admin: regenerate the group's invite token (old link/QR stops working). */
+  resetGroupInviteToken: async (chatId: string): Promise<{ inviteToken: string }> => {
+    const { data } = await api.post<{ inviteToken: string }>(`/api/chats/group/${chatId}/reset-invite-token`);
+    return data;
+  },
+
   /** Owner: promote a member to admin. */
   promoteAdmin: async (chatId: string, userId: string): Promise<ChatResponse> => {
     const { data } = await api.post<ChatResponse>(`/api/chats/group/${chatId}/admins`, { userId });

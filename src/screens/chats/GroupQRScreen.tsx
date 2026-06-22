@@ -1,14 +1,17 @@
 // Group QR Code — a join code for the current group chat. Anyone who
 // scans this with KB Chat will be navigated into the group (the in-app
-// scanner's URL pattern is extended to recognise /g/<chatId>).
+// scanner's URL pattern recognises /g/<inviteToken>).
 //
-// Format: https://kb-chat.com/g/<chatId> · kbchat://group/<chatId>
+// Format: https://kb-chat.com/g/<inviteToken> (legacy groups fall back to
+// <chatId> until the admin resets the link). Admins can reset the token,
+// which invalidates the previously-shared QR/link.
 
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
 import QRCode from 'react-native-qrcode-svg';
+import chatService from '../../services/chatService';
 import Avatar from '../../components/common/Avatar';
 import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -21,21 +24,48 @@ interface Props {
       groupName?: string;
       groupImage?: string;
       memberCount?: number;
+      inviteToken?: string;
+      canReset?: boolean;
     };
   };
 }
 
 const GroupQRScreen = ({ route }: Props) => {
-  const { chatId, groupName, groupImage, memberCount } = route.params;
+  const { chatId, groupName, groupImage, memberCount, inviteToken, canReset } = route.params;
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const qrValue = `https://kb-chat.com/g/${chatId}`;
+  // The shareable token (falls back to chatId for legacy groups without one).
+  const [token, setToken] = useState(inviteToken || chatId);
+  const [resetting, setResetting] = useState(false);
+  const qrValue = `https://kb-chat.com/g/${token}`;
 
   const handleCopyLink = async () => {
     await Clipboard.setStringAsync(qrValue);
     Toast.show({ type: 'success', text1: t('qr.linkCopied') });
+  };
+
+  const handleReset = () => {
+    Alert.alert(t('group.qr.reset'), t('group.qr.resetConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('group.qr.reset'),
+        style: 'destructive',
+        onPress: async () => {
+          setResetting(true);
+          try {
+            const { inviteToken: next } = await chatService.resetGroupInviteToken(chatId);
+            setToken(next);
+            Toast.show({ type: 'success', text1: t('group.qr.resetDone') });
+          } catch (e: any) {
+            Toast.show({ type: 'error', text1: e?.response?.data?.message || t('common.failed') });
+          } finally {
+            setResetting(false);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -67,6 +97,25 @@ const GroupQRScreen = ({ route }: Props) => {
       <TouchableOpacity style={styles.actionRow} activeOpacity={0.7} onPress={handleCopyLink}>
         <Text style={styles.actionText}>{t('qr.shareLink')}</Text>
       </TouchableOpacity>
+
+      {/* Admins can reset the link — the old QR/link stops working. */}
+      {canReset && (
+        <>
+          <TouchableOpacity
+            style={styles.actionRow}
+            activeOpacity={0.7}
+            onPress={handleReset}
+            disabled={resetting}
+          >
+            {resetting ? (
+              <ActivityIndicator size="small" color={colors.danger} />
+            ) : (
+              <Text style={[styles.actionText, { color: colors.danger }]}>{t('group.qr.reset')}</Text>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.resetHint}>{t('group.qr.resetHint')}</Text>
+        </>
+      )}
     </ScrollView>
   );
 };
@@ -100,6 +149,13 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       alignItems: 'center',
     },
     actionText: { fontSize: fontSize.md, color: colors.primary, fontWeight: '500' },
+    resetHint: {
+      fontSize: fontSize.xs,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
   });
 
 export default GroupQRScreen;

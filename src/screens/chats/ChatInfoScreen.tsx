@@ -507,6 +507,8 @@ const ChatInfoScreen = ({ route, navigation }: Props) => {
               groupName: chat.groupName,
               groupImage: chat.groupImage,
               memberCount: chat.participants.length,
+              inviteToken: chat.inviteToken,
+              canReset: isAdmin,
             })}
             bordered
             colors={colors}

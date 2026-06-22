@@ -19,6 +19,7 @@ export interface Chat {
   groupImage?: string;
   groupAdmin?: string; // the owner (creator)
   groupAdmins?: string[]; // promoted admins
+  inviteToken?: string; // rotating group invite token (for the /g/<token> link)
   pinnedMessage?: string | Message; // legacy single pin (most recent of pinnedMessages)
   pinnedMessages?: (string | Message)[]; // multiple pinned messages (Telegram-style)
   announcement?: string; // group announcement / notice

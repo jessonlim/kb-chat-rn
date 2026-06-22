@@ -30,7 +30,8 @@ export const linking: LinkingOptions<any> = {
         },
       },
       // Group invite link → join + open the group (GroupJoin self-joins then
-      // replaces itself with the chat). Also handles kbchat://group/<chatId>.
+      // replaces itself with the chat). The :chatId segment carries the group's
+      // inviteToken (or a legacy chatId). Also handles kbchat://g/<token>.
       ChatsTab: {
         screens: {
           GroupJoin: 'g/:chatId',
