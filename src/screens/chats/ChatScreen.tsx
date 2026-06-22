@@ -142,7 +142,12 @@ const ChatScreen = ({ route, navigation }: Props) => {
     }
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     const q = searchQuery.trim();
-    if (q.length < 2) {
+    // CJK (Chinese/Japanese/Korean) words are often a single character, so a
+    // 2-char minimum would silently never search them. Require 1 char when the
+    // query contains a CJK character, 2 otherwise (avoids noisy single-letter
+    // Latin searches).
+    const minLen = /[㐀-鿿぀-ヿ가-힯]/.test(q) ? 1 : 2;
+    if (q.length < minLen) {
       setSearchResults([]);
       return;
     }

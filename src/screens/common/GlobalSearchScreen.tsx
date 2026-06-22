@@ -8,7 +8,7 @@
 // Sections render the top 5 hits each. Tapping a result navigates to the
 // relevant detail screen.
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ import { useT } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { displayNameOf } from '../../stores/remarksStore';
-import type { User, Chat, Channel, Moment } from '../../types';
+import type { User, Chat, Channel, Moment, Message } from '../../types';
 
 interface Props {
   navigation: any;
@@ -49,6 +49,10 @@ const GlobalSearchScreen = ({ navigation }: Props) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [moments, setMoments] = useState<Moment[]>([]);
+  // Messages can't be preloaded (too many) — searched on the backend, debounced.
+  const [messageResults, setMessageResults] = useState<Message[]>([]);
+  const [searchingMsgs, setSearchingMsgs] = useState(false);
+  const msgDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load all data sources in parallel on mount.
   useEffect(() => {
@@ -71,6 +75,33 @@ const GlobalSearchScreen = ({ navigation }: Props) => {
       alive = false;
     };
   }, []);
+
+  // Message content search hits the backend (debounced). CJK-aware min length so
+  // a single Chinese character still searches.
+  useEffect(() => {
+    if (msgDebounceRef.current) clearTimeout(msgDebounceRef.current);
+    const q = query.trim();
+    const minLen = /[㐀-鿿぀-ヿ가-힯]/.test(q) ? 1 : 2;
+    if (q.length < minLen) {
+      setMessageResults([]);
+      setSearchingMsgs(false);
+      return;
+    }
+    setSearchingMsgs(true);
+    msgDebounceRef.current = setTimeout(async () => {
+      try {
+        const { messages } = await chatService.searchMessagesGlobal(q);
+        setMessageResults(messages);
+      } catch {
+        setMessageResults([]);
+      } finally {
+        setSearchingMsgs(false);
+      }
+    }, 350);
+    return () => {
+      if (msgDebounceRef.current) clearTimeout(msgDebounceRef.current);
+    };
+  }, [query]);
 
   const trimmed = query.trim().toLowerCase();
 
@@ -123,7 +154,8 @@ const GlobalSearchScreen = ({ navigation }: Props) => {
     contactResults.length +
       chatResults.length +
       channelResults.length +
-      momentResults.length >
+      momentResults.length +
+      messageResults.length >
     0;
 
   // Navigation handlers — jump cross-tab using getParent() to reach root.
@@ -193,7 +225,7 @@ const GlobalSearchScreen = ({ navigation }: Props) => {
           <Ionicons name="search-outline" size={48} color={colors.textMuted} />
           <Text style={styles.hint}>{t('globalSearch.hint')}</Text>
         </View>
-      ) : !hasAnyResults ? (
+      ) : !hasAnyResults && !searchingMsgs ? (
         <View style={styles.center}>
           <Text style={styles.empty}>{t('globalSearch.empty')}</Text>
         </View>
@@ -306,6 +338,50 @@ const GlobalSearchScreen = ({ navigation }: Props) => {
                   </View>
                 </TouchableOpacity>
               ))}
+            </Section>
+          )}
+
+          {/* Messages (full content search, from the backend) */}
+          {messageResults.length > 0 && (
+            <Section title={t('globalSearch.section.messages')}>
+              {messageResults.map((m) => {
+                const chat = m.chat as any;
+                const isGroup = chat?.type === 'group';
+                const other =
+                  !isGroup && Array.isArray(chat?.participants)
+                    ? chat.participants.find((p: any) => (p._id || p.id) !== user?.id)
+                    : null;
+                const senderName =
+                  typeof m.sender === 'object' ? displayNameOf(m.sender as any) : '';
+                const chatName = isGroup
+                  ? chat?.groupName || ''
+                  : other
+                    ? displayNameOf(other)
+                    : senderName;
+                return (
+                  <TouchableOpacity
+                    key={m._id}
+                    style={styles.row}
+                    activeOpacity={0.7}
+                    onPress={() => chat?._id && openChat({ _id: chat._id } as Chat)}
+                  >
+                    <Avatar
+                      name={chatName || '?'}
+                      src={isGroup ? chat?.groupImage : other?.avatar}
+                      size={40}
+                    />
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>
+                        {chatName}
+                      </Text>
+                      <Text style={styles.rowSubtitle} numberOfLines={2}>
+                        {isGroup && senderName ? `${senderName}: ` : ''}
+                        {m.content}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </Section>
           )}
         </ScrollView>

@@ -9,9 +9,11 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import userService from '../../services/userService';
 import contactService from '../../services/contactService';
 import chatService from '../../services/chatService';
+import * as authService from '../../services/authService';
 import { useAuth } from '../../stores/authStore';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../../components/common/Avatar';
@@ -39,19 +41,22 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
   const [requestId, setRequestId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   // Subscribes to the remarks store so this screen re-renders when the
   // user returns from the SetRemark screen with a saved change.
   const remark = useRemark(userId);
 
   const loadProfile = useCallback(async () => {
     try {
-      const [userRes, statusRes] = await Promise.all([
+      const [userRes, statusRes, blockedRes] = await Promise.all([
         userService.getUserById(userId),
         contactService.getStatus(userId),
+        authService.listBlockedUsers().catch(() => ({ users: [] })),
       ]);
       setProfile(userRes.user);
       setStatus(statusRes.status);
       setRequestId(statusRes.requestId);
+      setIsBlocked((blockedRes.users || []).some((u: any) => (u.id || u._id) === userId));
     } catch (err) {
       console.warn('Failed to load profile:', err);
     } finally {
@@ -161,6 +166,48 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
         },
       ]
     );
+  };
+
+  const handleBlock = () => {
+    if (!profile) return;
+    Alert.alert(
+      t('privacy.block'),
+      t('privacy.confirmBlock', { name: profile.displayName || profile.username }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('privacy.block'),
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              await authService.blockUser(profile.id);
+              setIsBlocked(true);
+              setStatus('none'); // blocking removes the friendship on the backend
+              Toast.show({ type: 'success', text1: t('privacy.blocked') });
+            } catch {
+              Toast.show({ type: 'error', text1: t('privacy.blockFailed') });
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUnblock = async () => {
+    if (!profile) return;
+    setActionLoading(true);
+    try {
+      await authService.unblockUser(profile.id);
+      setIsBlocked(false);
+      Toast.show({ type: 'success', text1: t('privacy.unblocked') });
+    } catch {
+      Toast.show({ type: 'error', text1: t('privacy.unblockFailed') });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const formatLastSeen = (dateStr: string): string => {
@@ -354,6 +401,23 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Block / Unblock — available for any other user */}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.dangerButton]}
+            activeOpacity={0.7}
+            onPress={isBlocked ? handleUnblock : handleBlock}
+            disabled={actionLoading}
+          >
+            <Ionicons
+              name={isBlocked ? 'checkmark-circle-outline' : 'ban'}
+              size={20}
+              color={colors.danger}
+            />
+            <Text style={styles.dangerButtonText}>
+              {isBlocked ? t('privacy.unblock') : t('privacy.block')}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>

@@ -181,6 +181,14 @@ const chatService = {
     return data;
   },
 
+  /** GET /api/chats/search-messages?q=... — search message content across ALL my chats */
+  searchMessagesGlobal: async (
+    query: string,
+  ): Promise<{ messages: import('../types').Message[] }> => {
+    const { data } = await api.get('/api/chats/search-messages', { params: { q: query } });
+    return data;
+  },
+
   /** GET /api/chats/:chatId/media — all media messages (images + videos) */
   listMediaInChat: async (
     chatId: string,
