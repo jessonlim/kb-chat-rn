@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import EmojiPicker from 'rn-emoji-keyboard';
 import { useTheme } from '../../context/ThemeContext';
+import { useT } from '../../i18n/I18nContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import type { Message, Attachment } from '../../types';
 
@@ -39,6 +40,7 @@ const MessageInput = ({
   onMicPress,
 }: Props) => {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -114,10 +116,10 @@ const MessageInput = ({
 
   const getReplyPreview = (): string => {
     if (!replyTo) return '';
-    if (replyTo.type === 'image') return 'Photo';
-    if (replyTo.type === 'video') return 'Video';
-    if (replyTo.type === 'audio') return 'Voice message';
-    if (replyTo.type === 'file') return 'File';
+    if (replyTo.type === 'image') return t('msg.preview.photo');
+    if (replyTo.type === 'video') return t('msg.preview.video');
+    if (replyTo.type === 'audio') return t('msg.preview.audio');
+    if (replyTo.type === 'file') return t('msg.preview.file');
     return replyTo.content || '';
   };
 
@@ -163,7 +165,7 @@ const MessageInput = ({
         <View style={styles.replyBar}>
           <View style={[styles.replyIndicator, { backgroundColor: colors.info }]} />
           <View style={styles.replyContent}>
-            <Text style={[styles.replyName, { color: colors.info }]}>Editing message</Text>
+            <Text style={[styles.replyName, { color: colors.info }]}>{t('input.editingMessage')}</Text>
             <Text style={styles.replyPreview} numberOfLines={1}>
               {editMessage!.content}
             </Text>
@@ -205,7 +207,7 @@ const MessageInput = ({
         <TextInput
           ref={inputRef}
           style={styles.input}
-          placeholder="Message"
+          placeholder={t('input.typeMessage')}
           placeholderTextColor={colors.textMuted}
           value={text}
           onChangeText={handleChangeText}

@@ -15,11 +15,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '../../context/CallContext';
 import Avatar from '../common/Avatar';
 import { useTheme } from '../../context/ThemeContext';
+import { useT } from '../../i18n/I18nContext';
 import { fontSize, spacing } from '../../utils/theme';
 
 const IncomingCallOverlay = () => {
   const { callState, callType, remoteUser, acceptCall, rejectCall } = useCall();
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Pulse animation for the avatar ring
@@ -67,7 +69,7 @@ const IncomingCallOverlay = () => {
             color={colors.primary}
           />
           <Text style={styles.typeText}>
-            Incoming {isVideo ? 'Video' : 'Voice'} Call
+            {t(isVideo ? 'call.incomingVideo' : 'call.incomingVoice')}
           </Text>
         </View>
 
@@ -95,7 +97,7 @@ const IncomingCallOverlay = () => {
               color="#fff"
               style={{ transform: [{ rotate: '135deg' }] }}
             />
-            <Text style={styles.btnLabel}>Decline</Text>
+            <Text style={styles.btnLabel}>{t('call.decline')}</Text>
           </TouchableOpacity>
 
           {/* Accept */}
@@ -109,7 +111,7 @@ const IncomingCallOverlay = () => {
               size={28}
               color="#fff"
             />
-            <Text style={styles.btnLabel}>Accept</Text>
+            <Text style={styles.btnLabel}>{t('call.accept')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

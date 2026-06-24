@@ -19,6 +19,7 @@ import socketService from '../services/socketService';
 import callService from '../services/callService';
 import userService from '../services/userService';
 import callkeepService from '../services/callkeepService';
+import { tStatic } from '../i18n/I18nContext';
 import {
   showIncomingCallNotification,
   hideIncomingCallNotification,
@@ -366,8 +367,12 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     const durationStr = durationSecs > 0
       ? `${mins}:${secs.toString().padStart(2, '0')}`
       : '';
-    const label = type === 'video' ? 'Video call' : 'Voice call';
-    const content = durationStr ? `${label} ${durationStr}` : `${label} — missed`;
+    // Localize at creation time (tStatic reads the current language). The record
+    // is stored as plain content, so this bakes in the caller's language — fine
+    // for a Chinese-default app and avoids a backend/schema change.
+    const content = durationStr
+      ? tStatic(type === 'video' ? 'call.recordVideo' : 'call.recordVoice', { duration: durationStr })
+      : tStatic(type === 'video' ? 'call.recordVideoMissed' : 'call.recordVoiceMissed');
 
     socketService.emit('send_message', {
       chatId: cid,

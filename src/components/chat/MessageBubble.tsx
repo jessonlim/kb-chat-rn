@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../stores/authStore';
+import { useT } from '../../i18n/I18nContext';
 import { spacing, fontSize, borderRadius } from '../../utils/theme';
 import { Video, ResizeMode } from 'expo-av';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -439,6 +440,7 @@ const MessageBubble = ({
 }: Props) => {
   const { colors, fontScaleMultiplier } = useTheme();
   const { user } = useAuth();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const sender = typeof message.sender === 'object' ? message.sender : null;
   // Cluster reactions by emoji → { emoji, count, mine } for the chips below the bubble.
@@ -507,7 +509,7 @@ const MessageBubble = ({
       >
         {checkbox}
         <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther, styles.deleted]}>
-          <Text style={styles.deletedText}>This message was deleted</Text>
+          <Text style={styles.deletedText}>{t('msg.deletedPlaceholder')}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -557,7 +559,14 @@ const MessageBubble = ({
                 : 'User'}
             </Text>
             <Text style={styles.replyContent} numberOfLines={1}>
-              {replyTo.content || (replyTo.type === 'image' ? 'Photo' : 'Attachment')}
+              {replyTo.content ||
+                (replyTo.type === 'image'
+                  ? t('msg.preview.photo')
+                  : replyTo.type === 'video'
+                    ? t('msg.preview.video')
+                    : replyTo.type === 'audio'
+                      ? t('msg.preview.audio')
+                      : t('msg.preview.file'))}
             </Text>
           </View>
         )}
@@ -650,7 +659,7 @@ const MessageBubble = ({
               style={{ marginRight: 3 }}
             />
           )}
-          {message.edited && <Text style={styles.edited}>edited</Text>}
+          {message.edited && <Text style={styles.edited}>{t('msg.edited')}</Text>}
           <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
           {isOwn && (
             <Text style={[styles.status, message.status === 'read' && styles.statusRead]}>

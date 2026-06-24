@@ -73,14 +73,14 @@ export const deleteAccount = async (password: string): Promise<void> => {
 };
 
 export const blockUser = async (userId: string): Promise<void> => {
-  await api.post(`/api/auth/block/${userId}`);
+  await api.post('/api/users/block', { userId });
 };
 
 export const unblockUser = async (userId: string): Promise<void> => {
-  await api.post(`/api/auth/unblock/${userId}`);
+  await api.post('/api/users/unblock', { userId });
 };
 
 export const listBlockedUsers = async (): Promise<{ users: User[] }> => {
-  const res = await api.get('/api/auth/blocked-users');
+  const res = await api.get('/api/users/blocked');
   return res.data;
 };
