@@ -367,9 +367,9 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     const durationStr = durationSecs > 0
       ? `${mins}:${secs.toString().padStart(2, '0')}`
       : '';
-    // Localize at creation time (tStatic reads the current language). The record
-    // is stored as plain content, so this bakes in the caller's language — fine
-    // for a Chinese-default app and avoids a backend/schema change.
+    // `content` is a localized fallback (caller's language) used for chat-list
+    // previews + push notifications. The bubble itself re-localizes from
+    // `callData` at render time, so switching language updates the label.
     const content = durationStr
       ? tStatic(type === 'video' ? 'call.recordVideo' : 'call.recordVoice', { duration: durationStr })
       : tStatic(type === 'video' ? 'call.recordVideoMissed' : 'call.recordVoiceMissed');
@@ -378,6 +378,11 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
       chatId: cid,
       content,
       type: 'system',
+      callData: {
+        callType: type,
+        missed: durationSecs <= 0,
+        duration: durationSecs,
+      },
     });
   }, []);
 

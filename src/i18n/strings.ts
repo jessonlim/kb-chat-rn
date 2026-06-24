@@ -743,7 +743,7 @@ export const STRINGS = {
   'privacy.blocking':         { en: 'Blocking…',             zh: '处理中…' },
   'privacy.blocked':          { en: 'User blocked',          zh: '已加入黑名单' },
   'privacy.blockFailed':      { en: 'Could not block',       zh: '加入黑名单失败' },
-  'privacy.confirmBlock':     { en: 'Block {name}? They will no longer be able to message you or send friend requests, and any existing friendship will be removed.', zh: '将 {name} 加入黑名单？对方将无法给你发消息或发送好友请求，已有好友关系也将被移除。' },
+  'privacy.confirmBlock':     { en: 'Block {name}? They will no longer be able to message or call you. You stay friends, and you can unblock anytime.', zh: '将 {name} 加入黑名单？对方将无法给你发消息或拨打电话。你们仍是好友，可随时解除拉黑。' },
 
   // Calls section (settings sub-page)
   'callsSettings.speaker.title': { en: 'Default to speaker',   zh: '默认使用扬声器' },

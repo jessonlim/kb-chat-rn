@@ -477,11 +477,27 @@ const MessageBubble = ({
     if (onPress) onPress(message);
   };
 
-  // System messages (user joined, etc.) — not selectable, no checkbox
+  // System messages (user joined, call records, etc.) — not selectable, no
+  // checkbox. Call records carry structured callData so we localize the label
+  // at render time (responds to language switching); old records fall back to
+  // the stored content string.
   if (message.type === 'system') {
+    let systemLabel = message.content;
+    const cd = message.callData;
+    if (cd) {
+      if (cd.missed) {
+        systemLabel = t(cd.callType === 'video' ? 'call.recordVideoMissed' : 'call.recordVoiceMissed');
+      } else {
+        const m = Math.floor(cd.duration / 60);
+        const s = cd.duration % 60;
+        systemLabel = t(cd.callType === 'video' ? 'call.recordVideo' : 'call.recordVoice', {
+          duration: `${m}:${s.toString().padStart(2, '0')}`,
+        });
+      }
+    }
     return (
       <View style={styles.systemRow}>
-        <Text style={styles.systemText}>{message.content}</Text>
+        <Text style={styles.systemText}>{systemLabel}</Text>
       </View>
     );
   }

@@ -45,6 +45,9 @@ export interface Message {
   deleted: boolean;
   reactions?: Reaction[];
   starredBy?: string[];
+  // Structured call-record data (type 'system'); lets the bubble render the
+  // label in the current language. Absent on old call records → use content.
+  callData?: { callType: 'voice' | 'video'; missed: boolean; duration: number };
   createdAt: string;
   updatedAt: string;
 }

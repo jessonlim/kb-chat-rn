@@ -183,7 +183,7 @@ const UserProfileScreen = ({ navigation, route }: Props) => {
             try {
               await authService.blockUser(profile.id);
               setIsBlocked(true);
-              setStatus('none'); // blocking removes the friendship on the backend
+              // Friendship is preserved on block (reversible) — leave status as-is.
               Toast.show({ type: 'success', text1: t('privacy.blocked') });
             } catch {
               Toast.show({ type: 'error', text1: t('privacy.blockFailed') });
